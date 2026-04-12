@@ -1,0 +1,8 @@
+{
+  "initial_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+  "moves_uci": ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6"],
+  "result": "*",
+  "metadata": {
+    "name": "sample_replay"
+  }
+}

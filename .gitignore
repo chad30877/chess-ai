@@ -1,0 +1,51 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Test and tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Editor / IDE settings
+.vscode/
+.idea/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Local scratch files
+temp.py
+
+# Generated datasets and batch outputs
+dataset.csv
+sample_dataset.csv
+sample_dataset.jsonl
+batch_match_results.csv
+data/**/*.csv
+data/**/*.jsonl
+
+# Generated replay exports
+# Keep sample_replay.json if you want a tracked example replay.
+data/replays/game_*.json
+
+# Trained model artifacts and metrics
+training/*.pkl
+training/*metrics*.json
