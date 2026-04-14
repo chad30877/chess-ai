@@ -252,11 +252,6 @@ def create_session(replay_data: dict) -> tuple[ReplaySession, int]:
     session = ReplaySession(replay_data["initial_fen"], replay_data["moves_uci"])
     return session, session.total_ply()
 
-
-def create_viewer_state() -> tuple[int, bool]:
-    return 0, False
-
-
 def handle_frame_events(
     session: ReplaySession,
     move_list_view: MoveListView,
@@ -321,50 +316,26 @@ def render_frame(
     pygame.display.flip()
 
 
-def process_frame(
-    session: ReplaySession,
-    board_view: BoardView,
-    replay_info_view: ReplayInfoView,
-    move_list_view: MoveListView,
-    replay_info: dict[str, str],
-    move_items: list[dict],
-    displayed_ply: int,
-    total_ply: int,
-    is_flipped: bool,
-) -> tuple[bool, int, bool]:
-    running, displayed_ply, is_flipped = handle_frame_events(
-        session=session,
-        move_list_view=move_list_view,
-        move_items=move_items,
-        displayed_ply=displayed_ply,
-        total_ply=total_ply,
-        is_flipped=is_flipped,
-    )
-    render_frame(
-        session=session,
-        board_view=board_view,
-        replay_info_view=replay_info_view,
-        move_list_view=move_list_view,
-        replay_info=replay_info,
-        move_items=move_items,
-        displayed_ply=displayed_ply,
-        total_ply=total_ply,
-        is_flipped=is_flipped,
-    )
-    return running, displayed_ply, is_flipped
-
-
 def main() -> None:
     args = parse_args()
     replay_data, move_items, replay_info = prepare_replay_content(args.replay)
     screen, clock = create_pygame_context()
     session, total_ply = create_session(replay_data)
     board_view, replay_info_view, move_list_view = create_views(screen)
-    displayed_ply, is_flipped = create_viewer_state()
+    displayed_ply = 0
+    is_flipped = False
     running = True
 
     while running:
-        running, displayed_ply, is_flipped = process_frame(
+        running, displayed_ply, is_flipped = handle_frame_events(
+            session=session,
+            move_list_view=move_list_view,
+            move_items=move_items,
+            displayed_ply=displayed_ply,
+            total_ply=total_ply,
+            is_flipped=is_flipped,
+        )
+        render_frame(
             session=session,
             board_view=board_view,
             replay_info_view=replay_info_view,
