@@ -41,6 +41,9 @@ sample_dataset.jsonl
 batch_match_results.csv
 data/**/*.csv
 data/**/*.jsonl
+data/batches/
+data/.sequences.sqlite3*
+data/replays/[0-9]*.json
 
 # Generated replay exports
 # Keep sample_replay.json if you want a tracked example replay.

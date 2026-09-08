@@ -2,22 +2,40 @@
 
 import chess
 
+from engine.game import create_board, get_outcome, get_result, make_move
+
 
 class ReplaySession:
     """Store replay positions and provide navigation over plies."""
 
-    def __init__(self, initial_fen: str, moves_uci: list[str]) -> None:
-        board = chess.Board(initial_fen)
+    def __init__(
+        self, initial_fen: str, moves_uci: list[str], *, claim_draw: bool = False
+    ) -> None:
+        board = create_board(initial_fen)
+        self.claim_draw = claim_draw
 
         self.positions: list[str] = [initial_fen]
         self.current_ply = 0
 
         for move_uci in moves_uci:
             move = chess.Move.from_uci(move_uci)
-            if move not in board.legal_moves:
-                raise ValueError(f"Illegal move for replay session: {move_uci}")
-            board.push(move)
+            make_move(board, move)
             self.positions.append(board.fen())
+
+        # Keep one complete history; FEN snapshots are only a display cache.
+        self._final_board = board
+
+    def current_board(self) -> chess.Board:
+        board = self._final_board.copy(stack=True)
+        while len(board.move_stack) > self.current_ply:
+            board.pop()
+        return board
+
+    def current_outcome(self) -> chess.Outcome | None:
+        return get_outcome(self.current_board(), claim_draw=self.claim_draw)
+
+    def current_result(self) -> str:
+        return get_result(self.current_board(), claim_draw=self.claim_draw)
 
     def first(self) -> None:
         self.current_ply = 0

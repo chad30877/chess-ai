@@ -25,14 +25,15 @@ SCROLLBAR_THUMB = (140, 140, 140)
 class MoveListView:
     """Render move history and map mouse clicks back to plies."""
 
-    def __init__(self, screen: pygame.Surface, origin_x: int, origin_y: int, height: int) -> None:
+    def __init__(self, screen: pygame.Surface, origin_x: int, origin_y: int, height: int, scale: float = 1.0) -> None:
         self.screen = screen
+        self.scale = scale
         self.origin_x = origin_x
         self.origin_y = origin_y
         self.height = height
-        self.panel_rect = pygame.Rect(self.origin_x, self.origin_y, MOVE_LIST_WIDTH, self.height)
-        self.header_font = pygame.font.SysFont(None, 28)
-        self.move_font = pygame.font.SysFont(None, 24)
+        self.panel_rect = pygame.Rect(self.origin_x, self.origin_y, round(MOVE_LIST_WIDTH * self.scale), self.height)
+        self.header_font = pygame.font.SysFont(None, round(28 * self.scale))
+        self.move_font = pygame.font.SysFont(None, round(24 * self.scale))
         self.scroll_offset = 0
         self.click_targets: list[tuple[pygame.Rect, int]] = []
         self.is_dragging_thumb = False
@@ -40,8 +41,8 @@ class MoveListView:
 
     @property
     def visible_count(self) -> int:
-        available_height = self.height - PANEL_PADDING
-        return max(1, available_height // ROW_HEIGHT - 2) # 不知為何但最後'-2'才是正確的
+        available_height = self.height - round(PANEL_PADDING * self.scale)
+        return max(1, available_height // round(ROW_HEIGHT * self.scale) - 2) # 不知為何但最後'-2'才是正確的
 
     def _group_rows(self, move_items: list[dict]) -> list[tuple[int, dict | None, dict | None]]:
         rows: list[tuple[int, dict | None, dict | None]] = []
@@ -66,15 +67,15 @@ class MoveListView:
         self.scroll_offset = max(0, min(self.scroll_offset, self._max_scroll(total_rows)))
 
     def _get_start_y(self) -> int:
-        return self.origin_y + PANEL_PADDING + HEADER_HEIGHT
+        return self.origin_y + round(PANEL_PADDING * self.scale) + round(HEADER_HEIGHT * self.scale)
 
     def _get_row_y(self, visible_row_index: int) -> int:
-        return self._get_start_y() + visible_row_index * ROW_HEIGHT
+        return self._get_start_y() + visible_row_index * round(ROW_HEIGHT * self.scale)
 
     def _get_item_rect(self, side: str, y: int) -> pygame.Rect:
         if side == "w":
-            return pygame.Rect(self.origin_x + 48, y, 78, ROW_HEIGHT - 2)
-        return pygame.Rect(self.origin_x + 138, y, 78, ROW_HEIGHT - 2)
+            return pygame.Rect(self.origin_x + round(48 * self.scale), y, round(78 * self.scale), round(ROW_HEIGHT * self.scale) - 2)
+        return pygame.Rect(self.origin_x + round(138 * self.scale), y, round(78 * self.scale), round(ROW_HEIGHT * self.scale) - 2)
 
     def _get_visible_rows(
         self,
@@ -98,9 +99,9 @@ class MoveListView:
         return None
 
     def _get_scrollbar_track_rect(self) -> pygame.Rect:
-        track_height = self.height - 2 * PANEL_PADDING
-        track_x = self.origin_x + MOVE_LIST_WIDTH - SCROLLBAR_MARGIN - SCROLLBAR_WIDTH
-        return pygame.Rect(track_x, self.origin_y + PANEL_PADDING, SCROLLBAR_WIDTH, track_height)
+        track_height = self.height - 2 * round(PANEL_PADDING * self.scale)
+        track_x = self.origin_x + round(MOVE_LIST_WIDTH * self.scale) - round(SCROLLBAR_MARGIN * self.scale) - round(SCROLLBAR_WIDTH * self.scale)
+        return pygame.Rect(track_x, self.origin_y + round(PANEL_PADDING * self.scale), round(SCROLLBAR_WIDTH * self.scale), track_height)
 
     def _get_scrollbar_thumb_rect(self, total_rows: int) -> pygame.Rect:
         track_rect = self._get_scrollbar_track_rect()
@@ -110,7 +111,7 @@ class MoveListView:
 
         max_scroll = self._max_scroll(total_rows)
         visible_ratio = min(1.0, self.visible_count / total_rows)
-        thumb_height = max(MIN_THUMB_HEIGHT, int(track_rect.height * visible_ratio))
+        thumb_height = max(round(MIN_THUMB_HEIGHT * self.scale), int(track_rect.height * visible_ratio))
         thumb_height = min(track_rect.height, thumb_height)
 
         if max_scroll == 0:
@@ -119,7 +120,7 @@ class MoveListView:
             travel = track_rect.height - thumb_height
             thumb_y = track_rect.y + int(travel * (self.scroll_offset / max_scroll))
 
-        return pygame.Rect(track_rect.x, thumb_y, SCROLLBAR_WIDTH, thumb_height)
+        return pygame.Rect(track_rect.x, thumb_y, round(SCROLLBAR_WIDTH * self.scale), thumb_height)
 
     def _set_scroll_from_thumb_top(self, thumb_top: int, total_rows: int) -> None:
         track_rect = self._get_scrollbar_track_rect()
@@ -195,18 +196,18 @@ class MoveListView:
         )
 
         title_surface = self.header_font.render("Moves", True, HEADER_COLOR)
-        self.screen.blit(title_surface, (self.origin_x + PANEL_PADDING, self.origin_y + PANEL_PADDING))
+        self.screen.blit(title_surface, (self.origin_x + round(PANEL_PADDING * self.scale), self.origin_y + round(PANEL_PADDING * self.scale)))
 
         self.click_targets = []
         visible_rows = self._get_visible_rows(rows)
 
         for row_index, (move_no, white_item, black_item) in enumerate(visible_rows):
             y = self._get_row_y(row_index)
-            if y + ROW_HEIGHT > self.origin_y + self.height - PANEL_PADDING:
+            if y + round(ROW_HEIGHT * self.scale) > self.origin_y + self.height - round(PANEL_PADDING * self.scale):
                 break
 
             move_no_surface = self.move_font.render(f"{move_no}.", True, MOVE_NUMBER_COLOR)
-            self.screen.blit(move_no_surface, (self.origin_x + PANEL_PADDING, y + 4))
+            self.screen.blit(move_no_surface, (self.origin_x + round(PANEL_PADDING * self.scale), y + 4))
 
             if white_item is not None:
                 white_rect = self._get_item_rect("w", y)

@@ -2,16 +2,22 @@
 
 import argparse
 import csv
+from contextlib import ExitStack
 import json
 import os
 import random
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from time import perf_counter
 from typing import TextIO
 
-from engine.game import create_board, is_game_over, make_move
+import chess
+
+from engine.game import create_board
+from engine.batch_storage import BatchWriter
 from engine.players import GreedyPlayer, RandomPlayer
+from engine.self_play import PlayedGame, play_game
+from engine.strategy_config import strategy_config
 
 DATASET_FIELDNAMES = [
     "game_id",
@@ -46,11 +52,10 @@ def _player_labels_for_game(game_id: int) -> tuple[str, str]:
     return GREEDY_LABEL, RANDOM_LABEL
 
 
-def play_single_game(game_id: int, seed: int | None = None) -> list[dict[str, str | int]]:
-    if game_id <= 0:
-        raise ValueError("game_id must be greater than 0")
-
-    board = create_board()
+def generate_game(
+    game_id: int, seed: int | None = None, *, initial_fen: str = chess.STARTING_FEN,
+    claim_draw: bool = False, max_plies: int | None = None,
+) -> PlayedGame:
     rng = random.Random(game_id if seed is None else seed)
 
     if game_id % 2 == 1:
@@ -62,31 +67,20 @@ def play_single_game(game_id: int, seed: int | None = None) -> list[dict[str, st
 
     white_player_label, black_player_label = _player_labels_for_game(game_id)
 
-    game_rows: list[Row] = []
-    ply = 0
+    return play_game(
+        game_id, white_player, black_player, white_player_label, black_player_label,
+        initial_fen=initial_fen, claim_draw=claim_draw, max_plies=max_plies,
+    )
 
-    while not is_game_over(board):
-        current_player = white_player if board.turn else black_player
-        move = current_player.choose_move(board)
-        ply += 1
 
-        game_rows.append(
-            {
-                "game_id": game_id,
-                "ply": ply,
-                "fen": board.fen(),
-                "side_to_move": "white" if board.turn else "black",
-                "selected_move": move.uci(),
-                "result": "",
-                "white_player": white_player_label,
-                "black_player": black_player_label,
-            }
-        )
+def play_single_game(game_id: int, seed: int | None = None) -> list[Row]:
+    """Keep the original single-game, move-row interface."""
+    return generate_game(game_id, seed).positions
 
-        make_move(board, move)
 
-    result = board.result()
-    return [{**row, "result": result} for row in game_rows]
+def game_seed(base_seed: int, game_id: int) -> int:
+    """Stable across processes, scheduling, and worker counts."""
+    return base_seed + game_id
 
 
 def worker_run_games(
@@ -99,13 +93,9 @@ def worker_run_games(
     if num_games <= 0:
         raise ValueError("num_games must be greater than 0")
 
-    process_seed = base_seed + os.getpid() + start_id
-    worker_rng = random.Random(process_seed)
-
     rows: list[Row] = []
     for game_id in range(start_id, start_id + num_games):
-        game_seed = worker_rng.randrange(0, 2**63)
-        rows.extend(play_single_game(game_id, seed=game_seed))
+        rows.extend(play_single_game(game_id, seed=game_seed(base_seed, game_id)))
     return rows
 
 
@@ -183,7 +173,12 @@ def update_stats_for_game(stats: dict[str, int], game_id: int, result: str) -> N
         stats[f"{black_name}_wins"] += 1
         return
 
-    stats["draws"] += 1
+    if result == "1/2-1/2":
+        stats["draws"] += 1
+    elif result == "*":
+        stats["truncated"] = stats.get("truncated", 0) + 1
+    else:
+        raise ValueError(f"Unknown result: {result}")
 
 
 def update_stats_for_chunk(
@@ -236,99 +231,107 @@ def flush_buffer(
     return rows_to_write
 
 
+def _generate_job(job: tuple[int, int, str, bool, int | None]) -> tuple[PlayedGame, int]:
+    game_id, seed, initial_fen, claim_draw, max_plies = job
+    return generate_game(game_id, seed, initial_fen=initial_fen,
+                         claim_draw=claim_draw, max_plies=max_plies), seed
+
+
+def generation_settings(
+    *, games: int, seed: int, workers: int, initial_fen: str,
+    claim_draw: bool, max_plies: int | None,
+) -> dict:
+    settings = {
+        "num_games": games, "initial_fen": initial_fen,
+        "rules": {"claim_draw": claim_draw}, "workers": workers,
+        "color_assignment": "alternate",
+        "strategies": {"a": strategy_config("Random"), "b": strategy_config("Greedy")},
+    }
+    if max_plies is not None:
+        settings["max_plies"] = max_plies
+    return settings
+
+
+def generate_batch(
+    *, games: int = 20, batch_root: Path = Path("data/batches"),
+    name: str | None = None, tags: list[str] | None = None,
+    output_format: str = "csv", output_path: Path | None = None,
+    seed: int = BASE_WORKER_SEED, workers: int | None = None,
+    initial_fen: str = chess.STARTING_FEN, claim_draw: bool = False,
+    max_plies: int | None = None,
+) -> Path:
+    """Always save an independent batch; optionally export the legacy row schema."""
+    if games <= 0:
+        raise ValueError("games must be greater than 0")
+    if workers is not None and workers <= 0:
+        raise ValueError("workers must be greater than 0")
+    if max_plies is not None and max_plies < 0:
+        raise ValueError("max_plies must be non-negative")
+    if output_format not in ("csv", "jsonl"):
+        raise ValueError("output_format must be csv or jsonl")
+    board = create_board(initial_fen)
+    if not board.is_valid():
+        raise ValueError("initial_fen must be a valid standard chess position")
+    initial_fen = board.fen()
+    workers = min(games, workers) if workers is not None else determine_max_workers(games)
+    # An explicitly requested single-file export also refuses to overwrite old data.
+    # Reserve it before creating a batch, so an existing path fails without side effects.
+    with ExitStack() as resources:
+        export_file = None
+        export_writer = None
+        if output_path is not None:
+            export_file = resources.enter_context(output_path.open("x", newline="", encoding="utf-8"))
+            if output_format == "csv":
+                export_writer = create_csv_writer(export_file)
+        settings = generation_settings(games=games, seed=seed, workers=workers,
+                                       initial_fen=initial_fen, claim_draw=claim_draw,
+                                       max_plies=max_plies)
+        with BatchWriter(Path(batch_root), name=name, tags=tags or [], settings=settings,
+                         output_format=output_format) as batch:
+            stats = initialize_stats(games)
+            print(f"Batch directory: {batch.path}", flush=True)
+            jobs = ((i, game_seed(seed, i), initial_fen, claim_draw, max_plies)
+                    for i in range(1, games + 1))
+            # Ordered map keeps files deterministic even when workers finish out of order.
+            with ExitStack() as worker_resources:
+                if workers == 1:
+                    results = map(_generate_job, jobs)
+                else:
+                    executor = worker_resources.enter_context(ProcessPoolExecutor(max_workers=workers))
+                    results = executor.map(_generate_job, jobs)
+                for game, actual_seed in results:
+                    batch.add_game(game, actual_seed)
+                    update_stats_for_game(stats, game.game_id, game.result)
+                    if export_file is not None:
+                        flush_buffer(export_file, output_format, list(game.positions), export_writer)
+                    print(f"Game {game.game_id}/{games}: {game.result} ({game.termination}), "
+                          f"{len(game.positions)} plies", flush=True)
+        print(f"Batch counts: {batch.manifest['counts']}")
+        print(f"Results: {stats}")
+        return batch.path
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate self-play move dataset.")
-    parser.add_argument("--games", type=int, default=20, help="Number of games to generate.")
-    parser.add_argument(
-        "--format",
-        choices=["csv", "jsonl"],
-        default="csv",
-        help="Output dataset format.",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default="dataset.csv",
-        help="Output file path. Default: dataset.csv or dataset.jsonl",
-    )
+    parser = argparse.ArgumentParser(description="Generate a self-play batch and optional single-file dataset.")
+    parser.add_argument("--games", type=int, default=20)
+    parser.add_argument("--format", choices=["csv", "jsonl"], default="csv")
+    parser.add_argument("--output", type=Path, help="Also export legacy rows to a NEW CSV/JSONL file.")
+    parser.add_argument("--batch-root", type=Path, default=Path("data/batches"))
+    parser.add_argument("--batch-name", help="Human-readable batch name; need not be unique.")
+    parser.add_argument("--tag", action="append", default=[], help="Classification tag; repeat for multiple tags.")
+    parser.add_argument("--seed", type=int, default=BASE_WORKER_SEED)
+    parser.add_argument("--workers", type=int, help="Worker processes; default: min(games, CPU count).")
+    parser.add_argument("--initial-fen", default=chess.STARTING_FEN)
+    parser.add_argument("--claim-draw", action="store_true", help="Automatically claim available draws.")
+    parser.add_argument("--max-plies", type=int, help="Execution limit in half-moves; 0 saves initial position only.")
     args = parser.parse_args()
-
-    if args.games <= 0:
-        raise ValueError("--games must be greater than 0")
-
-    start_time = perf_counter()
-    output_path = Path(args.output) if args.output else Path(f"dataset.{args.format}")
-    max_workers = determine_max_workers(args.games)
-    chunks = build_game_chunks(args.games, max_workers)
-    stats = initialize_stats(args.games)
-    moves_recorded = 0
-    completed_games = 0
-    next_start_id_to_write = 1
-    pending_chunks: dict[int, tuple[int, list[Row]]] = {}
-    row_buffer: list[Row] = []
-
-    with output_path.open("w", newline="", encoding="utf-8") as output_file:
-        csv_writer = None
-        if args.format == "csv":
-            csv_writer = create_csv_writer(output_file)
-        elif args.format != "jsonl":
-            raise ValueError(f"Unsupported output format: {args.format}")
-
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            future_to_chunk = {
-                executor.submit(worker_run_games, start_id, num_games): (
-                    worker_index,
-                    start_id,
-                    num_games,
-                )
-                for worker_index, (start_id, num_games) in enumerate(chunks, start=1)
-            }
-
-            for future in as_completed(future_to_chunk):
-                worker_index, start_id, num_games = future_to_chunk[future]
-                pending_chunks[start_id] = (num_games, future.result())
-                completed_games += num_games
-                elapsed_seconds = perf_counter() - start_time
-                end_id = start_id + num_games - 1
-                print(
-                    f"Worker {worker_index} completed games {start_id}-{end_id}. "
-                    f"Completed games: {completed_games}/{args.games}. "
-                    f"Elapsed: {elapsed_seconds:.2f} seconds"
-                )
-
-                while next_start_id_to_write in pending_chunks:
-                    ready_num_games, ready_rows = pending_chunks.pop(next_start_id_to_write)
-                    row_buffer.extend(ready_rows)
-                    update_stats_for_chunk(
-                        stats,
-                        next_start_id_to_write,
-                        ready_num_games,
-                        ready_rows,
-                    )
-                    next_start_id_to_write += ready_num_games
-
-                    while len(row_buffer) >= ROW_FLUSH_SIZE:
-                        moves_recorded += flush_buffer(
-                            output_file,
-                            args.format,
-                            row_buffer,
-                            csv_writer,
-                            ROW_FLUSH_SIZE,
-                        )
-
-        moves_recorded += flush_buffer(output_file, args.format, row_buffer, csv_writer)
-
-    elapsed_seconds = perf_counter() - start_time
-
-    print(f"Workers used: {max_workers}")
-    print(f"Chunks scheduled: {len(chunks)}")
-    print(f"Games generated: {stats['total_games']}")
-    print(f"Moves recorded: {moves_recorded}")
-    print(f"RandomPlayer wins: {stats['RandomPlayer_wins']}")
-    print(f"GreedyPlayer wins: {stats['GreedyPlayer_wins']}")
-    print(f"Draws: {stats['draws']}")
-    print(f"Elapsed time: {elapsed_seconds:.2f} seconds")
-    print(f"Dataset saved to: {output_path}")
+    started = perf_counter()
+    path = generate_batch(games=args.games, batch_root=args.batch_root, name=args.batch_name,
+                          tags=args.tag, output_format=args.format, output_path=args.output,
+                          seed=args.seed, workers=args.workers, initial_fen=args.initial_fen,
+                          claim_draw=args.claim_draw, max_plies=args.max_plies)
+    print(f"Batch saved to: {path}")
+    print(f"Elapsed time: {perf_counter() - started:.2f} seconds")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,71 @@
 
 from dataclasses import dataclass
 
-from engine.game import create_board, is_game_over, make_move
+import chess
+
+from engine.game import create_board, get_outcome, get_result, is_game_over, make_move
+from engine.data_ids import now_iso
+
+
+@dataclass(frozen=True)
+class PlayedGame:
+    game_id: int
+    white_player: str
+    black_player: str
+    initial_fen: str
+    final_fen: str
+    result: str
+    status: str
+    termination: str
+    positions: list[dict]
+    started_at: str = ""
+    finished_at: str = ""
+
+
+def play_game(
+    game_id: int, white_player, black_player, white_name: str, black_name: str,
+    *, initial_fen: str = chess.STARTING_FEN, claim_draw: bool = False,
+    max_plies: int | None = None,
+    control=None,
+) -> PlayedGame:
+    """Collect one game, keeping execution truncation separate from chess rules."""
+    if game_id <= 0:
+        raise ValueError("game_id must be greater than 0")
+    if max_plies is not None and max_plies < 0:
+        raise ValueError("max_plies must be non-negative")
+    started_at = now_iso()
+    board = create_board(initial_fen)
+    initial_fen = board.fen()
+    positions: list[dict] = []
+    while True:
+        outcome = get_outcome(board, claim_draw=claim_draw)
+        if outcome is not None:
+            result, status = outcome.result(), "completed"
+            termination = outcome.termination.name.lower()
+            break
+        if max_plies is not None and len(positions) >= max_plies:
+            result, status, termination = "*", "truncated", "max_plies"
+            break
+        if control is not None and not control():
+            result, status, termination = "*", "truncated", "user_stop"
+            break
+        player = white_player if board.turn else black_player
+        move = player.choose_move(board)
+        if control is not None and not control():
+            result, status, termination = "*", "truncated", "user_stop"
+            break
+        row = {
+            "game_id": game_id, "ply": len(positions) + 1, "fen": board.fen(),
+            "side_to_move": "white" if board.turn else "black",
+            "selected_move": move.uci(), "white_player": white_name,
+            "black_player": black_name,
+        }
+        make_move(board, move)
+        positions.append(row)
+    for row in positions:
+        row["result"] = result
+    return PlayedGame(game_id, white_name, black_name, initial_fen, board.fen(),
+                      result, status, termination, positions, started_at, now_iso())
 
 
 @dataclass(frozen=True)
@@ -77,7 +141,7 @@ def run_batch_matches(
             make_move(board, move)
             move_count += 1
 
-        result = board.result()
+        result = get_result(board)
         if result == "1-0":
             stats[f"{white_name}_wins"] += 1
         elif result == "0-1":
@@ -154,7 +218,7 @@ def collect_self_play_data(
             ply += 1
             game_moves.append((ply, fen_before_move, side_to_move, selected_move))
 
-        result = board.result()
+        result = get_result(board)
         move_count = ply
 
         if result == "1-0":

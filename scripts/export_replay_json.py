@@ -6,13 +6,13 @@ import json
 from pathlib import Path
 
 
-def load_game_rows(dataset_path: Path, game_id: int) -> list[dict[str, str]]:
+def load_game_rows(dataset_path: Path, game_id: int | str) -> list[dict[str, str]]:
     if not dataset_path.exists():
         raise FileNotFoundError(f"Dataset not found: {dataset_path}")
 
     with dataset_path.open("r", encoding="utf-8", newline="") as dataset_file:
         reader = csv.DictReader(dataset_file)
-        rows = [row for row in reader if int(row["game_id"]) == game_id]
+        rows = [row for row in reader if str(row["game_id"]) == str(game_id)]
 
     if not rows:
         raise ValueError(f"Game id {game_id} not found in dataset.")
@@ -21,7 +21,7 @@ def load_game_rows(dataset_path: Path, game_id: int) -> list[dict[str, str]]:
     return rows
 
 
-def build_replay_payload(game_rows: list[dict[str, str]], game_id: int) -> dict:
+def build_replay_payload(game_rows: list[dict[str, str]], game_id: int | str) -> dict:
     if not game_rows:
         raise ValueError("game_rows must not be empty.")
 
@@ -54,6 +54,18 @@ def build_replay_payload(game_rows: list[dict[str, str]], game_id: int) -> dict:
     if black_player:
         metadata["black_player"] = black_player
 
+    # Optional batch columns; old eight-column CSV files remain supported.
+    for field in ("batch_id", "status", "termination"):
+        if game_rows[0].get(field):
+            metadata[field] = game_rows[0][field]
+    if game_rows[0].get("seed"):
+        metadata["seed"] = int(game_rows[0]["seed"])
+    if "claim_draw" in game_rows[0]:
+        value = str(game_rows[0]["claim_draw"]).lower()
+        if value not in ("true", "false"):
+            raise ValueError("claim_draw must be True or False")
+        metadata["rules"] = {"claim_draw": value == "true"}
+
     return {
         "initial_fen": initial_fen,
         "moves_uci": moves_uci,
@@ -65,7 +77,7 @@ def build_replay_payload(game_rows: list[dict[str, str]], game_id: int) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export one dataset game to replay JSON.")
     parser.add_argument("--dataset", type=str, required=True, help="Path to dataset CSV file.")
-    parser.add_argument("--game-id", type=int, required=True, help="Game id to export.")
+    parser.add_argument("--game-id", type=str, required=True, help="Game id to export.")
     parser.add_argument(
         "--output",
         type=str,
@@ -74,8 +86,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.game_id <= 0:
-        raise ValueError("--game-id must be greater than 0")
+    import re
+    if not re.fullmatch(r"[0-9]+(?:_[0-9]+)?", args.game_id):
+        raise ValueError("--game-id must be a numeric or date-serial game ID")
 
     dataset_path = Path(args.dataset)
     output_path = (

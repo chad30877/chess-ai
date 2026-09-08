@@ -5,9 +5,11 @@ from collections.abc import Mapping
 
 import chess
 
-from engine.evaluator import MaterialEvaluator
+from engine.evaluator import HandcraftedEvaluator
 from engine.game import get_legal_moves
 from engine.interfaces import Evaluator, Player
+from engine.search import AlphaBetaSearcher
+from engine.search.types import SearchLimits, Searcher
 
 
 class RandomPlayer(Player):
@@ -37,7 +39,7 @@ class GreedyPlayer(Player):
         if evaluator is not None and weights is not None:
             raise ValueError("Pass either evaluator or weights, not both.")
 
-        self.evaluator = evaluator if evaluator is not None else MaterialEvaluator(weights=weights)
+        self.evaluator = evaluator if evaluator is not None else HandcraftedEvaluator(weights=weights)
         self.rng = rng
 
     def choose_move(self, board: chess.Board) -> chess.Move:
@@ -71,3 +73,34 @@ class GreedyPlayer(Player):
         if self.rng is not None:
             return self.rng.choice(best_moves)
         return random.choice(best_moves)
+
+
+class AlphaBetaPlayer(Player):
+    """A player that delegates move selection to a searcher."""
+
+    def __init__(self, searcher: Searcher) -> None:
+        self.searcher = searcher
+
+    @classmethod
+    def from_evaluator(
+        cls,
+        evaluator: Evaluator,
+        *,
+        limits: SearchLimits | None = None,
+        default_max_depth: int = 1,
+    ) -> "AlphaBetaPlayer":
+        """Build a player whose searcher owns the injected evaluator."""
+
+        return cls(
+            searcher=AlphaBetaSearcher(
+                evaluator=evaluator,
+                limits=limits,
+                default_max_depth=default_max_depth,
+            )
+        )
+
+    def choose_move(self, board: chess.Board) -> chess.Move:
+        result = self.searcher.search(board)
+        if result.best_move is None:
+            raise ValueError("No legal move available in this position.")
+        return result.best_move

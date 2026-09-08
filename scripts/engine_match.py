@@ -5,7 +5,7 @@ import random
 from dataclasses import dataclass
 
 from engine.evaluator import MaterialEvaluator
-from engine.game import create_board, is_game_over, make_move
+from engine.game import create_board, get_result, is_game_over, make_move
 from engine.ml_evaluator import MLEvaluator
 from engine.players import GreedyPlayer
 
@@ -51,7 +51,7 @@ def play_one_game(
         move = current_player.choose_move(board)
         make_move(board, move)
 
-    result = board.result()
+    result = get_result(board)
     if result == "1/2-1/2":
         return "draw"
     if result == "1-0":

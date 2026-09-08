@@ -20,19 +20,31 @@ from training.features import fen_to_features, result_to_target
 CONFUSION_MATRIX_LABELS = [-1, 0, 1]
 
 
+def completed_rows(rows: list[dict]) -> list[dict]:
+    """Exclude unfinished games at ingestion without inventing training labels."""
+    completed = [row for row in rows
+                 if row.get("result") != "*" and row.get("status", "completed") == "completed"]
+    skipped = len(rows) - len(completed)
+    if skipped:
+        print(f"Skipped {skipped} unfinished position rows (no training label).")
+    if not completed:
+        raise ValueError("Dataset has no completed positions available for training")
+    return completed
+
+
 def load_rows(dataset_path: Path) -> list[dict[str, str]]:
     suffix = dataset_path.suffix.lower()
 
     if suffix == ".csv":
         with dataset_path.open("r", encoding="utf-8", newline="") as f:
-            return list(csv.DictReader(f))
+            return completed_rows(list(csv.DictReader(f)))
 
     if suffix == ".jsonl":
         rows: list[dict[str, str]] = []
         with dataset_path.open("r", encoding="utf-8") as f:
             for line in f:
                 rows.append(json.loads(line))
-        return rows
+        return completed_rows(rows)
 
     raise ValueError("Dataset format must be .csv or .jsonl")
 

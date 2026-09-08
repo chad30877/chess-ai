@@ -9,8 +9,8 @@ from engine.interfaces import Evaluator
 from training.features import fen_to_features
 
 
-class MLEvaluator(Evaluator):
-    """Evaluate positions with a trained probabilistic value model."""
+class MLValueEvaluator(Evaluator):
+    """Evaluate non-terminal positions with a White-perspective value model."""
 
     def __init__(self, model_path: str | Path | None = None) -> None:
         project_root = Path(__file__).resolve().parents[1]
@@ -29,7 +29,7 @@ class MLEvaluator(Evaluator):
             )
 
     def evaluate(self, board: chess.Board) -> float:
-        """Return evaluation score = white_win_prob - black_win_prob."""
+        """Return White-perspective score = white_win_prob - black_win_prob."""
         fen = board.fen()
         features = fen_to_features(fen)
         classifier = self.model.named_steps["clf"]
@@ -47,3 +47,6 @@ class MLEvaluator(Evaluator):
         white_win_prob = float(class_probabilities.get(1, 0.0))
         black_win_prob = float(class_probabilities.get(-1, 0.0))
         return white_win_prob - black_win_prob
+
+
+MLEvaluator = MLValueEvaluator

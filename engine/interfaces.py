@@ -15,7 +15,12 @@ class Player(Protocol):
 
 @runtime_checkable
 class Evaluator(Protocol):
-    """A position evaluator that returns a score from White's perspective."""
+    """A non-terminal position evaluator that returns a score from White's perspective.
+
+    Positive scores favor White, negative scores favor Black, and the score must
+    not flip based on whose turn it is. Searchers are responsible for applying
+    shared terminal scoring rules for checkmate and drawn end states.
+    """
 
     def evaluate(self, board: chess.Board) -> float:
-        """Return an evaluation score for the given board."""
+        """Return a White-perspective evaluation score for the given board."""

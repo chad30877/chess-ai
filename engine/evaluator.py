@@ -1,10 +1,11 @@
-"""Material-based evaluator implementations."""
+"""Handcrafted evaluator implementations built from readable score terms."""
 
 from collections.abc import Mapping
 
 import chess
 
 from engine.interfaces import Evaluator
+from engine.pst import evaluate_piece_square_tables
 
 DEFAULT_WEIGHTS = {
     chess.PAWN: 1,
@@ -48,19 +49,44 @@ def _normalize_weights(weights: Mapping[int | str, float] | None) -> dict[int, f
 
 
 class MaterialEvaluator(Evaluator):
-    """Evaluate a board by material balance."""
+    """Evaluate a non-terminal board by material balance from White's perspective."""
 
     def __init__(self, weights: Mapping[int | str, float] | None = None) -> None:
         self.weights = _normalize_weights(weights)
 
     def evaluate(self, board: chess.Board) -> float:
-        score = 0.0
-        for piece_type, value in self.weights.items():
-            score += len(board.pieces(piece_type, chess.WHITE)) * value
-            score -= len(board.pieces(piece_type, chess.BLACK)) * value
-        return score
+        return _evaluate_material_balance(board, self.weights)
+
+
+class HandcraftedEvaluator(Evaluator):
+    """Evaluate a position as material plus handcrafted piece-square bonuses."""
+
+    def __init__(self, weights: Mapping[int | str, float] | None = None) -> None:
+        self.material_evaluator = MaterialEvaluator(weights=weights)
+
+    def evaluate(self, board: chess.Board) -> float:
+        # Keep each term visible so future tuning does not mix material and PST logic.
+        material_score = self.material_evaluator.evaluate(board)
+        piece_square_score = evaluate_piece_square_tables(board)
+        return material_score + piece_square_score
+
+
+def evaluate_material(board: chess.Board, weights: Mapping[int | str, float] | None = None) -> float:
+    """Return White material minus Black material."""
+
+    normalized_weights = _normalize_weights(weights)
+    return _evaluate_material_balance(board, normalized_weights)
+
+
+def _evaluate_material_balance(board: chess.Board, weights: Mapping[int, float]) -> float:
+    score = 0.0
+    for piece_type, value in weights.items():
+        score += len(board.pieces(piece_type, chess.WHITE)) * value
+        score -= len(board.pieces(piece_type, chess.BLACK)) * value
+    return score
 
 
 def evaluate(board: chess.Board, weights: Mapping[int | str, float] | None = None) -> float:
-    """Backward-compatible helper returning material score for a board."""
-    return MaterialEvaluator(weights=weights).evaluate(board)
+    """Backward-compatible helper returning the default handcrafted eval score."""
+
+    return HandcraftedEvaluator(weights=weights).evaluate(board)

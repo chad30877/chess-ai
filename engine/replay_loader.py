@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-import chess
+from engine.game import create_board
 
 
 def load_replay_json(path: str) -> dict:
@@ -23,7 +23,7 @@ def load_replay_json(path: str) -> dict:
     if not isinstance(data["initial_fen"], str):
         raise ValueError("'initial_fen' must be a string.")
 
-    chess.Board(data["initial_fen"])
+    create_board(data["initial_fen"])
 
     if "moves_uci" not in data:
         raise ValueError("Replay JSON must contain 'moves_uci'.")
@@ -39,6 +39,10 @@ def load_replay_json(path: str) -> dict:
     metadata = data.get("metadata", {})
     if not isinstance(metadata, dict):
         raise ValueError("'metadata' must be an object.")
+
+    rules = metadata.get("rules", {})
+    if not isinstance(rules, dict) or not isinstance(rules.get("claim_draw", False), bool):
+        raise ValueError("'metadata.rules.claim_draw' must be a boolean.")
 
     return {
         "initial_fen": data["initial_fen"],

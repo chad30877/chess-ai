@@ -1,5 +1,5 @@
 
-"""Pygame replay UI entrypoint."""
+"""Pygame chess demo entrypoint and compatible replay helpers."""
 
 import argparse
 import sys
@@ -14,11 +14,12 @@ import pygame
 
 from engine.replay_loader import load_replay_json
 from engine.replay_session import ReplaySession
+from engine.game import create_board, get_legal_moves, make_move
 from ui.board_view import BOARD_PIXELS, BoardView, WINDOW_HEIGHT
 from ui.move_list_view import MOVE_LIST_WIDTH, MoveListView
 from ui.replay_info_view import INFO_PANEL_HEIGHT, ReplayInfoView
 
-WINDOW_TITLE = "Chess AI Replay"
+WINDOW_TITLE = "Chess AI"
 SAMPLE_REPLAY = {
     "initial_fen": chess.STARTING_FEN,
     "moves_uci": ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6"],
@@ -34,12 +35,12 @@ def get_replay_data(replay_path: str | None) -> dict:
 
 
 def build_move_items(initial_fen: str, moves_uci: list[str]) -> list[dict]:
-    board = chess.Board(initial_fen)
+    board = create_board(initial_fen)
     move_items: list[dict] = []
 
     for ply, move_uci in enumerate(moves_uci, start=1):
         move = chess.Move.from_uci(move_uci)
-        if move not in board.legal_moves:
+        if move not in get_legal_moves(board):
             raise ValueError(f"Illegal move while building move list: {move_uci}")
 
         side = "w" if board.turn == chess.WHITE else "b"
@@ -56,7 +57,7 @@ def build_move_items(initial_fen: str, moves_uci: list[str]) -> list[dict]:
             }
         )
 
-        board.push(move)
+        make_move(board, move)
 
     return move_items
 
@@ -211,7 +212,7 @@ def handle_keydown(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Launch the replay UI.")
+    parser = argparse.ArgumentParser(description="Launch the chess home screen or open a replay.")
     parser.add_argument(
         "--replay",
         type=str,
@@ -249,7 +250,10 @@ def create_views(screen: pygame.Surface) -> tuple[BoardView, ReplayInfoView, Mov
 
 
 def create_session(replay_data: dict) -> tuple[ReplaySession, int]:
-    session = ReplaySession(replay_data["initial_fen"], replay_data["moves_uci"])
+    session = ReplaySession(
+        replay_data["initial_fen"], replay_data["moves_uci"],
+        claim_draw=replay_data.get("metadata", {}).get("rules", {}).get("claim_draw", False),
+    )
     return session, session.total_ply()
 
 def handle_frame_events(
@@ -304,7 +308,7 @@ def render_frame(
     total_ply: int,
     is_flipped: bool,
 ) -> None:
-    board = chess.Board(session.current_fen())
+    board = session.current_board()
     board_view.render(
         board=board,
         current_ply=displayed_ply,
@@ -317,38 +321,33 @@ def render_frame(
 
 
 def main() -> None:
+    from apps.chess_application import APP_SIZE, ChessApplication
+
     args = parse_args()
-    replay_data, move_items, replay_info = prepare_replay_content(args.replay)
-    screen, clock = create_pygame_context()
-    session, total_ply = create_session(replay_data)
-    board_view, replay_info_view, move_list_view = create_views(screen)
-    displayed_ply = 0
-    is_flipped = False
-    running = True
-
-    while running:
-        running, displayed_ply, is_flipped = handle_frame_events(
-            session=session,
-            move_list_view=move_list_view,
-            move_items=move_items,
-            displayed_ply=displayed_ply,
-            total_ply=total_ply,
-            is_flipped=is_flipped,
-        )
-        render_frame(
-            session=session,
-            board_view=board_view,
-            replay_info_view=replay_info_view,
-            move_list_view=move_list_view,
-            replay_info=replay_info,
-            move_items=move_items,
-            displayed_ply=displayed_ply,
-            total_ply=total_ply,
-            is_flipped=is_flipped,
-        )
-        clock.tick(60)
-
-    pygame.quit()
+    # Enable native pixels before SDL creates a window on Windows HiDPI displays.
+    import sys
+    if sys.platform == "win32":
+        import ctypes
+        try:
+            ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+        except (AttributeError, OSError):
+            ctypes.windll.user32.SetProcessDPIAware()
+    pygame.init()
+    screen = pygame.display.set_mode(APP_SIZE, pygame.RESIZABLE)
+    pygame.display.set_caption(WINDOW_TITLE)
+    clock = pygame.time.Clock()
+    app = ChessApplication(screen, args.replay)
+    try:
+        while app.running:
+            app.render()
+            pygame.display.flip()
+            for event in pygame.event.get():
+                app.handle_event(event)
+            app.tick()
+            clock.tick(60)
+    finally:
+        app.close()
+        pygame.quit()
 
 
 if __name__ == "__main__":
