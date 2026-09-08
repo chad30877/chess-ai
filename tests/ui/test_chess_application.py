@@ -16,7 +16,7 @@ import pygame
 from apps.chess_application import APP_SIZE, HEADER_HEIGHT, ChessApplication
 from engine.live_session import LiveSession, LiveSettings
 from engine.replay_loader import load_replay_json
-from test_live_session import ManualExecutor
+from tests.helpers.executors import ManualExecutor
 from engine.replay_catalog import ReplayCatalog
 
 

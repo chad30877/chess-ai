@@ -1,26 +1,12 @@
 """Live-game state transitions, worker isolation, and shared rule outcomes."""
 
 import unittest
-from concurrent.futures import Future
+from tests.helpers.executors import ManualExecutor
 
 import chess
 
 from engine.live_session import LiveSession, LiveSettings
 from engine.replay_session import ReplaySession
-
-
-class ManualExecutor:
-    def __init__(self):
-        self.jobs = []
-
-    def submit(self, fn, *args):
-        future = Future()
-        self.jobs.append((future, fn, args))
-        return future
-
-    def finish(self, index=-1):
-        future, fn, args = self.jobs[index]
-        future.set_result(fn(*args))
 
 
 class LiveSessionTest(unittest.TestCase):

@@ -13,9 +13,9 @@
 | [搜尋與評分](docs/搜尋與評分.md) | 決定每一步怎麼選，包含 Greedy、Alpha-Beta、子力與 PST | 搜尋核心已實作，尚未接入對戰 CLI；時間限制未生效 |
 | [使用者介面（UI）](docs/使用者介面.md) | 棋盤顯示、使用者操作與對局查找 | 已有高解析度模式首頁、批次生成、真人對 AI、日期／批次／對局回放 |
 
-後續任務順序與驗收以 [開發計畫](docs/開發計畫.md) 為準；測試現況與分類草案見 [測試導覽](tests/README.md)。四份功能文件區分目前實作與未來規劃。
+後續任務順序與驗收以 [開發計畫](docs/開發計畫.md) 為準；測試分類與執行方式見 [測試導覽](tests/README.md)。四份功能文件區分目前實作與未來規劃。
 
-**2026-09-09 P1 完成：** 已移除舊 ML 程式、訓練入口、模型與專屬參數；對戰 CLI 提供 Random 基準及原有 material。保留 PNG 備援與通用對局資料；後續 P2–P7 尚未實作。
+**2026-09-09 P1 完成：** 已移除舊 ML 程式、訓練入口、模型與專屬參數；對戰 CLI 提供 Random 基準及原有 material。保留 PNG 備援與通用對局資料；P2 測試分類也已完成，後續 P3–P7 尚未實作。
 
 ## 各區塊怎麼串接？
 
@@ -142,6 +142,8 @@ uv pip install --python "./.venv/Scripts/python.exe" chess pygame
 
 ## 驗證紀錄
 
+P2 已將測試分類至 rules、evaluation、search、self_play、replay、ui，並抽出共用 ManualExecutor。原有 88 個案例 ID 全數保留、搬移的 test 方法內容不變；新增 discovery 驗證後 **89 個測試全部通過**，`git diff --check` 通過。測試命令需加 `-t .` 避免 `tests/ui` 與正式 `ui` 匯入衝突。
+
 P1 移除 2 個 ML 專屬案例，保留原有非 ML 覆蓋，新增 6 個對戰 CLI 測試；完整測試共 **88 個通過**，`git diff --check` 通過。涵蓋 Random／material 兩盤完整對戰、黑白輪替、A 視角結果、種子重現及舊選項拒絕。執行方式見 [測試導覽](tests/README.md)。以下為先前功能提交紀錄，不代表本次重新執行了實體畫面驗證。
 
 2026-09-09：完整專案共 **82 個測試通過**。涵蓋共用棋規與歷史、正常終局／截斷、批次 ID／數量／路徑、同時分配流水號、CSV／JSONL、單／多程序重現、停止／失敗保存、跨午夜分類、舊格式與單檔訓練相容、真人落子及視窗縮放。
@@ -149,13 +151,13 @@ P1 移除 2 個 ML 專屬案例，保留原有非 ML 覆蓋，新增 6 個對戰
 已建立 `.venv` 時：
 
 ```powershell
-& "./.venv/Scripts/python.exe" -m unittest discover -s tests -v
+& "./.venv/Scripts/python.exe" -m unittest discover -s tests -t . -v
 ```
 
 使用目前依賴的隔離環境指令：
 
 ```powershell
-uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/python.exe --with chess --with pygame python -m unittest discover -s tests -v
+uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/python.exe --with chess --with pygame python -m unittest discover -s tests -t . -v
 ```
 
 先前功能提交另以 UI 真實背景執行緒完成 2 場正常終局，共 220 筆局面；CLI 驗證 2 場截斷 JSONL，共 24 筆。識別碼、數量、相對路徑、逐手 FEN、回放結果與依種子重跑均比對一致。畫面檢查包含設定、進度、日期回放清單、真人棋盤與高解析度渲染。
@@ -164,8 +166,8 @@ uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/pyth
 
 ## 建議接續順序
 
-依 [開發計畫](docs/開發計畫.md) 執行：P1 移除舊 ML（已完成）→ P2 測試分類 → P3 engine 分類 → P4 獨立權重及設定保存 → P5 比較流程 → P6 特徵／搜尋逐項擴充 → P7 評估自動調參。
+依 [開發計畫](docs/開發計畫.md) 執行：P1 移除舊 ML（已完成）→ P2 測試分類（已完成）→ P3 engine 分類 → P4 獨立權重及設定保存 → P5 比較流程 → P6 特徵／搜尋逐項擴充 → P7 評估自動調參。
 
-本次只完成 P1；下一階段為 P2 測試分類，需另行安排。每階段依 AGENTS.md 完成相關測試、全部驗證與獨立 commit，並更新文件狀態。
+本次完成 P2 測試分類；下一階段為 P3 engine 分類，需另行安排。每階段依 AGENTS.md 完成相關測試、全部驗證與獨立 commit，並更新文件狀態。
 
 目前 UI 真人模式、自動對戰與日期回放已完成，保留現有功能；名稱／標籤搜尋、悔棋、索引快取及中斷修復另行安排。資源圖片與舊對局資料本輪不清理。

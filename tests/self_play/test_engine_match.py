@@ -13,7 +13,7 @@ from engine.players import GreedyPlayer, RandomPlayer
 from scripts.engine_match import MatchStats, build_player, play_one_game, run_match
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class EngineMatchTest(unittest.TestCase):
