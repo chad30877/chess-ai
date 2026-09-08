@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import chess
 
 from engine.game import create_board, get_outcome, get_result, is_game_over, make_move
-from engine.data_ids import now_iso
+from engine.storage.data_ids import now_iso
 
 
 @dataclass(frozen=True)

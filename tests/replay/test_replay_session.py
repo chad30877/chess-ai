@@ -4,7 +4,7 @@ import unittest
 
 import chess
 
-from engine.replay_session import ReplaySession
+from engine.replay.replay_session import ReplaySession
 
 
 class ReplaySessionTest(unittest.TestCase):

@@ -4,7 +4,7 @@ import argparse
 import random
 from dataclasses import dataclass
 
-from engine.evaluator import MaterialEvaluator
+from engine.evaluation.evaluator import MaterialEvaluator
 from engine.game import create_board, get_result, is_game_over, make_move
 from engine.interfaces import Player
 from engine.players import GreedyPlayer, RandomPlayer

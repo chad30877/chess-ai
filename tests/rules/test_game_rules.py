@@ -5,8 +5,8 @@ import unittest
 import chess
 
 from engine.game import create_board, get_legal_moves, get_outcome, get_result, make_move
-from engine.replay_session import ReplaySession
-from engine.self_play import collect_self_play_data, play_game, run_batch_matches
+from engine.replay.replay_session import ReplaySession
+from engine.sessions.self_play import collect_self_play_data, play_game, run_batch_matches
 
 
 class ScriptedPlayer:

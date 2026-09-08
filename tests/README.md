@@ -2,7 +2,7 @@
 
 [回到專案總覽](../README.md) · [開發計畫](../docs/開發計畫.md)
 
-更新日期：2026-09-09。P2 已完成，測試依責任分類，沿用 unittest。原有 88 個案例全部保留，新增 1 個遞迴發現驗證，完整 89 個測試通過。
+更新日期：2026-09-09。P2 已完成，測試依責任分類，沿用 unittest。原有 88 個案例全部保留，新增 1 個遞迴發現驗證，P2 當時完整 89 個測試通過。P3 更新 engine 匯入／patch 路徑並新增 2 個整合案例，目前完整 91 個測試通過。
 
 ## 目前覆蓋
 
@@ -17,6 +17,8 @@
 | ui/test_live_session.py | 背景選步、暫停／停止、真人回合與歷史 |
 | ui/test_chess_application.py | Pygame 事件、模式、真人落子、回放查找與縮放 |
 | self_play/test_engine_match.py | Random／material CLI 完整對戰、原子力語意、種子、輪替／統計與舊選項拒絕 |
+| test_engine_imports.py | 各 engine 模組與 UI 入口於獨立程序載入，檢查循環匯入 |
+| self_play/test_cli_roundtrip.py | CLI 多程序生成、CSV 棋譜匯出及回放結果一致 |
 | test_discovery.py | 遞迴發現涵蓋所有測試模組、使用 tests 命名空間且案例不重複 |
 | helpers/executors.py | 共用 ManualExecutor，由測試控制背景工作完成時機 |
 | test_documentation.py | 文件本機連結／標題錨點與程式碼區塊完整性 |

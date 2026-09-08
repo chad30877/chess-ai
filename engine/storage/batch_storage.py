@@ -4,9 +4,9 @@ import csv
 import json
 from contextlib import ExitStack
 from pathlib import Path
-from engine.data_ids import allocate_id, now_iso
+from engine.storage.data_ids import allocate_id, now_iso
 
-from engine.self_play import PlayedGame
+from engine.sessions.self_play import PlayedGame
 
 POSITION_FIELDS = [
     "game_id", "ply", "fen", "side_to_move", "selected_move", "result",

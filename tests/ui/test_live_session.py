@@ -5,8 +5,8 @@ from tests.helpers.executors import ManualExecutor
 
 import chess
 
-from engine.live_session import LiveSession, LiveSettings
-from engine.replay_session import ReplaySession
+from engine.sessions.live_session import LiveSession, LiveSettings
+from engine.replay.replay_session import ReplaySession
 
 
 class LiveSessionTest(unittest.TestCase):

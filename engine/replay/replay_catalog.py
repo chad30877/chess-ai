@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from engine.data_ids import TAIPEI, date_key
+from engine.storage.data_ids import TAIPEI, date_key
 
 
 @dataclass(frozen=True)

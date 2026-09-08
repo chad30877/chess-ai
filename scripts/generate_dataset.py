@@ -14,9 +14,9 @@ from typing import TextIO
 import chess
 
 from engine.game import create_board
-from engine.batch_storage import BatchWriter
+from engine.storage.batch_storage import BatchWriter
 from engine.players import GreedyPlayer, RandomPlayer
-from engine.self_play import PlayedGame, play_game
+from engine.sessions.self_play import PlayedGame, play_game
 from engine.strategy_config import strategy_config
 
 DATASET_FIELDNAMES = [

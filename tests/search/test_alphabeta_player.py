@@ -4,7 +4,7 @@ import unittest
 
 import chess
 
-from engine.evaluator import MaterialEvaluator
+from engine.evaluation.evaluator import MaterialEvaluator
 from engine.players import AlphaBetaPlayer
 from engine.search import AlphaBetaSearcher, SearchLimits, SearchResult
 

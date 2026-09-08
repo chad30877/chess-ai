@@ -8,7 +8,7 @@ from unittest.mock import call, patch
 
 import chess
 
-from engine.evaluator import MaterialEvaluator
+from engine.evaluation.evaluator import MaterialEvaluator
 from engine.players import GreedyPlayer, RandomPlayer
 from scripts.engine_match import MatchStats, build_player, play_one_game, run_match
 

@@ -5,7 +5,7 @@ from collections.abc import Mapping
 
 import chess
 
-from engine.evaluator import HandcraftedEvaluator
+from engine.evaluation.evaluator import HandcraftedEvaluator
 from engine.game import get_legal_moves
 from engine.interfaces import Evaluator, Player
 from engine.search import AlphaBetaSearcher

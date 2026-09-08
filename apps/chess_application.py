@@ -13,11 +13,11 @@ import pygame
 
 from apps.play_ui import build_move_items, build_replay_info, create_session, get_replay_data
 from engine.game import create_board
-from engine.data_ids import TAIPEI, allocate_id, date_key, now_iso
-from engine.batch_run import BatchRun, BatchSettings
-from engine.replay_catalog import ReplayCatalog, result_badges
-from engine.live_session import LiveSession, LiveSettings
-from engine.replay_loader import load_replay_json
+from engine.storage.data_ids import TAIPEI, allocate_id, date_key, now_iso
+from engine.sessions.batch_run import BatchRun, BatchSettings
+from engine.replay.replay_catalog import ReplayCatalog, result_badges
+from engine.sessions.live_session import LiveSession, LiveSettings
+from engine.replay.replay_loader import load_replay_json
 from ui.board_view import BOARD_PIXELS, WINDOW_HEIGHT, BoardView
 from ui.controls import ACCENT, BACKGROUND, BORDER, MUTED, PANEL, TEXT, Button, draw_text, ui_font
 from ui.move_list_view import MOVE_LIST_WIDTH, MoveListView

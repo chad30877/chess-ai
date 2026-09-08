@@ -14,13 +14,13 @@ from unittest.mock import patch
 import chess
 
 from apps.play_ui import create_session
-from engine.batch_run import BatchRun, BatchSettings
-from engine.batch_storage import BatchWriter
-from engine.data_ids import allocate_id, date_key
+from engine.sessions.batch_run import BatchRun, BatchSettings
+from engine.storage.batch_storage import BatchWriter
+from engine.storage.data_ids import allocate_id, date_key
 from engine.players import GreedyPlayer, RandomPlayer
-from engine.replay_catalog import ReplayCatalog, result_badges
-from engine.replay_loader import load_replay_json
-from engine.self_play import play_game
+from engine.replay.replay_catalog import ReplayCatalog, result_badges
+from engine.replay.replay_loader import load_replay_json
+from engine.sessions.self_play import play_game
 from scripts.generate_dataset import generate_game, generation_settings
 
 
@@ -113,7 +113,7 @@ class BatchUIStorageTest(unittest.TestCase):
                     if not release.wait(5):
                         raise RuntimeError("test synchronization timeout")
                 return next(iter(board.legal_moves))
-        with patch("engine.batch_run.RandomPlayer", ControlledPlayer), ThreadPoolExecutor(max_workers=1) as executor:
+        with patch("engine.sessions.batch_run.RandomPlayer", ControlledPlayer), ThreadPoolExecutor(max_workers=1) as executor:
             run = BatchRun(BatchSettings(white="Random", black="Random", games=2, max_plies=4),
                            self.root / "batches", executor)
             try:
@@ -168,7 +168,7 @@ class BatchUIStorageTest(unittest.TestCase):
             if number == 2:
                 raise RuntimeError("controlled AI error")
             return original(number, *args, **kwargs)
-        with patch("engine.batch_run.play_game", fail_second), ThreadPoolExecutor(max_workers=1) as executor:
+        with patch("engine.sessions.batch_run.play_game", fail_second), ThreadPoolExecutor(max_workers=1) as executor:
             run = BatchRun(BatchSettings(games=3, max_plies=2), self.root / "batches", executor)
             run.future.result(timeout=5)
         self.assertEqual(run.snapshot()["status"], "failed")

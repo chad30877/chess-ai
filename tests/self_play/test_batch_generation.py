@@ -10,8 +10,8 @@ from unittest.mock import patch
 import chess
 
 from apps.play_ui import create_session, prepare_replay_content
-from engine.batch_storage import BatchWriter
-from engine.replay_loader import load_replay_json
+from engine.storage.batch_storage import BatchWriter
+from engine.replay.replay_loader import load_replay_json
 from scripts.export_replay_json import build_replay_payload, load_game_rows
 from scripts.generate_dataset import (
     DATASET_FIELDNAMES, game_seed, generate_batch, generate_game, generation_settings,

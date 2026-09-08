@@ -12,8 +12,8 @@ if str(PROJECT_ROOT) not in sys.path:
 import chess
 import pygame
 
-from engine.replay_loader import load_replay_json
-from engine.replay_session import ReplaySession
+from engine.replay.replay_loader import load_replay_json
+from engine.replay.replay_session import ReplaySession
 from engine.game import create_board, get_legal_moves, make_move
 from ui.board_view import BOARD_PIXELS, BoardView, WINDOW_HEIGHT
 from ui.move_list_view import MOVE_LIST_WIDTH, MoveListView

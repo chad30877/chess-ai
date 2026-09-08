@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import chess
 
 from engine.game import create_board, get_legal_moves, get_outcome, make_move
-from engine.data_ids import now_iso
+from engine.storage.data_ids import now_iso
 from engine.strategy_config import strategy_config
 from engine.players import GreedyPlayer, RandomPlayer
 

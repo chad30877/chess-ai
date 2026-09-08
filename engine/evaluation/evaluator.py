@@ -5,7 +5,7 @@ from collections.abc import Mapping
 import chess
 
 from engine.interfaces import Evaluator
-from engine.pst import evaluate_piece_square_tables
+from engine.evaluation.pst import evaluate_piece_square_tables
 
 DEFAULT_WEIGHTS = {
     chess.PAWN: 1,

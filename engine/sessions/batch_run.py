@@ -8,9 +8,9 @@ from time import monotonic
 
 import chess
 
-from engine.batch_storage import BatchWriter
+from engine.storage.batch_storage import BatchWriter
 from engine.players import GreedyPlayer, RandomPlayer
-from engine.self_play import play_game
+from engine.sessions.self_play import play_game
 from engine.strategy_config import strategy_config
 
 

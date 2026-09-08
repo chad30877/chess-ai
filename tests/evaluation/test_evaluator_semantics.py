@@ -4,8 +4,8 @@ import unittest
 
 import chess
 
-from engine.evaluator import HandcraftedEvaluator, MaterialEvaluator, evaluate_material
-from engine.pst import evaluate_piece_square_tables
+from engine.evaluation.evaluator import HandcraftedEvaluator, MaterialEvaluator, evaluate_material
+from engine.evaluation.pst import evaluate_piece_square_tables
 
 
 class EvaluatorSemanticsTest(unittest.TestCase):

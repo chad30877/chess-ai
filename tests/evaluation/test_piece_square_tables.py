@@ -4,7 +4,7 @@ import unittest
 
 import chess
 
-from engine.pst import (
+from engine.evaluation.pst import (
     evaluate_piece_square_tables,
     evaluate_piece_square_tables_for_color,
     get_piece_square_value,

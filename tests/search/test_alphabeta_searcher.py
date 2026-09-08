@@ -5,7 +5,7 @@ from math import inf
 
 import chess
 
-from engine.evaluator import MaterialEvaluator
+from engine.evaluation.evaluator import MaterialEvaluator
 from engine.search.alphabeta import AlphaBetaSearcher
 from engine.search.types import CHECKMATE_SCORE, DRAW_SCORE, SearchLimits
 
