@@ -2,20 +2,21 @@
 
 [回到專案總覽](../README.md) · [開發計畫](../docs/開發計畫.md)
 
-更新日期：2026-09-09。目前測試仍平鋪於 tests，本次未搬檔或切換框架。測試分類安排在 P2，舊 ML 測試隨 P1 調整。
+更新日期：2026-09-09。目前測試仍平鋪於 tests，本次未搬檔或切換框架。測試分類安排在 P2，P1 已移除 2 個 ML 專屬案例，新增 6 個對戰案例，完整 88 個測試通過。
 
 ## 目前覆蓋
 
 | 檔案 | 責任 |
 | --- | --- |
 | test_game_rules.py | 共用棋規、特殊走法、重複局面歷史、終局與上限 |
-| test_evaluator_semantics.py、test_piece_square_tables.py | 評分視角、子力與 PST、鏡射；前者尚有待移除 ML 別名測試 |
+| test_evaluator_semantics.py、test_piece_square_tables.py | 評分視角、子力與 PST、鏡射 |
 | test_alphabeta_player.py、test_alphabeta_searcher.py、test_search_types.py | 搜尋委派、Minimax 比對、終局分數與參數 |
-| test_batch_generation.py | 批次、CSV／JSONL、相容與失敗保存；尚含舊訓練讀入測試 |
+| test_batch_generation.py | 批次、CSV／JSONL、相容與失敗保存 |
 | test_batch_ui_storage.py | UI 批次保存、日期流水號、種子與跨午夜分類 |
 | test_replay_session.py | 回放跳步及邊界 |
 | test_live_session.py | 背景選步、暫停／停止、真人回合與歷史 |
 | test_chess_application.py | Pygame 事件、模式、真人落子、回放查找與縮放 |
+| test_engine_match.py | Random／material CLI 完整對戰、原子力語意、種子、輪替／統計與舊選項拒絕 |
 | test_documentation.py | 文件本機連結／標題錨點與程式碼區塊完整性 |
 
 ## 執行方式

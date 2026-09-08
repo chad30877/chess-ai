@@ -1,4 +1,4 @@
-"""Generate self-play dataset for future ML training."""
+"""Generate reusable self-play position records."""
 
 import argparse
 import csv

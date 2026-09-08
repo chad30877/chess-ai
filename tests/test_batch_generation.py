@@ -17,7 +17,6 @@ from scripts.generate_dataset import (
     DATASET_FIELDNAMES, game_seed, generate_batch, generate_game, generation_settings,
     update_stats_for_game, initialize_stats,
 )
-from training.train_value_model import build_xy, load_rows
 
 
 def read_csv(path):
@@ -180,25 +179,6 @@ class BatchGenerationTest(unittest.TestCase):
         self.assertEqual(len(read_csv(batch.path / "games.csv")), 1)
         self.assertEqual(len(read_csv(batch.path / "positions.csv")), 2)
         self.assertEqual(len(list((batch.path / "replays").glob("*.json"))), 1)
-
-    def test_training_skips_unfinished_rows_for_both_formats(self):
-        for suffix in ("csv", "jsonl"):
-            path = self.root / f"training.{suffix}"
-            rows = [{"fen": chess.STARTING_FEN, "result": result}
-                    for result in ("1-0", "*", "1/2-1/2", "0-1")]
-            if suffix == "csv":
-                with path.open("w", newline="", encoding="utf-8") as stream:
-                    writer = csv.DictWriter(stream, fieldnames=["fen", "result"])
-                    writer.writeheader()
-                    writer.writerows(rows)
-            else:
-                path.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
-            x, y = build_xy(load_rows(path))
-            self.assertEqual(x.shape, (3, 774))
-            self.assertEqual(y.tolist(), [1, 0, -1])
-        batch = self.generate()
-        with self.assertRaisesRegex(ValueError, "no completed positions"):
-            load_rows(batch / "positions.csv")
 
     def test_validation_happens_before_batch_creation(self):
         for kwargs in (dict(games=0), dict(workers=0), dict(max_plies=-1),

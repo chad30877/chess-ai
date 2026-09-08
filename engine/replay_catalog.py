@@ -1,4 +1,4 @@
-"""Date/group/game lookup; batch indexes never load training positions."""
+"""Date/group/game lookup; batch indexes never load position records."""
 
 import csv
 import json

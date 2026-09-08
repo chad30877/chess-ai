@@ -48,7 +48,3 @@ data/replays/[0-9]*.json
 # Generated replay exports
 # Keep sample_replay.json if you want a tracked example replay.
 data/replays/game_*.json
-
-# Trained model artifacts and metrics
-training/*.pkl
-training/*metrics*.json
