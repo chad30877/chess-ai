@@ -31,6 +31,20 @@ class FenScoreEvaluator:
         return self.scores_by_fen.get(board.fen(), self.default_score)
 
 
+class RaisingEvaluator:
+    """Evaluator used to verify that failed searches leave the root untouched."""
+
+    def evaluate(self, board: chess.Board) -> float:
+        raise RuntimeError("evaluation failed")
+
+
+def _repetition_board(cycles: int, trailing_moves: list[str]) -> chess.Board:
+    board = chess.Board()
+    for move_uci in ["g1f3", "g8f6", "f3g1", "f6g8"] * cycles + trailing_moves:
+        board.push_uci(move_uci)
+    return board
+
+
 def _minimax_reference(
     board: chess.Board,
     evaluator: MaterialEvaluator | ConstantEvaluator,
@@ -116,6 +130,10 @@ class AlphaBetaSearcherTest(unittest.TestCase):
                 limits=SearchLimits(max_depth=2),
                 default_max_depth=3,
             )
+
+    def test_constructor_rejects_non_boolean_claim_draw_policy(self) -> None:
+        with self.assertRaises(ValueError):
+            AlphaBetaSearcher(ConstantEvaluator(0.0), claim_draw=1)  # type: ignore[arg-type]
 
     def test_search_returns_a_legal_move(self) -> None:
         board = chess.Board("6k1/8/3q4/3r4/8/8/8/3Q2K1 w - - 0 1")
@@ -266,6 +284,51 @@ class AlphaBetaSearcherTest(unittest.TestCase):
 
         self.assertEqual(result.score, DRAW_SCORE)
         self.assertEqual(result.nodes_searched, 1)
+
+    def test_search_honors_claimable_draw_policy_at_root(self) -> None:
+        board = _repetition_board(1, ["g1f3", "g8f6", "f3g1"])
+
+        claiming_result = AlphaBetaSearcher(
+            ConstantEvaluator(8.0), claim_draw=True,
+        ).search(board)
+        continuing_result = AlphaBetaSearcher(
+            ConstantEvaluator(8.0), claim_draw=False,
+        ).search(board)
+
+        self.assertIsNone(claiming_result.best_move)
+        self.assertEqual(claiming_result.score, DRAW_SCORE)
+        self.assertEqual(claiming_result.nodes_searched, 1)
+        self.assertIsNotNone(continuing_result.best_move)
+
+    def test_search_preserves_history_for_fivefold_repetition_child(self) -> None:
+        board = _repetition_board(3, ["g1f3", "g8f6", "f3g1"])
+        repetition_move = chess.Move.from_uci("f6g8")
+        repeated_position = board.copy(stack=False)
+        repeated_position.push(repetition_move)
+        original_fen = board.fen()
+        original_stack = list(board.move_stack)
+        searcher = AlphaBetaSearcher(
+            FenScoreEvaluator({repeated_position.fen(): 100.0}, default_score=1.0),
+            claim_draw=False,
+        )
+
+        result = searcher.search(board)
+
+        self.assertEqual(result.best_move, repetition_move)
+        self.assertEqual(result.score, DRAW_SCORE)
+        self.assertEqual(board.fen(), original_fen)
+        self.assertEqual(board.move_stack, original_stack)
+
+    def test_search_exception_leaves_root_board_unchanged(self) -> None:
+        board = _repetition_board(1, ["g1f3"])
+        original_fen = board.fen()
+        original_stack = list(board.move_stack)
+
+        with self.assertRaisesRegex(RuntimeError, "evaluation failed"):
+            AlphaBetaSearcher(RaisingEvaluator()).search(board)
+
+        self.assertEqual(board.fen(), original_fen)
+        self.assertEqual(board.move_stack, original_stack)
 
     def test_evaluate_leaf_delegates_to_evaluator(self) -> None:
         board = chess.Board()

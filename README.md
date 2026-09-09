@@ -15,7 +15,7 @@
 
 後續任務順序與驗收以 [開發計畫](docs/開發計畫.md) 為準；測試分類與執行方式見 [測試導覽](tests/README.md)。四份功能文件區分目前實作與未來規劃。
 
-**2026-09-09 P1–P5 完成：** 已移除舊 ML，完成測試／engine 分類，加入版本化評分設定與成對交換黑白的比較批次。Random 基準、PNG 備援與通用對局資料保留；後續 P6–P7 尚未實作。
+**2026-09-09 P1–P5 與 P6/S0 完成：** 已移除舊 ML，完成測試／engine 分類、版本化評分設定、成對比較批次，以及搜尋／Greedy 的終局與歷史正確性。Random 基準、PNG 備援與通用對局資料保留；P6 其餘子項與 P7 尚未實作。
 
 ## 各區塊怎麼串接？
 
@@ -37,7 +37,7 @@ flowchart TD
 以下接點、批次格式與日期回放查找已完成：
 
 - **共用棋規**：底層維持 `chess.Board`，`engine/game.py` 提供棋盤建立、合法走法、落子、終局與結果。自動對戰、真人落子、棋譜載入與回放已接入，未改搜尋演算法或評分權重。
-- **歷史保存**：回放保留完整走法堆疊，跳步後可由 `current_board()`、`current_outcome()`／`current_result()` 取得帶歷史的局面與結果；FEN 快取僅供顯示。搜尋分支原有的 `copy(stack=False)` 限制仍保留，詳見搜尋文件。
+- **歷史保存**：回放保留完整走法堆疊，跳步後可由 `current_board()`、`current_outcome()`／`current_result()` 取得帶歷史的局面與結果；FEN 快取僅供顯示。P6/S0 後搜尋與 Greedy 分支也保留完整 move stack，重複局面沿用對局的申請和棋政策。
 - **棋規與執行設定分開**：預設不自動申請和棋；生成可用 `--claim-draw` 開啟，政策保存於批次與棋譜。`--max-plies` 是執行上限，截斷記為 `status=truncated`、`result=*`，不當作和棋。
 - **批次是保存單位**：每次生成建立 `data/batches/<日期_流水號>/`，內含 `manifest.json`、`games.csv`、`positions.csv` 或 JSONL，以及各盤回放 JSON。schema v2 以 manifest 管設定／進度、games 管每盤時間／一次種子、回放 JSON 管走法、positions 管逐手局面。名稱與標籤選填，移除雜湊與空預留欄位；UI 已可依日期 → 批次／非批次 → 對局查找。
 - **舊資料保留**：不搬移舊檔；生成器預設只寫新批次，明確指定 `--output <新檔名>` 可另外輸出原八欄逐手資料，若檔案已存在則拒絕覆寫。CSV／JSONL 生成與 CSV 棋譜匯出保留，回放仍使用 `--replay`。
@@ -148,6 +148,8 @@ uv pip install --python "./.venv/Scripts/python.exe" chess pygame
 
 ## 驗證紀錄
 
+P6/S0 統一 Alpha-Beta／Greedy 終局計分與 `claim_draw` 政策，搜尋分支保留 move stack，並把對局規則傳入各 Greedy 建構入口。新增 9 個案例後完整 **114 個測試全部通過**，`git diff --check` 通過；涵蓋將死優先、可申請三次重複、分支五次重複，以及正常／異常後根棋盤不變。未改權重、增加新評分特徵或實作 `time_ms`。
+
 P5 新增設定比較批次：每個初始局面以相同 pair seed 跑兩盤並交換 baseline／candidate 黑白，完整保存設定、固定深度預算、配對、結果、耗時及未完成統計。新增 7 個案例後完整 **105 個測試全部通過**，`git diff --check` 通過；小樣本只驗證流程，不代表棋力提升。
 
 P4 新增版本化 `EvaluationConfig`、PST 倍率／開關、逐項 breakdown，並讓 CLI 批次、UI 批次及真人對局從實際注入的 evaluator 保存完整設定。預設評分與 PST 表未變；新增 7 個驗收案例後，完整 **98 個測試全部通過**，`git diff --check` 通過。
@@ -180,6 +182,6 @@ uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/pyth
 
 依 [開發計畫](docs/開發計畫.md) 執行：P1 移除舊 ML（已完成）→ P2 測試分類（已完成）→ P3 engine 分類（已完成）→ P4 獨立權重及設定保存（已完成）→ P5 比較流程（已完成）→ P6 特徵／搜尋逐項擴充 → P7 評估自動調參。
 
-本次只完成 P5 設定比較流程；下一階段依 P6 每次選一個評分或搜尋子項，需另行安排。每階段依 AGENTS.md 完成相關測試、全部驗證與獨立 commit，並更新文件狀態。
+本次完成 P6/S0 終局與歷史正確性；下一階段仍依 P6 每次只選一個評分或搜尋子項。每階段依 AGENTS.md 完成相關測試、全部驗證與獨立 commit，並更新文件狀態。
 
 目前 UI 真人模式、自動對戰與日期回放已完成，保留現有功能；名稱／標籤搜尋、悔棋、索引快取及中斷修復另行安排。資源圖片與舊對局資料本輪不清理。

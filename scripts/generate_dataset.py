@@ -62,9 +62,13 @@ def generate_game(
 
     if game_id % 2 == 1:
         white_player = RandomPlayer(rng=rng)
-        black_player = GreedyPlayer(config=evaluation_config, rng=rng)
+        black_player = GreedyPlayer(
+            config=evaluation_config, rng=rng, claim_draw=claim_draw,
+        )
     else:
-        white_player = GreedyPlayer(config=evaluation_config, rng=rng)
+        white_player = GreedyPlayer(
+            config=evaluation_config, rng=rng, claim_draw=claim_draw,
+        )
         black_player = RandomPlayer(rng=rng)
 
     white_player_label, black_player_label = _player_labels_for_game(game_id)
@@ -290,7 +294,7 @@ def generate_batch(
     elif not isinstance(evaluation_config, EvaluationConfig):
         raise ValueError("evaluation_config must be an EvaluationConfig")
     random_player = RandomPlayer()
-    greedy_player = GreedyPlayer(config=evaluation_config)
+    greedy_player = GreedyPlayer(config=evaluation_config, claim_draw=claim_draw)
     # An explicitly requested single-file export also refuses to overwrite old data.
     # Reserve it before creating a batch, so an existing path fails without side effects.
     with ExitStack() as resources:

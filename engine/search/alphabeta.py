@@ -6,7 +6,8 @@ import chess
 
 from engine.game import get_legal_moves
 from engine.interfaces import Evaluator
-from engine.search.types import CHECKMATE_SCORE, DRAW_SCORE, SearchLimits, SearchResult
+from engine.search.terminal import terminal_score
+from engine.search.types import SearchLimits, SearchResult
 
 
 class AlphaBetaSearcher:
@@ -17,12 +18,16 @@ class AlphaBetaSearcher:
         evaluator: Evaluator,
         limits: SearchLimits | None = None,
         default_max_depth: int = 1,
+        claim_draw: bool = False,
     ) -> None:
         if limits is not None and default_max_depth != 1:
             raise ValueError("Pass either limits or default_max_depth, not both.")
+        if not isinstance(claim_draw, bool):
+            raise ValueError("claim_draw must be a boolean.")
 
         self.evaluator = evaluator
         self.default_limits = limits if limits is not None else SearchLimits(max_depth=default_max_depth)
+        self.claim_draw = claim_draw
 
     def search(self, board: chess.Board, limits: SearchLimits | None = None) -> SearchResult:
         """Search the position with depth-limited alpha-beta.
@@ -47,10 +52,15 @@ class AlphaBetaSearcher:
         current_depth: int,
     ) -> SearchResult:
         """Return the best result reachable from this node via alpha-beta."""
-        if depth <= 0 or board.is_game_over():
+        score = terminal_score(
+            board,
+            ply_from_root=current_depth,
+            claim_draw=self.claim_draw,
+        )
+        if score is not None or depth <= 0:
             return SearchResult(
                 best_move=None,
-                score=self._evaluate_leaf(board, current_depth),
+                score=score if score is not None else self.evaluator.evaluate(board),
                 depth_reached=current_depth,
                 nodes_searched=1,
                 cutoff_count=0,
@@ -65,7 +75,7 @@ class AlphaBetaSearcher:
         cutoff_count = 0
 
         for move in legal_moves:
-            next_board = board.copy(stack=False)
+            next_board = board.copy(stack=True)
             next_board.push(move)
             child_result = self._search_recursive(
                 board=next_board,
@@ -109,17 +119,9 @@ class AlphaBetaSearcher:
 
     def _evaluate_leaf(self, board: chess.Board, current_depth: int = 0) -> float:
         """Evaluate a leaf node with shared terminal-scoring rules."""
-
-        if board.is_checkmate():
-            mate_score = CHECKMATE_SCORE - current_depth
-            return mate_score if board.turn == chess.BLACK else -mate_score
-
-        if (
-            board.is_stalemate()
-            or board.is_insufficient_material()
-            or board.is_seventyfive_moves()
-            or board.is_fivefold_repetition()
-        ):
-            return DRAW_SCORE
-
-        return self.evaluator.evaluate(board)
+        score = terminal_score(
+            board,
+            ply_from_root=current_depth,
+            claim_draw=self.claim_draw,
+        )
+        return score if score is not None else self.evaluator.evaluate(board)

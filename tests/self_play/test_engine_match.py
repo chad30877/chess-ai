@@ -24,7 +24,7 @@ class EngineMatchTest(unittest.TestCase):
         )
 
     def test_player_types_material_semantics_and_seeded_legal_moves(self):
-        board = chess.Board("4k3/8/8/8/3N4/8/8/4K3 w - - 0 1")
+        board = chess.Board("4k3/p7/8/8/3N4/8/P7/4K3 w - - 0 1")
         material = build_player("material", 1, 1)
         self.assertIsInstance(material, GreedyPlayer)
         self.assertIs(type(material.evaluator), MaterialEvaluator)

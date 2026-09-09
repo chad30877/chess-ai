@@ -98,8 +98,12 @@ class BatchRun:
     def _run(self):
         s = self.settings
         templates = {
-            "white": self._create_player(s.white, random.Random(0), s.white_evaluation),
-            "black": self._create_player(s.black, random.Random(0), s.black_evaluation),
+            "white": self._create_player(
+                s.white, random.Random(0), s.white_evaluation, s.claim_draw,
+            ),
+            "black": self._create_player(
+                s.black, random.Random(0), s.black_evaluation, s.claim_draw,
+            ),
         }
         settings = dict(initial_fen=s.initial_fen, rules={"claim_draw": s.claim_draw},
                         strategies={"white": strategy_config(s.white, templates["white"]),
@@ -120,8 +124,8 @@ class BatchRun:
                     rng = random.Random(seed)
                     game = play_game(
                         number,
-                        self._create_player(s.white, rng, s.white_evaluation),
-                        self._create_player(s.black, rng, s.black_evaluation),
+                        self._create_player(s.white, rng, s.white_evaluation, s.claim_draw),
+                        self._create_player(s.black, rng, s.black_evaluation, s.claim_draw),
                         s.white, s.black, initial_fen=s.initial_fen,
                         claim_draw=s.claim_draw, max_plies=s.max_plies, control=self._control,
                     )
@@ -140,10 +144,13 @@ class BatchRun:
 
     @staticmethod
     def _create_player(
-        name: str, rng: random.Random, evaluation: EvaluationConfig | None,
+        name: str,
+        rng: random.Random,
+        evaluation: EvaluationConfig | None,
+        claim_draw: bool,
     ) -> RandomPlayer | GreedyPlayer:
         if name == "Random":
             return RandomPlayer(rng=rng)
         if name == "Greedy":
-            return GreedyPlayer(config=evaluation, rng=rng)
+            return GreedyPlayer(config=evaluation, rng=rng, claim_draw=claim_draw)
         raise ValueError(f"Unsupported batch player: {name}")

@@ -67,6 +67,15 @@ class AlphaBetaPlayerTest(unittest.TestCase):
         self.assertIs(player.searcher.evaluator, evaluator)
         self.assertEqual(player.searcher.default_limits.max_depth, 2)
 
+    def test_from_evaluator_forwards_claim_draw_policy(self) -> None:
+        player = AlphaBetaPlayer.from_evaluator(
+            evaluator=MaterialEvaluator(),
+            claim_draw=True,
+        )
+
+        assert isinstance(player.searcher, AlphaBetaSearcher)
+        self.assertTrue(player.searcher.claim_draw)
+
 
 if __name__ == "__main__":
     unittest.main()

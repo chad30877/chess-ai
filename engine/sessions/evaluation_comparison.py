@@ -45,9 +45,13 @@ class ComparisonParticipant:
     def random_baseline(cls, label: str = "Random") -> "ComparisonParticipant":
         return cls(label=label, strategy="random")
 
-    def create_player(self, rng: random.Random):
+    def create_player(self, rng: random.Random, *, claim_draw: bool = False):
         if self.strategy == "greedy":
-            return GreedyPlayer(config=self.evaluation_config, rng=rng)
+            return GreedyPlayer(
+                config=self.evaluation_config,
+                rng=rng,
+                claim_draw=claim_draw,
+            )
         return RandomPlayer(rng=rng)
 
     def settings_snapshot(self) -> dict:
@@ -211,8 +215,8 @@ def run_evaluation_comparison(
                     started = perf_counter()
                     game = play_game(
                         game_number,
-                        white.create_player(rng),
-                        black.create_player(rng),
+                        white.create_player(rng, claim_draw=claim_draw),
+                        black.create_player(rng, claim_draw=claim_draw),
                         white.label,
                         black.label,
                         initial_fen=initial_fen,

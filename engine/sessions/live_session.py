@@ -60,7 +60,9 @@ class LiveSession:
             chess.BLACK: settings.black_evaluation,
         }
         self.players = {
-            color: self._create_player(name, rng, evaluations[color]) if name != "Human" else None
+            color: self._create_player(
+                name, rng, evaluations[color], settings.claim_draw,
+            ) if name != "Human" else None
             for color, name in ((chess.WHITE, settings.white), (chess.BLACK, settings.black))
         }
         self._pending: Future | None = None
@@ -70,12 +72,15 @@ class LiveSession:
 
     @staticmethod
     def _create_player(
-        name: str, rng: random.Random, evaluation: EvaluationConfig | None,
+        name: str,
+        rng: random.Random,
+        evaluation: EvaluationConfig | None,
+        claim_draw: bool,
     ) -> RandomPlayer | GreedyPlayer:
         if name == "Random":
             return RandomPlayer(rng=rng)
         if name == "Greedy":
-            return GreedyPlayer(config=evaluation, rng=rng)
+            return GreedyPlayer(config=evaluation, rng=rng, claim_draw=claim_draw)
         raise ValueError(f"Unsupported AI player: {name}")
 
     @property

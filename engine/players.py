@@ -9,7 +9,7 @@ from engine.evaluation.config import EvaluationConfig
 from engine.evaluation.evaluator import HandcraftedEvaluator
 from engine.game import get_legal_moves
 from engine.interfaces import Evaluator, Player
-from engine.search import AlphaBetaSearcher
+from engine.search import AlphaBetaSearcher, terminal_score
 from engine.search.types import SearchLimits, Searcher
 
 
@@ -37,16 +37,22 @@ class GreedyPlayer(Player):
         weights: Mapping[int | str, float] | None = None,
         config: EvaluationConfig | None = None,
         rng: random.Random | None = None,
+        claim_draw: bool = False,
     ) -> None:
         if sum(value is not None for value in (evaluator, weights, config)) > 1:
             raise ValueError("Pass only one of evaluator, weights, or config.")
+        if not isinstance(claim_draw, bool):
+            raise ValueError("claim_draw must be a boolean.")
 
         self.evaluator = evaluator if evaluator is not None else HandcraftedEvaluator(
             weights=weights, config=config,
         )
         self.rng = rng
+        self.claim_draw = claim_draw
 
     def choose_move(self, board: chess.Board) -> chess.Move:
+        if terminal_score(board, claim_draw=self.claim_draw) is not None:
+            raise ValueError("No legal moves available in this position.")
         legal_moves = get_legal_moves(board)
         if not legal_moves:
             raise ValueError("No legal moves available in this position.")
@@ -56,9 +62,15 @@ class GreedyPlayer(Player):
         best_moves: list[chess.Move] = []
 
         for move in legal_moves:
-            next_board = board.copy(stack=False)
+            next_board = board.copy(stack=True)
             next_board.push(move)
-            score = self.evaluator.evaluate(next_board)
+            score = terminal_score(
+                next_board,
+                ply_from_root=1,
+                claim_draw=self.claim_draw,
+            )
+            if score is None:
+                score = self.evaluator.evaluate(next_board)
 
             if best_score is None:
                 best_score = score
@@ -92,6 +104,7 @@ class AlphaBetaPlayer(Player):
         *,
         limits: SearchLimits | None = None,
         default_max_depth: int = 1,
+        claim_draw: bool = False,
     ) -> "AlphaBetaPlayer":
         """Build a player whose searcher owns the injected evaluator."""
 
@@ -100,6 +113,7 @@ class AlphaBetaPlayer(Player):
                 evaluator=evaluator,
                 limits=limits,
                 default_max_depth=default_max_depth,
+                claim_draw=claim_draw,
             )
         )
 
