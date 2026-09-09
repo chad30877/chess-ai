@@ -13,6 +13,7 @@ from typing import TextIO
 
 import chess
 
+from engine.evaluation.config import EvaluationConfig
 from engine.game import create_board
 from engine.storage.batch_storage import BatchWriter
 from engine.players import GreedyPlayer, RandomPlayer
@@ -55,14 +56,15 @@ def _player_labels_for_game(game_id: int) -> tuple[str, str]:
 def generate_game(
     game_id: int, seed: int | None = None, *, initial_fen: str = chess.STARTING_FEN,
     claim_draw: bool = False, max_plies: int | None = None,
+    evaluation_config: EvaluationConfig | None = None,
 ) -> PlayedGame:
     rng = random.Random(game_id if seed is None else seed)
 
     if game_id % 2 == 1:
         white_player = RandomPlayer(rng=rng)
-        black_player = GreedyPlayer(rng=rng)
+        black_player = GreedyPlayer(config=evaluation_config, rng=rng)
     else:
-        white_player = GreedyPlayer(rng=rng)
+        white_player = GreedyPlayer(config=evaluation_config, rng=rng)
         black_player = RandomPlayer(rng=rng)
 
     white_player_label, black_player_label = _player_labels_for_game(game_id)
@@ -231,21 +233,29 @@ def flush_buffer(
     return rows_to_write
 
 
-def _generate_job(job: tuple[int, int, str, bool, int | None]) -> tuple[PlayedGame, int]:
-    game_id, seed, initial_fen, claim_draw, max_plies = job
+def _generate_job(
+    job: tuple[int, int, str, bool, int | None, dict],
+) -> tuple[PlayedGame, int]:
+    game_id, seed, initial_fen, claim_draw, max_plies, evaluation_payload = job
+    evaluation_config = EvaluationConfig.from_dict(evaluation_payload)
     return generate_game(game_id, seed, initial_fen=initial_fen,
-                         claim_draw=claim_draw, max_plies=max_plies), seed
+                         claim_draw=claim_draw, max_plies=max_plies,
+                         evaluation_config=evaluation_config), seed
 
 
 def generation_settings(
     *, games: int, seed: int, workers: int, initial_fen: str,
     claim_draw: bool, max_plies: int | None,
+    random_player: RandomPlayer, greedy_player: GreedyPlayer,
 ) -> dict:
     settings = {
         "num_games": games, "initial_fen": initial_fen,
         "rules": {"claim_draw": claim_draw}, "workers": workers,
         "color_assignment": "alternate",
-        "strategies": {"a": strategy_config("Random"), "b": strategy_config("Greedy")},
+        "strategies": {
+            "a": strategy_config("Random", random_player),
+            "b": strategy_config("Greedy", greedy_player),
+        },
     }
     if max_plies is not None:
         settings["max_plies"] = max_plies
@@ -259,6 +269,7 @@ def generate_batch(
     seed: int = BASE_WORKER_SEED, workers: int | None = None,
     initial_fen: str = chess.STARTING_FEN, claim_draw: bool = False,
     max_plies: int | None = None,
+    evaluation_config: EvaluationConfig | None = None,
 ) -> Path:
     """Always save an independent batch; optionally export the legacy row schema."""
     if games <= 0:
@@ -274,6 +285,12 @@ def generate_batch(
         raise ValueError("initial_fen must be a valid standard chess position")
     initial_fen = board.fen()
     workers = min(games, workers) if workers is not None else determine_max_workers(games)
+    if evaluation_config is None:
+        evaluation_config = EvaluationConfig()
+    elif not isinstance(evaluation_config, EvaluationConfig):
+        raise ValueError("evaluation_config must be an EvaluationConfig")
+    random_player = RandomPlayer()
+    greedy_player = GreedyPlayer(config=evaluation_config)
     # An explicitly requested single-file export also refuses to overwrite old data.
     # Reserve it before creating a batch, so an existing path fails without side effects.
     with ExitStack() as resources:
@@ -285,12 +302,15 @@ def generate_batch(
                 export_writer = create_csv_writer(export_file)
         settings = generation_settings(games=games, seed=seed, workers=workers,
                                        initial_fen=initial_fen, claim_draw=claim_draw,
-                                       max_plies=max_plies)
+                                       max_plies=max_plies, random_player=random_player,
+                                       greedy_player=greedy_player)
         with BatchWriter(Path(batch_root), name=name, tags=tags or [], settings=settings,
                          output_format=output_format) as batch:
             stats = initialize_stats(games)
             print(f"Batch directory: {batch.path}", flush=True)
-            jobs = ((i, game_seed(seed, i), initial_fen, claim_draw, max_plies)
+            evaluation_payload = evaluation_config.to_dict()
+            jobs = ((i, game_seed(seed, i), initial_fen, claim_draw, max_plies,
+                     evaluation_payload)
                     for i in range(1, games + 1))
             # Ordered map keeps files deterministic even when workers finish out of order.
             with ExitStack() as worker_resources:

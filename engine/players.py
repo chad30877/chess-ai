@@ -5,6 +5,7 @@ from collections.abc import Mapping
 
 import chess
 
+from engine.evaluation.config import EvaluationConfig
 from engine.evaluation.evaluator import HandcraftedEvaluator
 from engine.game import get_legal_moves
 from engine.interfaces import Evaluator, Player
@@ -34,12 +35,15 @@ class GreedyPlayer(Player):
         self,
         evaluator: Evaluator | None = None,
         weights: Mapping[int | str, float] | None = None,
+        config: EvaluationConfig | None = None,
         rng: random.Random | None = None,
     ) -> None:
-        if evaluator is not None and weights is not None:
-            raise ValueError("Pass either evaluator or weights, not both.")
+        if sum(value is not None for value in (evaluator, weights, config)) > 1:
+            raise ValueError("Pass only one of evaluator, weights, or config.")
 
-        self.evaluator = evaluator if evaluator is not None else HandcraftedEvaluator(weights=weights)
+        self.evaluator = evaluator if evaluator is not None else HandcraftedEvaluator(
+            weights=weights, config=config,
+        )
         self.rng = rng
 
     def choose_move(self, board: chess.Board) -> chess.Move:

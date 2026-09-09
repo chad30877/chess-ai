@@ -10,6 +10,8 @@ from unittest.mock import patch
 import chess
 
 from apps.play_ui import create_session, prepare_replay_content
+from engine.evaluation.config import EvaluationConfig
+from engine.players import GreedyPlayer, RandomPlayer
 from engine.storage.batch_storage import BatchWriter
 from engine.replay.replay_loader import load_replay_json
 from scripts.export_replay_json import build_replay_payload, load_game_rows
@@ -52,6 +54,10 @@ class BatchGenerationTest(unittest.TestCase):
         self.assertEqual(len(list((path / "replays").glob("*.json"))), len(games))
         self.assertEqual([int(g["game_number"]) for g in games], list(range(1, len(games) + 1)))
         settings = manifest["settings"]
+        saved_evaluator = settings["strategies"]["b"]["evaluator"]
+        evaluation_config = EvaluationConfig.from_dict({
+            key: value for key, value in saved_evaluator.items() if key != "type"
+        })
         for game in games:
             game_id = game["game_id"]
             selected = [row for row in positions if str(row["game_id"]) == game_id]
@@ -74,7 +80,8 @@ class BatchGenerationTest(unittest.TestCase):
             session.last()
             self.assertEqual(session.current_result(), game["result"])
             regenerated = generate_game(int(game["game_number"]), int(game["seed"]), initial_fen=settings["initial_fen"],
-                                        claim_draw=settings["rules"]["claim_draw"], max_plies=settings.get("max_plies"))
+                                        claim_draw=settings["rules"]["claim_draw"], max_plies=settings.get("max_plies"),
+                                        evaluation_config=evaluation_config)
             self.assertEqual([r["selected_move"] for r in regenerated.positions], replay["moves_uci"])
             self.assertEqual(regenerated.result, replay["result"])
             self.assertEqual(regenerated.final_fen, session.current_fen())
@@ -165,8 +172,11 @@ class BatchGenerationTest(unittest.TestCase):
         self.assertEqual(len(list((path / "replays").glob("*.json"))), 1)
 
     def test_failed_manifest_commit_rolls_back_only_current_game(self):
+        random_player = RandomPlayer()
+        greedy_player = GreedyPlayer()
         settings = generation_settings(games=2, seed=42, workers=1, initial_fen=chess.STARTING_FEN,
-                                       claim_draw=False, max_plies=2)
+                                       claim_draw=False, max_plies=2, random_player=random_player,
+                                       greedy_player=greedy_player)
         batch = BatchWriter(self.root / "batches", name="failure", tags=[], settings=settings)
         with self.assertRaisesRegex(OSError, "test write failure"):
             with batch:
@@ -193,6 +203,24 @@ class BatchGenerationTest(unittest.TestCase):
         update_stats_for_game(stats, 1, "*")
         self.assertEqual(stats["draws"], 0)
         self.assertEqual(stats["truncated"], 1)
+
+    def test_custom_evaluation_config_is_used_and_saved_verbatim(self):
+        config = EvaluationConfig(piece_values={"N": 4.5}, pst_weight=0.0)
+        path = self.generate(games=2, workers=2, max_plies=4, evaluation_config=config)
+        manifest, games, _ = self.verify_batch(path)
+        saved = manifest["settings"]["strategies"]["b"]["evaluator"]
+
+        self.assertEqual(saved["type"], "handcrafted")
+        self.assertEqual(saved["terms"]["material"]["piece_values"]["N"], 4.5)
+        self.assertEqual(saved["terms"]["piece_square"]["weight"], 0.0)
+        regenerated = generate_game(
+            1, int(games[0]["seed"]), max_plies=4, evaluation_config=config,
+        )
+        replay = json.loads((path / games[0]["replay_path"]).read_text(encoding="utf-8"))
+        self.assertEqual(
+            [row["selected_move"] for row in regenerated.positions],
+            replay["moves_uci"],
+        )
 
     def test_loader_rejects_string_draw_policy_and_accepts_old_replay(self):
         old = load_replay_json("data/replays/sample_replay.json")

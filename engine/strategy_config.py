@@ -1,18 +1,30 @@
-"""Actual settings for the strategies currently exposed by the UI and generator."""
+"""Serialize settings from the player objects that actually play a game."""
 
-import chess
+from engine.evaluation.evaluator import HandcraftedEvaluator, MaterialEvaluator
+from engine.interfaces import Player
 
-from engine.players import GreedyPlayer
 
-
-def strategy_config(name: str) -> dict:
-    if name in ("Human", "Random"):
+def strategy_config(name: str, player: Player | None) -> dict:
+    if name == "Human":
+        if player is not None:
+            raise ValueError("Human strategy must not have a player object")
+        return {"strategy": name}
+    if name == "Random":
+        if player is None:
+            raise ValueError("Random strategy requires the actual player object")
         return {"strategy": name}
     if name == "Greedy":
-        evaluator = GreedyPlayer().evaluator
-        return {"strategy": name, "evaluator": {
-            "type": "handcrafted",
-            "weights": {chess.piece_symbol(k).upper(): v
-                        for k, v in evaluator.material_evaluator.weights.items()},
-        }}
+        if player is None or not hasattr(player, "evaluator"):
+            raise ValueError("Greedy strategy requires its actual evaluator")
+        evaluator = player.evaluator
+        if isinstance(evaluator, HandcraftedEvaluator):
+            evaluator_type = "handcrafted"
+        elif isinstance(evaluator, MaterialEvaluator):
+            evaluator_type = "material"
+        else:
+            raise ValueError(f"Unsupported evaluator for saved settings: {type(evaluator).__name__}")
+        return {
+            "strategy": name,
+            "evaluator": {"type": evaluator_type, **evaluator.config.to_dict()},
+        }
     raise ValueError(f"Unsupported strategy: {name}")

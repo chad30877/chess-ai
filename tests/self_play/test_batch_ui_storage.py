@@ -14,6 +14,7 @@ from unittest.mock import patch
 import chess
 
 from apps.play_ui import create_session
+from engine.evaluation.config import EvaluationConfig
 from engine.sessions.batch_run import BatchRun, BatchSettings
 from engine.storage.batch_storage import BatchWriter
 from engine.storage.data_ids import allocate_id, date_key
@@ -49,9 +50,13 @@ class BatchUIStorageTest(unittest.TestCase):
         self.assertEqual(allocate_id(self.root, "game", "2026-09-09T16:00:00Z"), "20260910_000001")
 
     def test_completed_ui_batch_has_fixed_colors_and_seed_reproduction(self):
+        config = EvaluationConfig(piece_values={"N": 4.0}, pst_weight=0.5)
         with ThreadPoolExecutor(max_workers=1) as executor:
-            run = BatchRun(BatchSettings(white="Greedy", black="Random", games=2, max_plies=8),
-                           self.root / "batches", executor)
+            settings = BatchSettings(
+                white="Greedy", black="Random", games=2, max_plies=8,
+                white_evaluation=config,
+            )
+            run = BatchRun(settings, self.root / "batches", executor)
             run.future.result(timeout=10)
         state = run.snapshot()
         self.assertEqual(state["status"], "completed")
@@ -61,6 +66,9 @@ class BatchUIStorageTest(unittest.TestCase):
         self.assertEqual(manifest["schema_version"], 2)
         self.assertEqual(manifest["counts"]["positions"], 16)
         self.assertEqual(manifest["settings"]["color_assignment"], "fixed")
+        saved_evaluator = manifest["settings"]["strategies"]["white"]["evaluator"]
+        self.assertEqual(saved_evaluator["terms"]["material"]["piece_values"]["N"], 4.0)
+        self.assertEqual(saved_evaluator["terms"]["piece_square"]["weight"], 0.5)
         forbidden = {"source_sha256", "pst_sha256", "pst_source", "runtime", "rng", "seed_derivation",
                      "legacy_export", "class", "label", "final_fen", "num_games"}
         def check(value):
@@ -79,7 +87,7 @@ class BatchUIStorageTest(unittest.TestCase):
         for row in rows(batch / "games.csv"):
             self.assertEqual((row["white_player"], row["black_player"]), ("Greedy", "Random"))
             rng = random.Random(int(row["seed"]))
-            game = play_game(int(row["game_number"]), GreedyPlayer(rng=rng), RandomPlayer(rng=rng),
+            game = play_game(int(row["game_number"]), GreedyPlayer(config=config, rng=rng), RandomPlayer(rng=rng),
                              "Greedy", "Random", max_plies=8)
             data = load_replay_json(str(batch / row["replay_path"]))
             self.assertEqual(data["moves_uci"], [r["selected_move"] for r in game.positions])
@@ -180,7 +188,8 @@ class BatchUIStorageTest(unittest.TestCase):
 
     def test_cross_midnight_batch_and_standalone_group_by_actual_game_start(self):
         settings = generation_settings(games=2, seed=42, workers=1, initial_fen=chess.STARTING_FEN,
-                                       claim_draw=False, max_plies=1)
+                                       claim_draw=False, max_plies=1,
+                                       random_player=RandomPlayer(), greedy_player=GreedyPlayer())
         with BatchWriter(self.root / "batches", name=None, tags=[], settings=settings) as writer:
             for number, timestamp in enumerate(("2026-09-08T23:59:58+08:00", "2026-09-09T00:00:01+08:00"), 1):
                 game = replace(generate_game(number, 42, max_plies=1), started_at=timestamp)

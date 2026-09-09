@@ -9,13 +9,13 @@
 | 區塊 | 主要責任 | 目前進度 |
 | --- | --- | --- |
 | [自動對戰](docs/自動對戰.md) | 讓整盤棋跑完，設定對戰雙方與黑白輪替、統計、輸出資料 | 已有精簡 v2 批次保存、CLI 多程序生成與 UI 批次進度 |
-| [評分調整與實驗](docs/評分調整與實驗.md) | 獨立權重、手動比較與未來調參策略 | 舊 ML 已移除；獨立權重與比較流程待實作 |
+| [評分調整與實驗](docs/評分調整與實驗.md) | 獨立權重、手動比較與未來調參策略 | 可調評分設定與真實設定保存已完成；比較流程待實作 |
 | [搜尋與評分](docs/搜尋與評分.md) | 決定每一步怎麼選，包含 Greedy、Alpha-Beta、子力與 PST | 搜尋核心已實作，尚未接入對戰 CLI；時間限制未生效 |
 | [使用者介面（UI）](docs/使用者介面.md) | 棋盤顯示、使用者操作與對局查找 | 已有高解析度模式首頁、批次生成、真人對 AI、日期／批次／對局回放 |
 
 後續任務順序與驗收以 [開發計畫](docs/開發計畫.md) 為準；測試分類與執行方式見 [測試導覽](tests/README.md)。四份功能文件區分目前實作與未來規劃。
 
-**2026-09-09 P1 完成：** 已移除舊 ML 程式、訓練入口、模型與專屬參數；對戰 CLI 提供 Random 基準及原有 material。保留 PNG 備援與通用對局資料；P2 測試分類與 P3 engine 分類也已完成，後續 P4–P7 尚未實作。
+**2026-09-09 P1–P4 完成：** 已移除舊 ML，完成測試／engine 分類，並加入版本化評分設定、PST 倍率、分項輸出與實際對戰設定保存。Random 基準、PNG 備援與通用對局資料保留；後續 P5–P7 尚未實作。
 
 ## 各區塊怎麼串接？
 
@@ -80,7 +80,7 @@ flowchart TD
 | `.vscode/` | 編輯器設定，指定 Conda 環境管理偏好 | 開發工具設定，不代表 Conda 環境已存在 |
 | `.uv-python/`、`.uv-cache/`、`__pycache__/` | 本機 Python、套件快取與編譯快取 | 執行環境相關，非棋力邏輯 |
 
-P3 將 Python 匯入路徑統一為 `engine.evaluation.*`、`engine.sessions.*`、`engine.replay.*`、`engine.storage.*`，不保留舊平鋪模組別名；CLI 使用方式不變。
+P3 將 Python 匯入路徑統一為 `engine.evaluation.*`、`engine.sessions.*`、`engine.replay.*`、`engine.storage.*`，不保留舊平鋪模組別名；CLI 使用方式不變。P4 的 `engine/evaluation/config.py` 定義可序列化設定與分項結果，預設仍為原本的 material + PST。
 
 各目錄的 `__init__.py` 主要將目錄標記為 Python 套件；`engine/search/__init__.py` 另外集中匯出搜尋類別與型別。
 
@@ -148,6 +148,8 @@ uv pip install --python "./.venv/Scripts/python.exe" chess pygame
 
 ## 驗證紀錄
 
+P4 新增版本化 `EvaluationConfig`、PST 倍率／開關、逐項 breakdown，並讓 CLI 批次、UI 批次及真人對局從實際注入的 evaluator 保存完整設定。預設評分與 PST 表未變；新增 7 個驗收案例後，完整 **98 個測試全部通過**，`git diff --check` 通過。
+
 P3 已分類 10 個 engine 模組並同步所有專案引用；原有 Python 程式經匯入／patch 路徑正規化後 AST 一致，89 個既有案例保留。新增獨立程序匯入與 CLI 多程序生成／匯出回放驗證後，**91 個測試全部通過**，`git diff --check` 通過。目錄分類不改棋規、評分、搜尋與資料格式。
 
 P2 已將測試分類至 rules、evaluation、search、self_play、replay、ui，並抽出共用 ManualExecutor。原有 88 個案例 ID 全數保留、搬移的 test 方法內容不變；新增 discovery 驗證後 **89 個測試全部通過**，`git diff --check` 通過。測試命令需加 `-t .` 避免 `tests/ui` 與正式 `ui` 匯入衝突。
@@ -174,8 +176,8 @@ uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/pyth
 
 ## 建議接續順序
 
-依 [開發計畫](docs/開發計畫.md) 執行：P1 移除舊 ML（已完成）→ P2 測試分類（已完成）→ P3 engine 分類（已完成）→ P4 獨立權重及設定保存 → P5 比較流程 → P6 特徵／搜尋逐項擴充 → P7 評估自動調參。
+依 [開發計畫](docs/開發計畫.md) 執行：P1 移除舊 ML（已完成）→ P2 測試分類（已完成）→ P3 engine 分類（已完成）→ P4 獨立權重及設定保存（已完成）→ P5 比較流程 → P6 特徵／搜尋逐項擴充 → P7 評估自動調參。
 
-本次完成 P3 engine 分類；下一階段為 P4 可調評分設定，需另行安排。每階段依 AGENTS.md 完成相關測試、全部驗證與獨立 commit，並更新文件狀態。
+本次只完成 P4 可調評分設定；下一階段為 P5 設定比較流程，需另行安排。每階段依 AGENTS.md 完成相關測試、全部驗證與獨立 commit，並更新文件狀態。
 
 目前 UI 真人模式、自動對戰與日期回放已完成，保留現有功能；名稱／標籤搜尋、悔棋、索引快取及中斷修復另行安排。資源圖片與舊對局資料本輪不清理。

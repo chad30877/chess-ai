@@ -5,6 +5,7 @@ from tests.helpers.executors import ManualExecutor
 
 import chess
 
+from engine.evaluation.config import EvaluationConfig
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.replay.replay_session import ReplaySession
 
@@ -135,6 +136,17 @@ class LiveSessionTest(unittest.TestCase):
         game = LiveSession(LiveSettings(initial_fen="7k/8/8/8/8/8/8/K7 w - - 0 1", max_plies=0))
         game.start()
         self.assertEqual((game.status, game.result), ("completed", "1/2-1/2"))
+
+    def test_replay_saves_the_actual_injected_evaluation_settings(self):
+        config = EvaluationConfig(piece_values={"B": 3.75}, pst_weight=0.25)
+        game = LiveSession(LiveSettings(
+            white="Human", black="Greedy", black_evaluation=config,
+        ))
+
+        saved = game.replay_payload()["metadata"]["strategies"]["black"]["evaluator"]
+
+        self.assertEqual(saved["terms"]["material"]["piece_values"]["B"], 3.75)
+        self.assertEqual(saved["terms"]["piece_square"]["weight"], 0.25)
 
 
 if __name__ == "__main__":

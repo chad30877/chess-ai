@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import chess
 
+from engine.evaluation.config import EvaluationConfig
 from engine.game import create_board, get_legal_moves, get_outcome, make_move
 from engine.storage.data_ids import now_iso
 from engine.strategy_config import strategy_config
@@ -21,12 +22,22 @@ class LiveSettings:
     initial_fen: str = chess.STARTING_FEN
     claim_draw: bool = False
     max_plies: int | None = None
+    white_evaluation: EvaluationConfig | None = None
+    black_evaluation: EvaluationConfig | None = None
 
     def __post_init__(self):
         if self.white not in ("Random", "Greedy", "Human") or self.black not in ("Random", "Greedy", "Human"):
             raise ValueError("Unsupported player")
         if self.interval < 0 or (self.max_plies is not None and self.max_plies < 0):
             raise ValueError("Execution limits must be non-negative")
+        if self.white_evaluation is not None and not isinstance(self.white_evaluation, EvaluationConfig):
+            raise ValueError("white_evaluation must be an EvaluationConfig")
+        if self.black_evaluation is not None and not isinstance(self.black_evaluation, EvaluationConfig):
+            raise ValueError("black_evaluation must be an EvaluationConfig")
+        if self.white != "Greedy" and self.white_evaluation is not None:
+            raise ValueError("white_evaluation is only valid for Greedy")
+        if self.black != "Greedy" and self.black_evaluation is not None:
+            raise ValueError("black_evaluation is only valid for Greedy")
 
 
 class LiveSession:
@@ -44,15 +55,28 @@ class LiveSession:
         self.error = ""
         self.move_items: list[dict] = []
         rng = random.Random(settings.seed)
-        classes = {"Random": RandomPlayer, "Greedy": GreedyPlayer}
+        evaluations = {
+            chess.WHITE: settings.white_evaluation,
+            chess.BLACK: settings.black_evaluation,
+        }
         self.players = {
-            color: classes[name](rng=rng) if name != "Human" else None
+            color: self._create_player(name, rng, evaluations[color]) if name != "Human" else None
             for color, name in ((chess.WHITE, settings.white), (chess.BLACK, settings.black))
         }
         self._pending: Future | None = None
         self._pending_position: tuple[str, int] | None = None
         self._step_requested = False
         self._next_due = 0.0
+
+    @staticmethod
+    def _create_player(
+        name: str, rng: random.Random, evaluation: EvaluationConfig | None,
+    ) -> RandomPlayer | GreedyPlayer:
+        if name == "Random":
+            return RandomPlayer(rng=rng)
+        if name == "Greedy":
+            return GreedyPlayer(config=evaluation, rng=rng)
+        raise ValueError(f"Unsupported AI player: {name}")
 
     @property
     def active(self) -> bool:
@@ -166,8 +190,10 @@ class LiveSession:
             "white_player": self.settings.white, "black_player": self.settings.black,
             "seed": self.settings.seed, "started_at": self.started_at,
             "status": self.status, "rules": {"claim_draw": self.settings.claim_draw},
-            "strategies": {"white": strategy_config(self.settings.white),
-                           "black": strategy_config(self.settings.black)},
+            "strategies": {
+                "white": strategy_config(self.settings.white, self.players[chess.WHITE]),
+                "black": strategy_config(self.settings.black, self.players[chess.BLACK]),
+            },
             "interval_seconds": self.settings.interval,
         }
         if self.finished_at:
