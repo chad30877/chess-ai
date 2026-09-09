@@ -63,6 +63,32 @@ class BatchWriter:
         self.manifest["updated_at"] = now_iso()
         write_json_atomic(self.path / "manifest.json", self.manifest)
 
+    def add_json_artifact(self, key: str, filename: str, payload: dict) -> None:
+        """Publish one named JSON artifact through the manifest."""
+
+        if not isinstance(filename, str):
+            raise ValueError("Artifact filename must be a string")
+        relative_path = Path(filename)
+        if not key or key in self.manifest["files"]:
+            raise ValueError(f"Invalid or duplicate artifact key: {key}")
+        if (
+            relative_path.is_absolute()
+            or len(relative_path.parts) != 1
+            or relative_path.name in ("", ".", "..")
+        ):
+            raise ValueError("Artifact filename must stay directly inside the batch")
+        artifact_path = self.path / relative_path
+        if artifact_path.exists():
+            raise FileExistsError(artifact_path)
+        try:
+            write_json_atomic(artifact_path, payload)
+            self.manifest["files"][key] = filename
+            self._save_manifest()
+        except BaseException:
+            self.manifest["files"].pop(key, None)
+            artifact_path.unlink(missing_ok=True)
+            raise
+
     def __enter__(self):
         try:
             (self.path / "replays").mkdir()
@@ -83,7 +109,7 @@ class BatchWriter:
             self.__exit__(type(exc), exc, exc.__traceback__)
             raise
 
-    def add_game(self, game: PlayedGame, seed: int) -> None:
+    def add_game(self, game: PlayedGame, seed: int) -> str:
         expected_id = self.manifest["counts"]["saved_games"] + 1
         if game.game_id != expected_id or expected_id > self.manifest["counts"]["requested_games"]:
             raise ValueError(f"Expected game_id {expected_id} within requested game count")
@@ -133,6 +159,7 @@ class BatchWriter:
             counts["positions"] += len(game.positions)
             self.manifest["results"][game.result] += 1
             self._save_manifest()
+            return game_id
         except BaseException:
             self.manifest["counts"] = old_counts
             self.manifest["results"] = old_results

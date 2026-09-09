@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "perspective": "white",
+  "score_unit": "pawn",
+  "terms": {
+    "material": {
+      "enabled": true,
+      "weight": 1.0,
+      "piece_values": {
+        "P": 1.0,
+        "N": 3.0,
+        "B": 3.0,
+        "R": 5.0,
+        "Q": 9.0
+      }
+    },
+    "piece_square": {
+      "enabled": true,
+      "weight": 1.0,
+      "table_version": 1
+    }
+  }
+}
