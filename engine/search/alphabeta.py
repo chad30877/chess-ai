@@ -6,6 +6,7 @@ import chess
 
 from engine.game import get_legal_moves
 from engine.interfaces import Evaluator
+from engine.search.ordering import order_moves
 from engine.search.terminal import terminal_score
 from engine.search.types import SearchLimits, SearchResult
 
@@ -19,15 +20,19 @@ class AlphaBetaSearcher:
         limits: SearchLimits | None = None,
         default_max_depth: int = 1,
         claim_draw: bool = False,
+        move_ordering: bool = True,
     ) -> None:
         if limits is not None and default_max_depth != 1:
             raise ValueError("Pass either limits or default_max_depth, not both.")
         if not isinstance(claim_draw, bool):
             raise ValueError("claim_draw must be a boolean.")
+        if not isinstance(move_ordering, bool):
+            raise ValueError("move_ordering must be a boolean.")
 
         self.evaluator = evaluator
         self.default_limits = limits if limits is not None else SearchLimits(max_depth=default_max_depth)
         self.claim_draw = claim_draw
+        self.move_ordering = move_ordering
 
     def search(self, board: chess.Board, limits: SearchLimits | None = None) -> SearchResult:
         """Search the position with depth-limited alpha-beta.
@@ -67,6 +72,8 @@ class AlphaBetaSearcher:
             )
 
         legal_moves = get_legal_moves(board)
+        if self.move_ordering:
+            legal_moves = order_moves(board, legal_moves)
         is_maximizing = board.turn == chess.WHITE
         best_move: chess.Move | None = None
         best_score = -inf if is_maximizing else inf

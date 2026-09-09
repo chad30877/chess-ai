@@ -76,6 +76,15 @@ class AlphaBetaPlayerTest(unittest.TestCase):
         assert isinstance(player.searcher, AlphaBetaSearcher)
         self.assertTrue(player.searcher.claim_draw)
 
+    def test_from_evaluator_forwards_move_ordering_switch(self) -> None:
+        player = AlphaBetaPlayer.from_evaluator(
+            evaluator=MaterialEvaluator(),
+            move_ordering=False,
+        )
+
+        assert isinstance(player.searcher, AlphaBetaSearcher)
+        self.assertFalse(player.searcher.move_ordering)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,7 @@
 """Search layer exports."""
 
 from engine.search.alphabeta import AlphaBetaSearcher
+from engine.search.ordering import move_order_key, order_moves
 from engine.search.terminal import terminal_score
 from engine.search.types import CHECKMATE_SCORE, DRAW_SCORE, SearchLimits, SearchResult, Searcher
 
@@ -8,6 +9,8 @@ __all__ = [
     "AlphaBetaSearcher",
     "CHECKMATE_SCORE",
     "DRAW_SCORE",
+    "move_order_key",
+    "order_moves",
     "SearchLimits",
     "SearchResult",
     "Searcher",

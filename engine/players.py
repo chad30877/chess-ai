@@ -105,6 +105,7 @@ class AlphaBetaPlayer(Player):
         limits: SearchLimits | None = None,
         default_max_depth: int = 1,
         claim_draw: bool = False,
+        move_ordering: bool = True,
     ) -> "AlphaBetaPlayer":
         """Build a player whose searcher owns the injected evaluator."""
 
@@ -114,6 +115,7 @@ class AlphaBetaPlayer(Player):
                 limits=limits,
                 default_max_depth=default_max_depth,
                 claim_draw=claim_draw,
+                move_ordering=move_ordering,
             )
         )
 

@@ -135,6 +135,10 @@ class AlphaBetaSearcherTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             AlphaBetaSearcher(ConstantEvaluator(0.0), claim_draw=1)  # type: ignore[arg-type]
 
+    def test_constructor_rejects_non_boolean_move_ordering_switch(self) -> None:
+        with self.assertRaises(ValueError):
+            AlphaBetaSearcher(ConstantEvaluator(0.0), move_ordering=1)  # type: ignore[arg-type]
+
     def test_search_returns_a_legal_move(self) -> None:
         board = chess.Board("6k1/8/3q4/3r4/8/8/8/3Q2K1 w - - 0 1")
         searcher = AlphaBetaSearcher(MaterialEvaluator(), default_max_depth=1)
@@ -206,6 +210,21 @@ class AlphaBetaSearcherTest(unittest.TestCase):
         self.assertEqual(result.depth_reached, expected_depth)
         self.assertLess(result.nodes_searched, expected_nodes)
         self.assertGreater(result.cutoff_count, 0)
+
+    def test_move_ordering_preserves_score_and_reduces_fixture_nodes(self) -> None:
+        board = chess.Board("6k1/8/3q4/3r4/8/8/8/3Q2K1 w - - 0 1")
+        limits = SearchLimits(max_depth=3)
+
+        unordered = AlphaBetaSearcher(
+            MaterialEvaluator(), move_ordering=False,
+        ).search(board, limits)
+        ordered = AlphaBetaSearcher(
+            MaterialEvaluator(), move_ordering=True,
+        ).search(board, limits)
+
+        self.assertEqual(ordered.score, unordered.score)
+        self.assertEqual(ordered.best_move, unordered.best_move)
+        self.assertLess(ordered.nodes_searched, unordered.nodes_searched)
 
     def test_same_searcher_logic_supports_different_evaluators(self) -> None:
         board = chess.Board("6k1/8/3q4/3r4/8/8/8/3Q2K1 w - - 0 1")
