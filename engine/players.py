@@ -107,6 +107,7 @@ class AlphaBetaPlayer(Player):
         claim_draw: bool = False,
         move_ordering: bool = True,
         quiescence_depth: int = 4,
+        use_transposition_table: bool = True,
     ) -> "AlphaBetaPlayer":
         """Build a player whose searcher owns the injected evaluator."""
 
@@ -118,6 +119,7 @@ class AlphaBetaPlayer(Player):
                 claim_draw=claim_draw,
                 move_ordering=move_ordering,
                 quiescence_depth=quiescence_depth,
+                use_transposition_table=use_transposition_table,
             )
         )
 

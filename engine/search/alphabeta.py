@@ -11,6 +11,14 @@ from engine.game import get_legal_moves
 from engine.interfaces import Evaluator
 from engine.search.ordering import order_moves
 from engine.search.terminal import terminal_score
+from engine.search.transposition import (
+    BoundType,
+    TranspositionEntry,
+    TranspositionKey,
+    TranspositionTable,
+    classify_bound,
+    make_transposition_key,
+)
 from engine.search.types import SearchLimits, SearchResult
 
 
@@ -24,9 +32,12 @@ class _SearchStopped(Exception):
 class _SearchContext:
     deadline: float | None
     stop_requested: Callable[[], bool] | None
+    transposition_table: TranspositionTable | None
     nodes_searched: int = 0
     cutoff_count: int = 0
     depth_reached: int = 0
+    transposition_hits: int = 0
+    transposition_stores: int = 0
 
     def enter_node(self, current_depth: int) -> None:
         self.nodes_searched += 1
@@ -38,6 +49,28 @@ class _SearchContext:
 
     def record_cutoff(self) -> None:
         self.cutoff_count += 1
+
+    def probe_transposition(
+        self,
+        key: TranspositionKey,
+    ) -> TranspositionEntry | None:
+        if self.transposition_table is None:
+            return None
+        entry = self.transposition_table.probe(key)
+        if entry is not None:
+            self.transposition_hits += 1
+        return entry
+
+    def store_transposition(
+        self,
+        key: TranspositionKey,
+        entry: TranspositionEntry,
+    ) -> None:
+        if (
+            self.transposition_table is not None
+            and self.transposition_table.store(key, entry)
+        ):
+            self.transposition_stores += 1
 
 
 class AlphaBetaSearcher:
@@ -51,6 +84,7 @@ class AlphaBetaSearcher:
         claim_draw: bool = False,
         move_ordering: bool = True,
         quiescence_depth: int = 4,
+        use_transposition_table: bool = True,
     ) -> None:
         if limits is not None and default_max_depth != 1:
             raise ValueError("Pass either limits or default_max_depth, not both.")
@@ -58,6 +92,8 @@ class AlphaBetaSearcher:
             raise ValueError("claim_draw must be a boolean.")
         if not isinstance(move_ordering, bool):
             raise ValueError("move_ordering must be a boolean.")
+        if not isinstance(use_transposition_table, bool):
+            raise ValueError("use_transposition_table must be a boolean.")
         if (
             isinstance(quiescence_depth, bool)
             or not isinstance(quiescence_depth, int)
@@ -70,6 +106,7 @@ class AlphaBetaSearcher:
         self.claim_draw = claim_draw
         self.move_ordering = move_ordering
         self.quiescence_depth = quiescence_depth
+        self.use_transposition_table = use_transposition_table
 
     def search(self, board: chess.Board, limits: SearchLimits | None = None) -> SearchResult:
         """Search by iterative deepening and return the last completed iteration."""
@@ -104,6 +141,9 @@ class AlphaBetaSearcher:
         context = _SearchContext(
             deadline=deadline,
             stop_requested=resolved_limits.stop_requested,
+            transposition_table=(
+                TranspositionTable() if self.use_transposition_table else None
+            ),
         )
         last_completed = fallback
 
@@ -124,6 +164,8 @@ class AlphaBetaSearcher:
                     depth_reached=context.depth_reached,
                     nodes_searched=context.nodes_searched,
                     cutoff_count=context.cutoff_count,
+                    transposition_hits=context.transposition_hits,
+                    transposition_stores=context.transposition_stores,
                     completed_depth=last_completed.completed_depth,
                     stop_reason=stopped.reason,
                 )
@@ -133,6 +175,8 @@ class AlphaBetaSearcher:
                 depth_reached=context.depth_reached,
                 nodes_searched=context.nodes_searched,
                 cutoff_count=context.cutoff_count,
+                transposition_hits=context.transposition_hits,
+                transposition_stores=context.transposition_stores,
                 completed_depth=target_depth,
             )
 
@@ -163,28 +207,78 @@ class AlphaBetaSearcher:
                 nodes_searched=1,
                 cutoff_count=0,
             )
+
+        original_alpha = alpha
+        original_beta = beta
+        table_key: TranspositionKey | None = None
+        preferred_move: chess.Move | None = None
+        if context is not None and context.transposition_table is not None:
+            table_key = make_transposition_key(
+                board,
+                ply_from_root=current_depth,
+            )
+            entry = context.probe_transposition(table_key)
+            if entry is not None:
+                preferred_move = entry.best_move
+                if entry.depth >= max(depth, 0):
+                    if entry.bound is BoundType.EXACT:
+                        return SearchResult(
+                            best_move=entry.best_move,
+                            score=entry.score,
+                            depth_reached=current_depth,
+                            nodes_searched=1,
+                            cutoff_count=0,
+                        )
+                    if entry.bound is BoundType.LOWER:
+                        alpha = max(alpha, entry.score)
+                    else:
+                        beta = min(beta, entry.score)
+                    if alpha >= beta:
+                        context.record_cutoff()
+                        return SearchResult(
+                            best_move=entry.best_move,
+                            score=entry.score,
+                            depth_reached=current_depth,
+                            nodes_searched=1,
+                            cutoff_count=1,
+                        )
+
         if depth <= 0:
             if self.quiescence_depth == 0:
-                return SearchResult(
+                result = SearchResult(
                     best_move=None,
                     score=self.evaluator.evaluate(board),
                     depth_reached=current_depth,
                     nodes_searched=1,
                     cutoff_count=0,
                 )
-            return self._quiescence(
-                board=board,
-                alpha=alpha,
-                beta=beta,
-                current_depth=current_depth,
-                remaining_depth=self.quiescence_depth,
+            else:
+                result = self._quiescence(
+                    board=board,
+                    alpha=alpha,
+                    beta=beta,
+                    current_depth=current_depth,
+                    remaining_depth=self.quiescence_depth,
+                    context=context,
+                    count_current=False,
+                )
+            self._store_transposition_result(
                 context=context,
-                count_current=False,
+                key=table_key,
+                depth=0,
+                result=result,
+                original_alpha=original_alpha,
+                original_beta=original_beta,
             )
+            return result
 
         legal_moves = get_legal_moves(board)
         if self.move_ordering:
-            legal_moves = order_moves(board, legal_moves)
+            legal_moves = order_moves(
+                board,
+                legal_moves,
+                preferred_move=preferred_move,
+            )
         is_maximizing = board.turn == chess.WHITE
         best_move: chess.Move | None = None
         best_score = -inf if is_maximizing else inf
@@ -230,13 +324,22 @@ class AlphaBetaSearcher:
                     context.record_cutoff()
                 break
 
-        return SearchResult(
+        result = SearchResult(
             best_move=best_move,
             score=best_score,
             depth_reached=depth_reached,
             nodes_searched=nodes_searched,
             cutoff_count=cutoff_count,
         )
+        self._store_transposition_result(
+            context=context,
+            key=table_key,
+            depth=depth,
+            result=result,
+            original_alpha=original_alpha,
+            original_beta=original_beta,
+        )
+        return result
 
     def _quiescence(
         self,
@@ -373,3 +476,29 @@ class AlphaBetaSearcher:
             claim_draw=self.claim_draw,
         )
         return score if score is not None else self.evaluator.evaluate(board)
+
+    @staticmethod
+    def _store_transposition_result(
+        *,
+        context: _SearchContext | None,
+        key: TranspositionKey | None,
+        depth: int,
+        result: SearchResult,
+        original_alpha: float,
+        original_beta: float,
+    ) -> None:
+        if context is None or key is None:
+            return
+        context.store_transposition(
+            key,
+            TranspositionEntry(
+                depth=max(depth, 0),
+                score=result.score,
+                bound=classify_bound(
+                    result.score,
+                    original_alpha,
+                    original_beta,
+                ),
+                best_move=result.best_move,
+            ),
+        )

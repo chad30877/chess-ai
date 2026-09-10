@@ -94,6 +94,15 @@ class AlphaBetaPlayerTest(unittest.TestCase):
         assert isinstance(player.searcher, AlphaBetaSearcher)
         self.assertEqual(player.searcher.quiescence_depth, 6)
 
+    def test_from_evaluator_forwards_transposition_table_switch(self) -> None:
+        player = AlphaBetaPlayer.from_evaluator(
+            evaluator=MaterialEvaluator(),
+            use_transposition_table=False,
+        )
+
+        assert isinstance(player.searcher, AlphaBetaSearcher)
+        self.assertFalse(player.searcher.use_transposition_table)
+
 
 if __name__ == "__main__":
     unittest.main()

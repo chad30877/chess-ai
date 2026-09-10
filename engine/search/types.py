@@ -49,6 +49,9 @@ class SearchResult:
     any quiescence extension beyond the requested regular depth.
     `nodes_searched` counts visited positions, including the root node.
     `cutoff_count` counts alpha-beta cutoffs triggered during the search.
+    `transposition_hits` counts table probes that found an entry, including a
+    shallower entry used only for move ordering. `transposition_stores` counts
+    accepted table writes.
     `completed_depth` is the deepest fully completed regular iterative-deepening
     iteration; it excludes quiescence extensions. `stop_reason` is ``timeout``
     or ``cancelled`` when a cooperative stop returned an earlier result.
@@ -61,6 +64,8 @@ class SearchResult:
     cutoff_count: int = 0
     completed_depth: int = 0
     stop_reason: str | None = None
+    transposition_hits: int = 0
+    transposition_stores: int = 0
 
     def __post_init__(self) -> None:
         if self.depth_reached < 0:
@@ -69,6 +74,10 @@ class SearchResult:
             raise ValueError("nodes_searched must be non-negative.")
         if self.cutoff_count < 0:
             raise ValueError("cutoff_count must be non-negative.")
+        if self.transposition_hits < 0:
+            raise ValueError("transposition_hits must be non-negative.")
+        if self.transposition_stores < 0:
+            raise ValueError("transposition_stores must be non-negative.")
         if self.completed_depth < 0:
             raise ValueError("completed_depth must be non-negative.")
         if self.completed_depth > self.depth_reached:

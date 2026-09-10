@@ -139,6 +139,12 @@ class AlphaBetaSearcherTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             AlphaBetaSearcher(ConstantEvaluator(0.0), move_ordering=1)  # type: ignore[arg-type]
 
+    def test_constructor_rejects_non_boolean_transposition_switch(self) -> None:
+        with self.assertRaises(ValueError):
+            AlphaBetaSearcher(  # type: ignore[arg-type]
+                ConstantEvaluator(0.0), use_transposition_table=1,
+            )
+
     def test_constructor_validates_quiescence_depth(self) -> None:
         self.assertEqual(
             AlphaBetaSearcher(ConstantEvaluator(0.0)).quiescence_depth,

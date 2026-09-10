@@ -38,6 +38,20 @@ class MoveOrderingTest(unittest.TestCase):
 
         self.assertEqual(ordered, [pawn_takes_queen, knight_takes_queen])
 
+    def test_preferred_move_precedes_the_normal_priority_order(self) -> None:
+        board = chess.Board()
+        preferred = chess.Move.from_uci("e2e4")
+        moves = [
+            chess.Move.from_uci("g1f3"),
+            preferred,
+            chess.Move.from_uci("d2d4"),
+        ]
+
+        ordered = order_moves(board, moves, preferred_move=preferred)
+
+        self.assertEqual(ordered[0], preferred)
+        self.assertEqual(set(ordered), set(moves))
+
 
 if __name__ == "__main__":
     unittest.main()

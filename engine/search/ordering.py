@@ -42,7 +42,15 @@ def move_order_key(board: chess.Board, move: chess.Move) -> tuple[int, int, int,
     )
 
 
-def order_moves(board: chess.Board, moves: Iterable[chess.Move]) -> list[chess.Move]:
-    """Return a stable highest-priority-first move list without changing the board."""
+def order_moves(
+    board: chess.Board,
+    moves: Iterable[chess.Move],
+    preferred_move: chess.Move | None = None,
+) -> list[chess.Move]:
+    """Return a stable priority list, optionally led by a cached best move."""
 
-    return sorted(moves, key=lambda move: move_order_key(board, move), reverse=True)
+    ordered = sorted(moves, key=lambda move: move_order_key(board, move), reverse=True)
+    if preferred_move is not None and preferred_move in ordered:
+        ordered.remove(preferred_move)
+        ordered.insert(0, preferred_move)
+    return ordered
