@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from math import inf
+from math import inf, isfinite, nextafter
 from time import monotonic
 
 import chess
@@ -38,6 +38,8 @@ class _SearchContext:
     depth_reached: int = 0
     transposition_hits: int = 0
     transposition_stores: int = 0
+    pvs_scouts: int = 0
+    pvs_researches: int = 0
 
     def enter_node(self, current_depth: int) -> None:
         self.nodes_searched += 1
@@ -49,6 +51,12 @@ class _SearchContext:
 
     def record_cutoff(self) -> None:
         self.cutoff_count += 1
+
+    def record_pvs_scout(self) -> None:
+        self.pvs_scouts += 1
+
+    def record_pvs_research(self) -> None:
+        self.pvs_researches += 1
 
     def probe_transposition(
         self,
@@ -85,6 +93,7 @@ class AlphaBetaSearcher:
         move_ordering: bool = True,
         quiescence_depth: int = 4,
         use_transposition_table: bool = True,
+        use_pvs: bool = True,
     ) -> None:
         if limits is not None and default_max_depth != 1:
             raise ValueError("Pass either limits or default_max_depth, not both.")
@@ -94,6 +103,8 @@ class AlphaBetaSearcher:
             raise ValueError("move_ordering must be a boolean.")
         if not isinstance(use_transposition_table, bool):
             raise ValueError("use_transposition_table must be a boolean.")
+        if not isinstance(use_pvs, bool):
+            raise ValueError("use_pvs must be a boolean.")
         if (
             isinstance(quiescence_depth, bool)
             or not isinstance(quiescence_depth, int)
@@ -107,6 +118,7 @@ class AlphaBetaSearcher:
         self.move_ordering = move_ordering
         self.quiescence_depth = quiescence_depth
         self.use_transposition_table = use_transposition_table
+        self.use_pvs = use_pvs
 
     def search(self, board: chess.Board, limits: SearchLimits | None = None) -> SearchResult:
         """Search by iterative deepening and return the last completed iteration."""
@@ -166,6 +178,8 @@ class AlphaBetaSearcher:
                     cutoff_count=context.cutoff_count,
                     transposition_hits=context.transposition_hits,
                     transposition_stores=context.transposition_stores,
+                    pvs_scouts=context.pvs_scouts,
+                    pvs_researches=context.pvs_researches,
                     completed_depth=last_completed.completed_depth,
                     stop_reason=stopped.reason,
                 )
@@ -177,6 +191,8 @@ class AlphaBetaSearcher:
                 cutoff_count=context.cutoff_count,
                 transposition_hits=context.transposition_hits,
                 transposition_stores=context.transposition_stores,
+                pvs_scouts=context.pvs_scouts,
+                pvs_researches=context.pvs_researches,
                 completed_depth=target_depth,
             )
 
@@ -289,11 +305,27 @@ class AlphaBetaSearcher:
         for move in legal_moves:
             next_board = board.copy(stack=True)
             next_board.push(move)
+            scout_bound = alpha if is_maximizing else beta
+            use_scout = (
+                self.use_pvs
+                and best_move is not None
+                and isfinite(scout_bound)
+            )
+            scout_alpha = alpha
+            scout_beta = beta
+            if use_scout:
+                if context is not None:
+                    context.record_pvs_scout()
+                # Adjacent representable floats form a score-independent null window.
+                if is_maximizing:
+                    scout_beta = nextafter(alpha, inf)
+                else:
+                    scout_alpha = nextafter(beta, -inf)
             child_result = self._search_recursive(
                 board=next_board,
                 depth=depth - 1,
-                alpha=alpha,
-                beta=beta,
+                alpha=scout_alpha,
+                beta=scout_beta,
                 current_depth=current_depth + 1,
                 context=context,
             )
@@ -301,6 +333,21 @@ class AlphaBetaSearcher:
             nodes_searched += child_result.nodes_searched
             depth_reached = max(depth_reached, child_result.depth_reached)
             cutoff_count += child_result.cutoff_count
+
+            if use_scout and alpha < child_result.score < beta:
+                if context is not None:
+                    context.record_pvs_research()
+                child_result = self._search_recursive(
+                    board=next_board,
+                    depth=depth - 1,
+                    alpha=alpha,
+                    beta=beta,
+                    current_depth=current_depth + 1,
+                    context=context,
+                )
+                nodes_searched += child_result.nodes_searched
+                depth_reached = max(depth_reached, child_result.depth_reached)
+                cutoff_count += child_result.cutoff_count
 
             if best_move is None:
                 best_move = move

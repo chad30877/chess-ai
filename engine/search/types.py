@@ -52,6 +52,8 @@ class SearchResult:
     `transposition_hits` counts table probes that found an entry, including a
     shallower entry used only for move ordering. `transposition_stores` counts
     accepted table writes.
+    `pvs_scouts` counts narrow-window searches started after a node's first
+    move. `pvs_researches` counts their full-window retries.
     `completed_depth` is the deepest fully completed regular iterative-deepening
     iteration; it excludes quiescence extensions. `stop_reason` is ``timeout``
     or ``cancelled`` when a cooperative stop returned an earlier result.
@@ -66,6 +68,8 @@ class SearchResult:
     stop_reason: str | None = None
     transposition_hits: int = 0
     transposition_stores: int = 0
+    pvs_scouts: int = 0
+    pvs_researches: int = 0
 
     def __post_init__(self) -> None:
         if self.depth_reached < 0:
@@ -78,6 +82,10 @@ class SearchResult:
             raise ValueError("transposition_hits must be non-negative.")
         if self.transposition_stores < 0:
             raise ValueError("transposition_stores must be non-negative.")
+        if self.pvs_scouts < 0:
+            raise ValueError("pvs_scouts must be non-negative.")
+        if self.pvs_researches < 0:
+            raise ValueError("pvs_researches must be non-negative.")
         if self.completed_depth < 0:
             raise ValueError("completed_depth must be non-negative.")
         if self.completed_depth > self.depth_reached:

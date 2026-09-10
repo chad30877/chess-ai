@@ -103,6 +103,15 @@ class AlphaBetaPlayerTest(unittest.TestCase):
         assert isinstance(player.searcher, AlphaBetaSearcher)
         self.assertFalse(player.searcher.use_transposition_table)
 
+    def test_from_evaluator_forwards_pvs_switch(self) -> None:
+        player = AlphaBetaPlayer.from_evaluator(
+            evaluator=MaterialEvaluator(),
+            use_pvs=False,
+        )
+
+        assert isinstance(player.searcher, AlphaBetaSearcher)
+        self.assertFalse(player.searcher.use_pvs)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -145,6 +145,12 @@ class AlphaBetaSearcherTest(unittest.TestCase):
                 ConstantEvaluator(0.0), use_transposition_table=1,
             )
 
+    def test_constructor_rejects_non_boolean_pvs_switch(self) -> None:
+        with self.assertRaises(ValueError):
+            AlphaBetaSearcher(  # type: ignore[arg-type]
+                ConstantEvaluator(0.0), use_pvs=1,
+            )
+
     def test_constructor_validates_quiescence_depth(self) -> None:
         self.assertEqual(
             AlphaBetaSearcher(ConstantEvaluator(0.0)).quiescence_depth,

@@ -49,6 +49,8 @@ class SearchResultTest(unittest.TestCase):
             cutoff_count=5,
             transposition_hits=6,
             transposition_stores=7,
+            pvs_scouts=8,
+            pvs_researches=9,
             completed_depth=3,
             stop_reason="timeout",
         )
@@ -60,6 +62,8 @@ class SearchResultTest(unittest.TestCase):
         self.assertEqual(result.cutoff_count, 5)
         self.assertEqual(result.transposition_hits, 6)
         self.assertEqual(result.transposition_stores, 7)
+        self.assertEqual(result.pvs_scouts, 8)
+        self.assertEqual(result.pvs_researches, 9)
         self.assertEqual(result.completed_depth, 3)
         self.assertEqual(result.stop_reason, "timeout")
 
@@ -78,6 +82,12 @@ class SearchResultTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             SearchResult(best_move=None, score=0.0, transposition_stores=-1)
+
+        with self.assertRaises(ValueError):
+            SearchResult(best_move=None, score=0.0, pvs_scouts=-1)
+
+        with self.assertRaises(ValueError):
+            SearchResult(best_move=None, score=0.0, pvs_researches=-1)
 
         with self.assertRaises(ValueError):
             SearchResult(best_move=None, score=0.0, completed_depth=-1)
