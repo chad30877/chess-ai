@@ -1,7 +1,7 @@
 """Tests for the alpha-beta search scaffold."""
 
 import unittest
-from math import inf
+from math import inf, nan
 
 import chess
 
@@ -150,6 +150,22 @@ class AlphaBetaSearcherTest(unittest.TestCase):
             AlphaBetaSearcher(  # type: ignore[arg-type]
                 ConstantEvaluator(0.0), use_pvs=1,
             )
+
+    def test_constructor_validates_aspiration_window(self) -> None:
+        self.assertEqual(
+            AlphaBetaSearcher(ConstantEvaluator(0.0)).aspiration_window,
+            1.0,
+        )
+        self.assertIsNone(
+            AlphaBetaSearcher(
+                ConstantEvaluator(0.0), aspiration_window=None,
+            ).aspiration_window,
+        )
+        for invalid in (0.0, -1.0, inf, nan, True, "1"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                AlphaBetaSearcher(  # type: ignore[arg-type]
+                    ConstantEvaluator(0.0), aspiration_window=invalid,
+                )
 
     def test_constructor_validates_quiescence_depth(self) -> None:
         self.assertEqual(

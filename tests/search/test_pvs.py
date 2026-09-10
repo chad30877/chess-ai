@@ -115,12 +115,14 @@ class PrincipalVariationSearchTest(unittest.TestCase):
             MaterialEvaluator(),
             quiescence_depth=0,
             use_transposition_table=False,
+            aspiration_window=None,
         ).search(board, limits)
         full_window = AlphaBetaSearcher(
             MaterialEvaluator(),
             quiescence_depth=0,
             use_transposition_table=False,
             use_pvs=False,
+            aspiration_window=None,
         ).search(board, limits)
 
         self.assertEqual(pvs.best_move, full_window.best_move)

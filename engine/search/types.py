@@ -54,6 +54,8 @@ class SearchResult:
     accepted table writes.
     `pvs_scouts` counts narrow-window searches started after a node's first
     move. `pvs_researches` counts their full-window retries.
+    `aspiration_searches` counts iterations started around the prior score.
+    `aspiration_researches` counts full-window retries after a boundary miss.
     `completed_depth` is the deepest fully completed regular iterative-deepening
     iteration; it excludes quiescence extensions. `stop_reason` is ``timeout``
     or ``cancelled`` when a cooperative stop returned an earlier result.
@@ -70,6 +72,8 @@ class SearchResult:
     transposition_stores: int = 0
     pvs_scouts: int = 0
     pvs_researches: int = 0
+    aspiration_searches: int = 0
+    aspiration_researches: int = 0
 
     def __post_init__(self) -> None:
         if self.depth_reached < 0:
@@ -86,6 +90,10 @@ class SearchResult:
             raise ValueError("pvs_scouts must be non-negative.")
         if self.pvs_researches < 0:
             raise ValueError("pvs_researches must be non-negative.")
+        if self.aspiration_searches < 0:
+            raise ValueError("aspiration_searches must be non-negative.")
+        if self.aspiration_researches < 0:
+            raise ValueError("aspiration_researches must be non-negative.")
         if self.completed_depth < 0:
             raise ValueError("completed_depth must be non-negative.")
         if self.completed_depth > self.depth_reached:

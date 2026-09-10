@@ -109,6 +109,7 @@ class AlphaBetaPlayer(Player):
         quiescence_depth: int = 4,
         use_transposition_table: bool = True,
         use_pvs: bool = True,
+        aspiration_window: float | None = 1.0,
     ) -> "AlphaBetaPlayer":
         """Build a player whose searcher owns the injected evaluator."""
 
@@ -122,6 +123,7 @@ class AlphaBetaPlayer(Player):
                 quiescence_depth=quiescence_depth,
                 use_transposition_table=use_transposition_table,
                 use_pvs=use_pvs,
+                aspiration_window=aspiration_window,
             )
         )
 

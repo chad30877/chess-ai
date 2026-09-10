@@ -112,6 +112,15 @@ class AlphaBetaPlayerTest(unittest.TestCase):
         assert isinstance(player.searcher, AlphaBetaSearcher)
         self.assertFalse(player.searcher.use_pvs)
 
+    def test_from_evaluator_forwards_aspiration_window(self) -> None:
+        player = AlphaBetaPlayer.from_evaluator(
+            evaluator=MaterialEvaluator(),
+            aspiration_window=0.75,
+        )
+
+        assert isinstance(player.searcher, AlphaBetaSearcher)
+        self.assertEqual(player.searcher.aspiration_window, 0.75)
+
 
 if __name__ == "__main__":
     unittest.main()

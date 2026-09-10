@@ -40,6 +40,8 @@ class _SearchContext:
     transposition_stores: int = 0
     pvs_scouts: int = 0
     pvs_researches: int = 0
+    aspiration_searches: int = 0
+    aspiration_researches: int = 0
 
     def enter_node(self, current_depth: int) -> None:
         self.nodes_searched += 1
@@ -57,6 +59,12 @@ class _SearchContext:
 
     def record_pvs_research(self) -> None:
         self.pvs_researches += 1
+
+    def record_aspiration_search(self) -> None:
+        self.aspiration_searches += 1
+
+    def record_aspiration_research(self) -> None:
+        self.aspiration_researches += 1
 
     def probe_transposition(
         self,
@@ -94,6 +102,7 @@ class AlphaBetaSearcher:
         quiescence_depth: int = 4,
         use_transposition_table: bool = True,
         use_pvs: bool = True,
+        aspiration_window: float | None = 1.0,
     ) -> None:
         if limits is not None and default_max_depth != 1:
             raise ValueError("Pass either limits or default_max_depth, not both.")
@@ -105,6 +114,15 @@ class AlphaBetaSearcher:
             raise ValueError("use_transposition_table must be a boolean.")
         if not isinstance(use_pvs, bool):
             raise ValueError("use_pvs must be a boolean.")
+        if aspiration_window is not None and (
+            isinstance(aspiration_window, bool)
+            or not isinstance(aspiration_window, (int, float))
+            or not isfinite(aspiration_window)
+            or aspiration_window <= 0
+        ):
+            raise ValueError(
+                "aspiration_window must be positive and finite, or None."
+            )
         if (
             isinstance(quiescence_depth, bool)
             or not isinstance(quiescence_depth, int)
@@ -119,6 +137,9 @@ class AlphaBetaSearcher:
         self.quiescence_depth = quiescence_depth
         self.use_transposition_table = use_transposition_table
         self.use_pvs = use_pvs
+        self.aspiration_window = (
+            float(aspiration_window) if aspiration_window is not None else None
+        )
 
     def search(self, board: chess.Board, limits: SearchLimits | None = None) -> SearchResult:
         """Search by iterative deepening and return the last completed iteration."""
@@ -161,14 +182,40 @@ class AlphaBetaSearcher:
 
         for target_depth in range(1, resolved_limits.max_depth + 1):
             try:
+                aspiration_window = self.aspiration_window
+                use_aspiration = (
+                    aspiration_window is not None
+                    and last_completed.completed_depth > 0
+                )
+                if use_aspiration:
+                    assert aspiration_window is not None
+                    iteration_alpha = last_completed.score - aspiration_window
+                    iteration_beta = last_completed.score + aspiration_window
+                    context.record_aspiration_search()
+                else:
+                    iteration_alpha = -inf
+                    iteration_beta = inf
                 iteration = self._search_recursive(
                     board=board,
                     depth=target_depth,
-                    alpha=-inf,
-                    beta=inf,
+                    alpha=iteration_alpha,
+                    beta=iteration_beta,
                     current_depth=0,
                     context=context,
                 )
+                if use_aspiration and (
+                    iteration.score <= iteration_alpha
+                    or iteration.score >= iteration_beta
+                ):
+                    context.record_aspiration_research()
+                    iteration = self._search_recursive(
+                        board=board,
+                        depth=target_depth,
+                        alpha=-inf,
+                        beta=inf,
+                        current_depth=0,
+                        context=context,
+                    )
             except _SearchStopped as stopped:
                 return SearchResult(
                     best_move=last_completed.best_move,
@@ -180,6 +227,8 @@ class AlphaBetaSearcher:
                     transposition_stores=context.transposition_stores,
                     pvs_scouts=context.pvs_scouts,
                     pvs_researches=context.pvs_researches,
+                    aspiration_searches=context.aspiration_searches,
+                    aspiration_researches=context.aspiration_researches,
                     completed_depth=last_completed.completed_depth,
                     stop_reason=stopped.reason,
                 )
@@ -193,6 +242,8 @@ class AlphaBetaSearcher:
                 transposition_stores=context.transposition_stores,
                 pvs_scouts=context.pvs_scouts,
                 pvs_researches=context.pvs_researches,
+                aspiration_searches=context.aspiration_searches,
+                aspiration_researches=context.aspiration_researches,
                 completed_depth=target_depth,
             )
 
