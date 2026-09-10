@@ -1,6 +1,9 @@
 """Alpha-beta search scaffold."""
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from math import inf
+from time import monotonic
 
 import chess
 
@@ -9,6 +12,32 @@ from engine.interfaces import Evaluator
 from engine.search.ordering import order_moves
 from engine.search.terminal import terminal_score
 from engine.search.types import SearchLimits, SearchResult
+
+
+class _SearchStopped(Exception):
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+@dataclass
+class _SearchContext:
+    deadline: float | None
+    stop_requested: Callable[[], bool] | None
+    nodes_searched: int = 0
+    cutoff_count: int = 0
+    depth_reached: int = 0
+
+    def enter_node(self, current_depth: int) -> None:
+        self.nodes_searched += 1
+        self.depth_reached = max(self.depth_reached, current_depth)
+        if self.stop_requested is not None and self.stop_requested():
+            raise _SearchStopped("cancelled")
+        if self.deadline is not None and monotonic() >= self.deadline:
+            raise _SearchStopped("timeout")
+
+    def record_cutoff(self) -> None:
+        self.cutoff_count += 1
 
 
 class AlphaBetaSearcher:
@@ -43,18 +72,71 @@ class AlphaBetaSearcher:
         self.quiescence_depth = quiescence_depth
 
     def search(self, board: chess.Board, limits: SearchLimits | None = None) -> SearchResult:
-        """Search the position with depth-limited alpha-beta.
-
-        Time controls will be added in later tasks.
-        """
+        """Search by iterative deepening and return the last completed iteration."""
         resolved_limits = limits if limits is not None else self.default_limits
-        return self._search_recursive(
-            board=board,
-            depth=resolved_limits.max_depth,
-            alpha=-inf,
-            beta=inf,
-            current_depth=0,
+        deadline = (
+            monotonic() + resolved_limits.time_ms / 1000
+            if resolved_limits.time_ms is not None
+            else None
         )
+        root_terminal = terminal_score(board, claim_draw=self.claim_draw)
+        if root_terminal is not None:
+            return SearchResult(
+                best_move=None,
+                score=root_terminal,
+                depth_reached=0,
+                nodes_searched=1,
+                cutoff_count=0,
+                completed_depth=0,
+            )
+
+        legal_moves = get_legal_moves(board)
+        if self.move_ordering:
+            legal_moves = order_moves(board, legal_moves)
+        fallback = SearchResult(
+            best_move=legal_moves[0] if legal_moves else None,
+            score=self.evaluator.evaluate(board),
+            depth_reached=0,
+            nodes_searched=0,
+            cutoff_count=0,
+            completed_depth=0,
+        )
+        context = _SearchContext(
+            deadline=deadline,
+            stop_requested=resolved_limits.stop_requested,
+        )
+        last_completed = fallback
+
+        for target_depth in range(1, resolved_limits.max_depth + 1):
+            try:
+                iteration = self._search_recursive(
+                    board=board,
+                    depth=target_depth,
+                    alpha=-inf,
+                    beta=inf,
+                    current_depth=0,
+                    context=context,
+                )
+            except _SearchStopped as stopped:
+                return SearchResult(
+                    best_move=last_completed.best_move,
+                    score=last_completed.score,
+                    depth_reached=context.depth_reached,
+                    nodes_searched=context.nodes_searched,
+                    cutoff_count=context.cutoff_count,
+                    completed_depth=last_completed.completed_depth,
+                    stop_reason=stopped.reason,
+                )
+            last_completed = SearchResult(
+                best_move=iteration.best_move,
+                score=iteration.score,
+                depth_reached=context.depth_reached,
+                nodes_searched=context.nodes_searched,
+                cutoff_count=context.cutoff_count,
+                completed_depth=target_depth,
+            )
+
+        return last_completed
 
     def _search_recursive(
         self,
@@ -63,8 +145,11 @@ class AlphaBetaSearcher:
         alpha: float,
         beta: float,
         current_depth: int,
+        context: _SearchContext | None = None,
     ) -> SearchResult:
         """Return the best result reachable from this node via alpha-beta."""
+        if context is not None:
+            context.enter_node(current_depth)
         score = terminal_score(
             board,
             ply_from_root=current_depth,
@@ -93,6 +178,8 @@ class AlphaBetaSearcher:
                 beta=beta,
                 current_depth=current_depth,
                 remaining_depth=self.quiescence_depth,
+                context=context,
+                count_current=False,
             )
 
         legal_moves = get_legal_moves(board)
@@ -114,6 +201,7 @@ class AlphaBetaSearcher:
                 alpha=alpha,
                 beta=beta,
                 current_depth=current_depth + 1,
+                context=context,
             )
 
             nodes_searched += child_result.nodes_searched
@@ -138,6 +226,8 @@ class AlphaBetaSearcher:
             # Once the window closes, no later sibling can improve the parent result.
             if alpha >= beta:
                 cutoff_count += 1
+                if context is not None:
+                    context.record_cutoff()
                 break
 
         return SearchResult(
@@ -155,8 +245,13 @@ class AlphaBetaSearcher:
         beta: float,
         current_depth: int,
         remaining_depth: int,
+        context: _SearchContext | None = None,
+        count_current: bool = True,
     ) -> SearchResult:
         """Extend captures/promotions and require legal evasions while in check."""
+
+        if context is not None and count_current:
+            context.enter_node(current_depth)
 
         terminal = terminal_score(
             board,
@@ -195,12 +290,16 @@ class AlphaBetaSearcher:
             best_score = self.evaluator.evaluate(board)
             if is_maximizing:
                 if best_score >= beta:
+                    if context is not None:
+                        context.record_cutoff()
                     return SearchResult(
                         None, best_score, current_depth, nodes_searched, 1,
                     )
                 alpha = max(alpha, best_score)
             else:
                 if best_score <= alpha:
+                    if context is not None:
+                        context.record_cutoff()
                     return SearchResult(
                         None, best_score, current_depth, nodes_searched, 1,
                     )
@@ -218,6 +317,8 @@ class AlphaBetaSearcher:
             next_board = board.copy(stack=True)
             next_board.push(move)
             if remaining_depth <= 0:
+                if context is not None:
+                    context.enter_node(current_depth + 1)
                 child_result = SearchResult(
                     best_move=None,
                     score=self._evaluate_leaf(next_board, current_depth + 1),
@@ -232,6 +333,7 @@ class AlphaBetaSearcher:
                     beta=beta,
                     current_depth=current_depth + 1,
                     remaining_depth=remaining_depth - 1,
+                    context=context,
                 )
 
             nodes_searched += child_result.nodes_searched
@@ -251,6 +353,8 @@ class AlphaBetaSearcher:
                 beta = min(beta, best_score)
             if alpha >= beta:
                 cutoff_count += 1
+                if context is not None:
+                    context.record_cutoff()
                 break
 
         return SearchResult(

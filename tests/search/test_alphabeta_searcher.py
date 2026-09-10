@@ -188,6 +188,8 @@ class AlphaBetaSearcherTest(unittest.TestCase):
         self.assertIn(depth_two_result.best_move, board.legal_moves)
         self.assertEqual(depth_one_result.depth_reached, 1)
         self.assertEqual(depth_two_result.depth_reached, 2)
+        self.assertEqual(depth_one_result.completed_depth, 1)
+        self.assertEqual(depth_two_result.completed_depth, 2)
 
     def test_depth_two_uses_minimax_reply_scores(self) -> None:
         board = chess.Board("6k1/8/3q4/3r4/8/8/8/3Q2K1 w - - 0 1")
