@@ -106,6 +106,7 @@ class AlphaBetaPlayer(Player):
         default_max_depth: int = 1,
         claim_draw: bool = False,
         move_ordering: bool = True,
+        quiescence_depth: int = 4,
     ) -> "AlphaBetaPlayer":
         """Build a player whose searcher owns the injected evaluator."""
 
@@ -116,6 +117,7 @@ class AlphaBetaPlayer(Player):
                 default_max_depth=default_max_depth,
                 claim_draw=claim_draw,
                 move_ordering=move_ordering,
+                quiescence_depth=quiescence_depth,
             )
         )
 

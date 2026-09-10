@@ -85,6 +85,15 @@ class AlphaBetaPlayerTest(unittest.TestCase):
         assert isinstance(player.searcher, AlphaBetaSearcher)
         self.assertFalse(player.searcher.move_ordering)
 
+    def test_from_evaluator_forwards_quiescence_depth(self) -> None:
+        player = AlphaBetaPlayer.from_evaluator(
+            evaluator=MaterialEvaluator(),
+            quiescence_depth=6,
+        )
+
+        assert isinstance(player.searcher, AlphaBetaSearcher)
+        self.assertEqual(player.searcher.quiescence_depth, 6)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -139,9 +139,26 @@ class AlphaBetaSearcherTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             AlphaBetaSearcher(ConstantEvaluator(0.0), move_ordering=1)  # type: ignore[arg-type]
 
+    def test_constructor_validates_quiescence_depth(self) -> None:
+        self.assertEqual(
+            AlphaBetaSearcher(ConstantEvaluator(0.0)).quiescence_depth,
+            4,
+        )
+        self.assertEqual(
+            AlphaBetaSearcher(ConstantEvaluator(0.0), quiescence_depth=0).quiescence_depth,
+            0,
+        )
+        for invalid in (-1, 1.5, True):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                AlphaBetaSearcher(  # type: ignore[arg-type]
+                    ConstantEvaluator(0.0), quiescence_depth=invalid,
+                )
+
     def test_search_returns_a_legal_move(self) -> None:
         board = chess.Board("6k1/8/3q4/3r4/8/8/8/3Q2K1 w - - 0 1")
-        searcher = AlphaBetaSearcher(MaterialEvaluator(), default_max_depth=1)
+        searcher = AlphaBetaSearcher(
+            MaterialEvaluator(), default_max_depth=1, quiescence_depth=0,
+        )
 
         result = searcher.search(board)
 
@@ -156,7 +173,9 @@ class AlphaBetaSearcherTest(unittest.TestCase):
 
     def test_search_runs_at_depth_one_and_depth_two(self) -> None:
         board = chess.Board("6k1/8/3q4/3r4/8/8/8/3Q2K1 w - - 0 1")
-        searcher = AlphaBetaSearcher(MaterialEvaluator(), default_max_depth=3)
+        searcher = AlphaBetaSearcher(
+            MaterialEvaluator(), default_max_depth=3, quiescence_depth=0,
+        )
 
         depth_one_result = searcher.search(board, limits=SearchLimits(max_depth=1))
         depth_two_result = searcher.search(board, limits=SearchLimits(max_depth=2))
@@ -172,7 +191,9 @@ class AlphaBetaSearcherTest(unittest.TestCase):
 
     def test_depth_two_uses_minimax_reply_scores(self) -> None:
         board = chess.Board("6k1/8/3q4/3r4/8/8/8/3Q2K1 w - - 0 1")
-        searcher = AlphaBetaSearcher(MaterialEvaluator(), default_max_depth=2)
+        searcher = AlphaBetaSearcher(
+            MaterialEvaluator(), default_max_depth=2, quiescence_depth=0,
+        )
 
         result = searcher.search(board)
 
@@ -185,7 +206,9 @@ class AlphaBetaSearcherTest(unittest.TestCase):
 
     def test_nodes_searched_accumulates_with_deeper_search(self) -> None:
         board = chess.Board("6k1/8/3q4/3r4/8/8/8/3Q2K1 w - - 0 1")
-        searcher = AlphaBetaSearcher(MaterialEvaluator(), default_max_depth=3)
+        searcher = AlphaBetaSearcher(
+            MaterialEvaluator(), default_max_depth=3, quiescence_depth=0,
+        )
 
         depth_one_result = searcher.search(board, limits=SearchLimits(max_depth=1))
         depth_two_result = searcher.search(board, limits=SearchLimits(max_depth=2))
@@ -196,7 +219,9 @@ class AlphaBetaSearcherTest(unittest.TestCase):
     def test_alpha_beta_matches_reference_minimax_at_same_depth(self) -> None:
         board = chess.Board("r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1")
         evaluator = MaterialEvaluator()
-        searcher = AlphaBetaSearcher(evaluator, default_max_depth=3)
+        searcher = AlphaBetaSearcher(
+            evaluator, default_max_depth=3, quiescence_depth=0,
+        )
 
         result = searcher.search(board)
         expected_move, expected_score, expected_depth, expected_nodes = _minimax_reference(
@@ -216,10 +241,10 @@ class AlphaBetaSearcherTest(unittest.TestCase):
         limits = SearchLimits(max_depth=3)
 
         unordered = AlphaBetaSearcher(
-            MaterialEvaluator(), move_ordering=False,
+            MaterialEvaluator(), move_ordering=False, quiescence_depth=0,
         ).search(board, limits)
         ordered = AlphaBetaSearcher(
-            MaterialEvaluator(), move_ordering=True,
+            MaterialEvaluator(), move_ordering=True, quiescence_depth=0,
         ).search(board, limits)
 
         self.assertEqual(ordered.score, unordered.score)
@@ -243,6 +268,7 @@ class AlphaBetaSearcherTest(unittest.TestCase):
                 }
             ),
             default_max_depth=1,
+            quiescence_depth=0,
         )
         quiet_favoring = AlphaBetaSearcher(
             evaluator=FenScoreEvaluator(
@@ -252,6 +278,7 @@ class AlphaBetaSearcherTest(unittest.TestCase):
                 }
             ),
             default_max_depth=1,
+            quiescence_depth=0,
         )
 
         capture_result = capture_favoring.search(board)

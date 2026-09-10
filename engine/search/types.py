@@ -33,7 +33,8 @@ class SearchResult:
     `+CHECKMATE_SCORE - ply` means Black is checkmated,
     `-CHECKMATE_SCORE + ply` means White is checkmated,
     and drawn end states score `DRAW_SCORE`.
-    `depth_reached` is the deepest ply actually visited from the root.
+    `depth_reached` is the deepest ply actually visited from the root, including
+    any quiescence extension beyond the requested regular depth.
     `nodes_searched` counts visited positions, including the root node.
     `cutoff_count` counts alpha-beta cutoffs triggered during the search.
     """
