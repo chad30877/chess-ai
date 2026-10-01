@@ -20,6 +20,7 @@ from engine.evaluation.pst import (
 from engine.evaluation.pawn_structure import pawn_structure_balance
 from engine.evaluation.mobility import mobility_balance
 from engine.evaluation.king_safety import king_safety_balance
+from engine.evaluation.coordination import coordination_balance
 from engine.interfaces import Evaluator
 
 DEFAULT_WEIGHTS = {
@@ -162,6 +163,7 @@ def _evaluate_breakdown(
     terms.update(_pawn_terms(config, "middlegame", pawn_structure_balance(board)))
     terms.update(_mobility_terms(config, "middlegame", mobility_balance(board)))
     terms.update(_king_safety_terms(config, "middlegame", king_safety_balance(board)))
+    terms.update(_coordination_terms(config, "middlegame", coordination_balance(board)))
     return EvaluationBreakdown(
         terms=terms,
         total_score=sum(term.contribution for term in terms.values()),
@@ -192,6 +194,7 @@ def _evaluate_tapered_breakdown(
     pawn_raw = pawn_structure_balance(board)
     mobility_raw = mobility_balance(board)
     safety_raw = king_safety_balance(board)
+    coordination_raw = coordination_balance(board)
     for stage, (material, pst) in raw.items():
         weight = config.pst_weight if stage == "middlegame" else config.endgame_pst_weight
         stage_terms[stage] = {
@@ -206,6 +209,7 @@ def _evaluate_tapered_breakdown(
         stage_terms[stage].update(_pawn_terms(config, stage, pawn_raw))
         stage_terms[stage].update(_mobility_terms(config, stage, mobility_raw))
         stage_terms[stage].update(_king_safety_terms(config, stage, safety_raw))
+        stage_terms[stage].update(_coordination_terms(config, stage, coordination_raw))
     # Endpoint contributions are weighted before interpolation; raw PST and weight
     # cannot be interpolated separately without introducing cross terms.
     terms = {}
@@ -217,7 +221,7 @@ def _evaluate_tapered_breakdown(
             1.0, contribution, mg.enabled,
             "pawn weighted feature contribution"
             if name in config.pawn_terms or name in config.mobility_terms
-            or name in config.king_safety_terms else mg.unit,
+            or name in config.king_safety_terms or name in config.coordination_terms else mg.unit,
             mg.direction, "tapered",
             mg.overlap_risk,
         )
@@ -285,5 +289,26 @@ def _king_safety_terms(
             enabled=settings.enabled, unit=units[name], direction="positive favors White",
             stage=stage if config.phase_enabled else "all",
             overlap_risk="overlaps king/pawn PST, pawn structure and geometric mobility",
+        )
+    return terms
+
+
+def _coordination_terms(
+    config: EvaluationConfig, stage: str, raw: Mapping[str, float],
+) -> dict[str, EvaluationTerm]:
+    units = {
+        "bishop_pair": "opposite-square-color bishop coverage balance (White minus Black; max 1 per side)",
+        "rook_open_file": "rooks on pawn-free files balance (White minus Black)",
+        "rook_half_open_file": "rooks on files with enemy pawns only balance (White minus Black)",
+    }
+    terms = {}
+    for name, settings in config.coordination_terms.items():
+        weight = settings.endgame_weight if stage == "endgame" else settings.weight
+        terms[name] = EvaluationTerm(
+            raw_value=raw[name], weight=weight,
+            contribution=raw[name] * weight if settings.enabled else 0.0,
+            enabled=settings.enabled, unit=units[name], direction="positive favors White",
+            stage=stage if config.phase_enabled else "all",
+            overlap_risk="overlaps bishop/rook PST, geometric mobility, pawn structure and king-file exposure",
         )
     return terms

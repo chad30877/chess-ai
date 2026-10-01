@@ -67,7 +67,7 @@ class EvaluationConfigTest(unittest.TestCase):
             {"pst_weight": -1},
             {"pst_weight": float("inf")},
             {"pst_enabled": 1},
-            {"version": 6},
+            {"version": 7},
             {"piece_values": {"P": True}},
         ):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):

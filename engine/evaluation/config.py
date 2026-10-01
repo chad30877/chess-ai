@@ -7,7 +7,9 @@ from numbers import Real
 from types import MappingProxyType
 
 
-EVALUATION_CONFIG_VERSION = 5
+EVALUATION_CONFIG_VERSION = 6
+COORDINATION_FEATURE_VERSION = 1
+COORDINATION_TERM_NAMES = ("bishop_pair", "rook_open_file", "rook_half_open_file")
 KING_SAFETY_FEATURE_VERSION = 1
 KING_SAFETY_TERM_NAMES = ("king_pawn_shield", "king_zone_attacks", "king_file_exposure")
 MOBILITY_FEATURE_VERSION = 1
@@ -142,6 +144,32 @@ def _default_king_safety_terms() -> dict[str, KingSafetyTermConfig]:
 
 
 @dataclass(frozen=True)
+class CoordinationTermConfig:
+    """Independent pawn-unit prices for bishop coverage and rook-file features."""
+
+    enabled: bool = False
+    weight: float = 0.0
+    endgame_weight: float = 0.0
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "enabled", _boolean(self.enabled, "coordination term enabled"))
+        for name in ("weight", "endgame_weight"):
+            object.__setattr__(self, name, _finite_number(
+                getattr(self, name), f"coordination term {name}", non_negative=True,
+            ))
+
+    def to_dict(self) -> dict:
+        return {"enabled": self.enabled, "weight": self.weight,
+                "endgame_weight": self.endgame_weight, "feature_version": COORDINATION_FEATURE_VERSION}
+
+
+def _default_coordination_terms() -> dict[str, CoordinationTermConfig]:
+    prices = ((.30, .40), (.15, .20), (.10, .15))
+    return {name: CoordinationTermConfig(weight=mg, endgame_weight=eg)
+            for name, (mg, eg) in zip(COORDINATION_TERM_NAMES, prices)}
+
+
+@dataclass(frozen=True)
 class EvaluationConfig:
     """The complete settings needed to reproduce a handcrafted evaluation."""
 
@@ -156,6 +184,8 @@ class EvaluationConfig:
     pawn_terms: Mapping[str, PawnTermConfig] = field(default_factory=_default_pawn_terms)
     mobility_terms: Mapping[str, MobilityTermConfig] = field(default_factory=_default_mobility_terms)
     king_safety_terms: Mapping[str, KingSafetyTermConfig] = field(default_factory=_default_king_safety_terms)
+
+    coordination_terms: Mapping[str, CoordinationTermConfig] = field(default_factory=_default_coordination_terms)
 
     def __post_init__(self) -> None:
         if isinstance(self.version, bool) or self.version != EVALUATION_CONFIG_VERSION:
@@ -202,6 +232,14 @@ class EvaluationConfig:
                 raise ValueError(f"Unsupported king safety term or settings: {name}")
             normalized_safety[name] = settings
         object.__setattr__(self, "king_safety_terms", MappingProxyType(normalized_safety))
+        if not isinstance(self.coordination_terms, Mapping):
+            raise ValueError("coordination_terms must be a mapping")
+        normalized_coordination = _default_coordination_terms()
+        for name, settings in self.coordination_terms.items():
+            if name not in COORDINATION_TERM_NAMES or not isinstance(settings, CoordinationTermConfig):
+                raise ValueError(f"Unsupported coordination term or settings: {name}")
+            normalized_coordination[name] = settings
+        object.__setattr__(self, "coordination_terms", MappingProxyType(normalized_coordination))
 
     @classmethod
     def material_only(
@@ -232,6 +270,7 @@ class EvaluationConfig:
                 **{name: settings.to_dict() for name, settings in self.pawn_terms.items()},
                 **{name: settings.to_dict() for name, settings in self.mobility_terms.items()},
                 **{name: settings.to_dict() for name, settings in self.king_safety_terms.items()},
+                **{name: settings.to_dict() for name, settings in self.coordination_terms.items()},
             },
         }
 
@@ -240,7 +279,7 @@ class EvaluationConfig:
         if not isinstance(payload, Mapping):
             raise ValueError("Evaluation config must be an object")
         version = payload.get("version")
-        if isinstance(version, bool) or version not in (1, 2, 3, 4, 5):
+        if isinstance(version, bool) or version not in (1, 2, 3, 4, 5, 6):
             raise ValueError(f"Unsupported evaluation config version: {version}")
         expected = {"version", "perspective", "score_unit", "terms"}
         if version >= 2:
@@ -257,8 +296,10 @@ class EvaluationConfig:
             term_names.update(PAWN_TERM_NAMES)
         if version >= 4:
             term_names.update(MOBILITY_TERM_NAMES)
-        if version == 5:
+        if version >= 5:
             term_names.update(KING_SAFETY_TERM_NAMES)
+        if version == 6:
+            term_names.update(COORDINATION_TERM_NAMES)
         if not isinstance(terms, Mapping) or set(terms) != term_names:
             raise ValueError("Evaluation terms do not match declared version")
         material = terms["material"]
@@ -328,7 +369,7 @@ class EvaluationConfig:
                     endgame_weight=settings["endgame_weight"],
                 )
         king_safety_terms = _default_king_safety_terms()
-        if version == 5:
+        if version >= 5:
             for name in KING_SAFETY_TERM_NAMES:
                 settings = terms[name]
                 if not isinstance(settings, Mapping) or set(settings) != {
@@ -342,7 +383,23 @@ class EvaluationConfig:
                     enabled=settings["enabled"], weight=settings["weight"],
                     endgame_weight=settings["endgame_weight"],
                 )
+        coordination_terms = _default_coordination_terms()
+        if version == 6:
+            for name in COORDINATION_TERM_NAMES:
+                settings = terms[name]
+                if not isinstance(settings, Mapping) or set(settings) != {
+                    "enabled", "weight", "endgame_weight", "feature_version",
+                }:
+                    raise ValueError(f"Invalid coordination term fields: {name}")
+                feature_version = settings["feature_version"]
+                if isinstance(feature_version, bool) or feature_version != COORDINATION_FEATURE_VERSION:
+                    raise ValueError(f"Unsupported coordination feature version: {feature_version}")
+                coordination_terms[name] = CoordinationTermConfig(
+                    enabled=settings["enabled"], weight=settings["weight"],
+                    endgame_weight=settings["endgame_weight"],
+                )
         return cls(
+            coordination_terms=coordination_terms,
             king_safety_terms=king_safety_terms,
             mobility_terms=mobility_terms,
             pawn_terms=pawn_terms,

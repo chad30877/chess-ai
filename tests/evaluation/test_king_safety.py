@@ -169,7 +169,7 @@ class KingSafetyTest(unittest.TestCase):
             self.assertTrue(all(not item.enabled for item in cfg.king_safety_terms.values()))
             self.assertAlmostEqual(HandcraftedEvaluator(config=cfg).evaluate(board), expected)
             self.assertEqual(cfg, EvaluationConfig.from_dict(cfg.to_dict()))
-            self.assertEqual(cfg.to_dict()["version"], 5)
+            self.assertEqual(cfg.to_dict()["version"], 6)
         evaluator = MaterialEvaluator()
         self.assertEqual(evaluator.evaluate(board), evaluator.evaluate_breakdown(board).total_score)
         self.assertTrue(all(not item.enabled and item.endgame_weight == 0

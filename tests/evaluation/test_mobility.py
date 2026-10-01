@@ -150,7 +150,7 @@ class MobilityTest(unittest.TestCase):
             self.assertTrue(all(not setting.enabled for setting in cfg.mobility_terms.values()))
             self.assertAlmostEqual(HandcraftedEvaluator(config=cfg).evaluate(board), expected)
             self.assertEqual(EvaluationConfig.from_dict(cfg.to_dict()), cfg)
-            self.assertEqual(cfg.to_dict()["version"], 5)
+            self.assertEqual(cfg.to_dict()["version"], 6)
         material = MaterialEvaluator()
         self.assertEqual(material.evaluate(board), material.evaluate_breakdown(board).total_score)
         self.assertTrue(all(not setting.enabled for setting in EvaluationConfig().mobility_terms.values()))

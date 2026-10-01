@@ -10,7 +10,7 @@ import unittest
 
 import chess
 
-from engine.evaluation.config import EvaluationConfig, PawnTermConfig, MobilityTermConfig, KingSafetyTermConfig
+from engine.evaluation.config import EvaluationConfig, PawnTermConfig, MobilityTermConfig, KingSafetyTermConfig, CoordinationTermConfig
 from engine.sessions.evaluation_comparison import (
     ComparisonParticipant,
     run_evaluation_comparison,
@@ -35,6 +35,11 @@ class EvaluationComparisonTest(unittest.TestCase):
         self.baseline_config = EvaluationConfig(pst_weight=1.0)
         self.candidate_config = EvaluationConfig(piece_values={"N": 4.0}, pst_weight=0.25,
                                                  phase_enabled=True, endgame_pst_weight=0.75,
+                                                 coordination_terms={
+                                                     "bishop_pair": CoordinationTermConfig(True, .3, .4),
+                                                     "rook_open_file": CoordinationTermConfig(True, .15, .2),
+                                                     "rook_half_open_file": CoordinationTermConfig(True, .1, .15),
+                                                 },
                                                  king_safety_terms={
                                                      "king_pawn_shield": KingSafetyTermConfig(True, .1, 0),
                                                      "king_zone_attacks": KingSafetyTermConfig(True, .05, 0),

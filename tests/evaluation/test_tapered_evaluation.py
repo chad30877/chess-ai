@@ -117,7 +117,7 @@ class TaperedEvaluationTest(unittest.TestCase):
             self.assertEqual(payload["version"], 1)
             config = EvaluationConfig.from_dict(payload)
             self.assertFalse(config.phase_enabled)
-            self.assertEqual(config.to_dict()["version"], 5)
+            self.assertEqual(config.to_dict()["version"], 6)
             self.assertEqual(config, EvaluationConfig.from_dict(config.to_dict()))
             board = chess.Board("7k/8/8/8/3K4/8/8/Q7 w - - 0 1")
             legacy = HandcraftedEvaluator(config=EvaluationConfig(pst_weight=config.pst_weight))
