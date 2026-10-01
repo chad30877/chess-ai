@@ -10,7 +10,7 @@ import unittest
 
 import chess
 
-from engine.evaluation.config import EvaluationConfig, PawnTermConfig, MobilityTermConfig
+from engine.evaluation.config import EvaluationConfig, PawnTermConfig, MobilityTermConfig, KingSafetyTermConfig
 from engine.sessions.evaluation_comparison import (
     ComparisonParticipant,
     run_evaluation_comparison,
@@ -35,6 +35,11 @@ class EvaluationComparisonTest(unittest.TestCase):
         self.baseline_config = EvaluationConfig(pst_weight=1.0)
         self.candidate_config = EvaluationConfig(piece_values={"N": 4.0}, pst_weight=0.25,
                                                  phase_enabled=True, endgame_pst_weight=0.75,
+                                                 king_safety_terms={
+                                                     "king_pawn_shield": KingSafetyTermConfig(True, .1, 0),
+                                                     "king_zone_attacks": KingSafetyTermConfig(True, .05, 0),
+                                                     "king_file_exposure": KingSafetyTermConfig(True, .08, 0),
+                                                 },
                                                  mobility_terms={
                                                      "knight_mobility": MobilityTermConfig(True, .04, .06),
                                                      "rook_mobility": MobilityTermConfig(True, .02, .03),

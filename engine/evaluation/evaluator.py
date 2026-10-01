@@ -19,6 +19,7 @@ from engine.evaluation.pst import (
 )
 from engine.evaluation.pawn_structure import pawn_structure_balance
 from engine.evaluation.mobility import mobility_balance
+from engine.evaluation.king_safety import king_safety_balance
 from engine.interfaces import Evaluator
 
 DEFAULT_WEIGHTS = {
@@ -160,6 +161,7 @@ def _evaluate_breakdown(
     }
     terms.update(_pawn_terms(config, "middlegame", pawn_structure_balance(board)))
     terms.update(_mobility_terms(config, "middlegame", mobility_balance(board)))
+    terms.update(_king_safety_terms(config, "middlegame", king_safety_balance(board)))
     return EvaluationBreakdown(
         terms=terms,
         total_score=sum(term.contribution for term in terms.values()),
@@ -189,6 +191,7 @@ def _evaluate_tapered_breakdown(
     stage_terms = {}
     pawn_raw = pawn_structure_balance(board)
     mobility_raw = mobility_balance(board)
+    safety_raw = king_safety_balance(board)
     for stage, (material, pst) in raw.items():
         weight = config.pst_weight if stage == "middlegame" else config.endgame_pst_weight
         stage_terms[stage] = {
@@ -202,6 +205,7 @@ def _evaluate_tapered_breakdown(
         }
         stage_terms[stage].update(_pawn_terms(config, stage, pawn_raw))
         stage_terms[stage].update(_mobility_terms(config, stage, mobility_raw))
+        stage_terms[stage].update(_king_safety_terms(config, stage, safety_raw))
     # Endpoint contributions are weighted before interpolation; raw PST and weight
     # cannot be interpolated separately without introducing cross terms.
     terms = {}
@@ -212,7 +216,8 @@ def _evaluate_tapered_breakdown(
             phase * mg.raw_value * mg.weight + (1 - phase) * eg.raw_value * eg.weight,
             1.0, contribution, mg.enabled,
             "pawn weighted feature contribution"
-            if name in config.pawn_terms or name in config.mobility_terms else mg.unit,
+            if name in config.pawn_terms or name in config.mobility_terms
+            or name in config.king_safety_terms else mg.unit,
             mg.direction, "tapered",
             mg.overlap_risk,
         )
@@ -259,5 +264,26 @@ def _mobility_terms(
             enabled=settings.enabled, unit="geometric attack destination balance (White minus Black)",
             direction="positive favors White", stage=stage if config.phase_enabled else "all",
             overlap_risk="overlaps PST centralization, pawn attacks and future king-safety features",
+        )
+    return terms
+
+
+def _king_safety_terms(
+    config: EvaluationConfig, stage: str, raw: Mapping[str, float],
+) -> dict[str, EvaluationTerm]:
+    units = {
+        "king_pawn_shield": "immediate forward shield pawn balance (White minus Black)",
+        "king_zone_attacks": "attacked king-ring square balance (Black minus White)",
+        "king_file_exposure": "king-adjacent exposed file units (Black minus White; half-open=1/open=2)",
+    }
+    terms = {}
+    for name, settings in config.king_safety_terms.items():
+        weight = settings.endgame_weight if stage == "endgame" else settings.weight
+        terms[name] = EvaluationTerm(
+            raw_value=raw[name], weight=weight,
+            contribution=raw[name] * weight if settings.enabled else 0.0,
+            enabled=settings.enabled, unit=units[name], direction="positive favors White",
+            stage=stage if config.phase_enabled else "all",
+            overlap_risk="overlaps king/pawn PST, pawn structure and geometric mobility",
         )
     return terms

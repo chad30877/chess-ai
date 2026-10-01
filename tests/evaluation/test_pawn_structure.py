@@ -180,7 +180,7 @@ class PawnStructureTest(unittest.TestCase):
             payload = json.loads((ROOT / "configs/evaluation" / name).read_text(encoding="utf-8"))
             self.assertEqual(payload["version"], version)
             config = EvaluationConfig.from_dict(payload)
-            self.assertEqual(config.to_dict()["version"], 4)
+            self.assertEqual(config.to_dict()["version"], 5)
             self.assertTrue(all(not item.enabled for item in config.pawn_terms.values()))
             self.assertEqual(config.phase_enabled, version == 2)
             self.assertEqual(config, EvaluationConfig.from_dict(config.to_dict()))

@@ -7,7 +7,9 @@ from numbers import Real
 from types import MappingProxyType
 
 
-EVALUATION_CONFIG_VERSION = 4
+EVALUATION_CONFIG_VERSION = 5
+KING_SAFETY_FEATURE_VERSION = 1
+KING_SAFETY_TERM_NAMES = ("king_pawn_shield", "king_zone_attacks", "king_file_exposure")
 MOBILITY_FEATURE_VERSION = 1
 MOBILITY_TERM_NAMES = ("pawn_mobility", "knight_mobility", "bishop_mobility",
                        "rook_mobility", "queen_mobility", "king_mobility")
@@ -115,6 +117,31 @@ def _default_mobility_terms() -> dict[str, MobilityTermConfig]:
 
 
 @dataclass(frozen=True)
+class KingSafetyTermConfig:
+    """Independent non-negative prices; default endgame contribution is zero."""
+
+    enabled: bool = False
+    weight: float = 0.0
+    endgame_weight: float = 0.0
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "enabled", _boolean(self.enabled, "king safety term enabled"))
+        for name in ("weight", "endgame_weight"):
+            object.__setattr__(self, name, _finite_number(
+                getattr(self, name), f"king safety term {name}", non_negative=True,
+            ))
+
+    def to_dict(self) -> dict:
+        return {"enabled": self.enabled, "weight": self.weight,
+                "endgame_weight": self.endgame_weight, "feature_version": KING_SAFETY_FEATURE_VERSION}
+
+
+def _default_king_safety_terms() -> dict[str, KingSafetyTermConfig]:
+    return {name: KingSafetyTermConfig(weight=weight)
+            for name, weight in zip(KING_SAFETY_TERM_NAMES, (.10, .05, .08))}
+
+
+@dataclass(frozen=True)
 class EvaluationConfig:
     """The complete settings needed to reproduce a handcrafted evaluation."""
 
@@ -128,6 +155,7 @@ class EvaluationConfig:
     endgame_pst_weight: float = 1.0
     pawn_terms: Mapping[str, PawnTermConfig] = field(default_factory=_default_pawn_terms)
     mobility_terms: Mapping[str, MobilityTermConfig] = field(default_factory=_default_mobility_terms)
+    king_safety_terms: Mapping[str, KingSafetyTermConfig] = field(default_factory=_default_king_safety_terms)
 
     def __post_init__(self) -> None:
         if isinstance(self.version, bool) or self.version != EVALUATION_CONFIG_VERSION:
@@ -166,6 +194,14 @@ class EvaluationConfig:
                 raise ValueError(f"Unsupported mobility term or settings: {name}")
             normalized_mobility[name] = settings
         object.__setattr__(self, "mobility_terms", MappingProxyType(normalized_mobility))
+        if not isinstance(self.king_safety_terms, Mapping):
+            raise ValueError("king_safety_terms must be a mapping")
+        normalized_safety = _default_king_safety_terms()
+        for name, settings in self.king_safety_terms.items():
+            if name not in KING_SAFETY_TERM_NAMES or not isinstance(settings, KingSafetyTermConfig):
+                raise ValueError(f"Unsupported king safety term or settings: {name}")
+            normalized_safety[name] = settings
+        object.__setattr__(self, "king_safety_terms", MappingProxyType(normalized_safety))
 
     @classmethod
     def material_only(
@@ -195,6 +231,7 @@ class EvaluationConfig:
                 },
                 **{name: settings.to_dict() for name, settings in self.pawn_terms.items()},
                 **{name: settings.to_dict() for name, settings in self.mobility_terms.items()},
+                **{name: settings.to_dict() for name, settings in self.king_safety_terms.items()},
             },
         }
 
@@ -203,7 +240,7 @@ class EvaluationConfig:
         if not isinstance(payload, Mapping):
             raise ValueError("Evaluation config must be an object")
         version = payload.get("version")
-        if isinstance(version, bool) or version not in (1, 2, 3, 4):
+        if isinstance(version, bool) or version not in (1, 2, 3, 4, 5):
             raise ValueError(f"Unsupported evaluation config version: {version}")
         expected = {"version", "perspective", "score_unit", "terms"}
         if version >= 2:
@@ -218,8 +255,10 @@ class EvaluationConfig:
         term_names = {"material", "piece_square"}
         if version >= 3:
             term_names.update(PAWN_TERM_NAMES)
-        if version == 4:
+        if version >= 4:
             term_names.update(MOBILITY_TERM_NAMES)
+        if version == 5:
+            term_names.update(KING_SAFETY_TERM_NAMES)
         if not isinstance(terms, Mapping) or set(terms) != term_names:
             raise ValueError("Evaluation terms do not match declared version")
         material = terms["material"]
@@ -274,7 +313,7 @@ class EvaluationConfig:
                     endgame_weight=settings["endgame_weight"],
                 )
         mobility_terms = _default_mobility_terms()
-        if version == 4:
+        if version >= 4:
             for name in MOBILITY_TERM_NAMES:
                 settings = terms[name]
                 if not isinstance(settings, Mapping) or set(settings) != {
@@ -288,7 +327,23 @@ class EvaluationConfig:
                     enabled=settings["enabled"], weight=settings["weight"],
                     endgame_weight=settings["endgame_weight"],
                 )
+        king_safety_terms = _default_king_safety_terms()
+        if version == 5:
+            for name in KING_SAFETY_TERM_NAMES:
+                settings = terms[name]
+                if not isinstance(settings, Mapping) or set(settings) != {
+                    "enabled", "weight", "endgame_weight", "feature_version",
+                }:
+                    raise ValueError(f"Invalid king safety term fields: {name}")
+                feature_version = settings["feature_version"]
+                if isinstance(feature_version, bool) or feature_version != KING_SAFETY_FEATURE_VERSION:
+                    raise ValueError(f"Unsupported king safety feature version: {feature_version}")
+                king_safety_terms[name] = KingSafetyTermConfig(
+                    enabled=settings["enabled"], weight=settings["weight"],
+                    endgame_weight=settings["endgame_weight"],
+                )
         return cls(
+            king_safety_terms=king_safety_terms,
             mobility_terms=mobility_terms,
             pawn_terms=pawn_terms,
             phase_enabled=phase_enabled,
