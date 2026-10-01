@@ -123,3 +123,39 @@ def evaluate_piece_square_tables(board: chess.Board) -> float:
     white_total = evaluate_piece_square_tables_for_color(board, chess.WHITE)
     black_total = evaluate_piece_square_tables_for_color(board, chess.BLACK)
     return white_total - black_total
+
+
+# Endgame v1 changes only the king: central activity replaces shelter bonuses.
+KING_ENDGAME_PST: PieceSquareTable = (
+    (-0.30, -0.20, -0.10, -0.05, -0.05, -0.10, -0.20, -0.30),
+    (-0.20, -0.10, 0.00, 0.05, 0.05, 0.00, -0.10, -0.20),
+    (-0.10, 0.00, 0.10, 0.15, 0.15, 0.10, 0.00, -0.10),
+    (-0.05, 0.05, 0.15, 0.25, 0.25, 0.15, 0.05, -0.05),
+    (-0.05, 0.05, 0.15, 0.25, 0.25, 0.15, 0.05, -0.05),
+    (-0.10, 0.00, 0.10, 0.15, 0.15, 0.10, 0.00, -0.10),
+    (-0.20, -0.10, 0.00, 0.05, 0.05, 0.00, -0.10, -0.20),
+    (-0.30, -0.20, -0.10, -0.05, -0.05, -0.10, -0.20, -0.30),
+)
+ENDGAME_PIECE_SQUARE_TABLES = {**WHITE_PIECE_SQUARE_TABLES, chess.KING: KING_ENDGAME_PST}
+
+
+def evaluate_endgame_piece_square_tables(board: chess.Board) -> float:
+    """Endgame PST v1, with the same rank mirror and White perspective."""
+    totals = {chess.WHITE: 0.0, chess.BLACK: 0.0}
+    for square, piece in board.piece_map().items():
+        row, file = _table_coordinates(_white_perspective_square(piece, square))
+        totals[piece.color] += ENDGAME_PIECE_SQUARE_TABLES[piece.piece_type][row][file]
+    return totals[chess.WHITE] - totals[chess.BLACK]
+
+
+def middlegame_phase(board: chess.Board) -> float:
+    """Model v1: N/B=1, R=2, Q=4; both sides total 24 initially.
+
+    Pawns/kings do not affect phase; promotions are capped at the initial total.
+    This depends on counts, never configurable material prices or side to move.
+    """
+    units = sum(len(board.pieces(kind, color)) * weight
+                for kind, weight in ((chess.KNIGHT, 1), (chess.BISHOP, 1),
+                                     (chess.ROOK, 2), (chess.QUEEN, 4))
+                for color in chess.COLORS)
+    return min(units, 24) / 24.0

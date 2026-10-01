@@ -7,7 +7,9 @@ from numbers import Real
 from types import MappingProxyType
 
 
-EVALUATION_CONFIG_VERSION = 1
+EVALUATION_CONFIG_VERSION = 2
+ENDGAME_PST_TABLE_VERSION = 1
+PHASE_MODEL_VERSION = 1
 PST_TABLE_VERSION = 1
 PIECE_SYMBOLS = ("P", "N", "B", "R", "Q")
 DEFAULT_PIECE_VALUES = {
@@ -61,12 +63,23 @@ class EvaluationConfig:
     pst_enabled: bool = True
     pst_weight: float = 1.0
     version: int = EVALUATION_CONFIG_VERSION
+    phase_enabled: bool = False
+    endgame_piece_values: Mapping[str, float] | None = None
+    endgame_pst_weight: float = 1.0
 
     def __post_init__(self) -> None:
         if isinstance(self.version, bool) or self.version != EVALUATION_CONFIG_VERSION:
             raise ValueError(f"Unsupported evaluation config version: {self.version}")
         object.__setattr__(self, "piece_values", MappingProxyType(
             _normalize_piece_values(self.piece_values),
+        ))
+        object.__setattr__(self, "endgame_piece_values", MappingProxyType(
+            _normalize_piece_values(self.piece_values if self.endgame_piece_values is None
+                                    else self.endgame_piece_values),
+        ))
+        object.__setattr__(self, "phase_enabled", _boolean(self.phase_enabled, "phase_enabled"))
+        object.__setattr__(self, "endgame_pst_weight", _finite_number(
+            self.endgame_pst_weight, "endgame_pst_weight", non_negative=True,
         ))
         object.__setattr__(self, "material_enabled", _boolean(
             self.material_enabled, "material_enabled",
@@ -85,6 +98,7 @@ class EvaluationConfig:
     def to_dict(self) -> dict:
         return {
             "version": self.version,
+            "phase": {"enabled": self.phase_enabled, "model_version": PHASE_MODEL_VERSION},
             "perspective": "white",
             "score_unit": "pawn",
             "terms": {
@@ -92,11 +106,14 @@ class EvaluationConfig:
                     "enabled": self.material_enabled,
                     "weight": 1.0,
                     "piece_values": dict(self.piece_values),
+                    "endgame_piece_values": dict(self.endgame_piece_values),
                 },
                 "piece_square": {
                     "enabled": self.pst_enabled,
                     "weight": self.pst_weight,
                     "table_version": PST_TABLE_VERSION,
+                    "endgame_weight": self.endgame_pst_weight,
+                    "endgame_table_version": ENDGAME_PST_TABLE_VERSION,
                 },
             },
         }
@@ -105,9 +122,14 @@ class EvaluationConfig:
     def from_dict(cls, payload: Mapping[str, object]) -> "EvaluationConfig":
         if not isinstance(payload, Mapping):
             raise ValueError("Evaluation config must be an object")
+        version = payload.get("version")
+        if isinstance(version, bool) or version not in (1, 2):
+            raise ValueError(f"Unsupported evaluation config version: {version}")
         expected = {"version", "perspective", "score_unit", "terms"}
+        if version == 2:
+            expected.add("phase")
         if set(payload) != expected:
-            raise ValueError("Evaluation config fields do not match version 1")
+            raise ValueError("Evaluation config fields do not match declared version")
         if payload["perspective"] != "white":
             raise ValueError("Evaluation perspective must be white")
         if payload["score_unit"] != "pawn":
@@ -117,22 +139,44 @@ class EvaluationConfig:
             raise ValueError("Evaluation terms must contain material and piece_square")
         material = terms["material"]
         piece_square = terms["piece_square"]
-        if not isinstance(material, Mapping) or set(material) != {"enabled", "weight", "piece_values"}:
-            raise ValueError("Material term fields do not match version 1")
+        material_fields = {"enabled", "weight", "piece_values"}
+        pst_fields = {"enabled", "weight", "table_version"}
+        if version == 2:
+            material_fields.add("endgame_piece_values")
+            pst_fields.update({"endgame_weight", "endgame_table_version"})
+        if not isinstance(material, Mapping) or set(material) != material_fields:
+            raise ValueError("Material term fields do not match declared version")
         if _finite_number(material["weight"], "material.weight") != 1.0:
             raise ValueError("Material term weight is fixed at 1")
-        if not isinstance(piece_square, Mapping) or set(piece_square) != {
-            "enabled", "weight", "table_version",
-        }:
-            raise ValueError("Piece-square term fields do not match version 1")
+        if not isinstance(piece_square, Mapping) or set(piece_square) != pst_fields:
+            raise ValueError("Piece-square term fields do not match declared version")
         table_version = piece_square["table_version"]
         if isinstance(table_version, bool) or table_version != PST_TABLE_VERSION:
             raise ValueError(f"Unsupported PST table version: {table_version}")
         piece_values = material["piece_values"]
         if not isinstance(piece_values, Mapping) or set(piece_values) != set(PIECE_SYMBOLS):
             raise ValueError("Material piece_values must contain P, N, B, R, and Q")
+        phase_enabled = False
+        endgame_values = piece_values
+        endgame_weight = piece_square["weight"]
+        if version == 2:
+            phase = payload["phase"]
+            if not isinstance(phase, Mapping) or set(phase) != {"enabled", "model_version"}:
+                raise ValueError("Invalid phase model fields")
+            if isinstance(phase["model_version"], bool) or phase["model_version"] != PHASE_MODEL_VERSION:
+                raise ValueError("Unsupported phase model version")
+            phase_enabled = _boolean(phase["enabled"], "phase.enabled")
+            endgame_values = material["endgame_piece_values"]
+            if not isinstance(endgame_values, Mapping) or set(endgame_values) != set(PIECE_SYMBOLS):
+                raise ValueError("Endgame piece_values must contain P, N, B, R, and Q")
+            endgame_weight = piece_square["endgame_weight"]
+            eg_version = piece_square["endgame_table_version"]
+            if isinstance(eg_version, bool) or eg_version != ENDGAME_PST_TABLE_VERSION:
+                raise ValueError("Unsupported endgame PST table version")
         return cls(
-            version=payload["version"],
+            phase_enabled=phase_enabled,
+            endgame_piece_values=endgame_values,
+            endgame_pst_weight=endgame_weight,
             piece_values=piece_values,
             material_enabled=_boolean(material["enabled"], "material.enabled"),
             pst_enabled=_boolean(piece_square["enabled"], "piece_square.enabled"),
@@ -172,11 +216,18 @@ class EvaluationBreakdown:
 
     terms: Mapping[str, EvaluationTerm]
     total_score: float
+    phase: Mapping[str, object] | None = None
+    stage_terms: Mapping[str, Mapping[str, EvaluationTerm]] | None = None
     perspective: str = "white"
     score_unit: str = "pawn"
 
     def to_dict(self) -> dict:
         return {
+            "phase": dict(self.phase) if self.phase is not None else None,
+            "stage_terms": {
+                stage: {name: term.to_dict() for name, term in terms.items()}
+                for stage, terms in (self.stage_terms or {}).items()
+            },
             "perspective": self.perspective,
             "score_unit": self.score_unit,
             "terms": {name: term.to_dict() for name, term in self.terms.items()},

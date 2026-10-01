@@ -9,11 +9,14 @@ import chess
 
 from engine.evaluation.config import (
     DEFAULT_PIECE_VALUES,
+    PHASE_MODEL_VERSION,
     EvaluationBreakdown,
     EvaluationConfig,
     EvaluationTerm,
 )
-from engine.evaluation.pst import evaluate_piece_square_tables
+from engine.evaluation.pst import (
+    evaluate_piece_square_tables, evaluate_endgame_piece_square_tables, middlegame_phase,
+)
 from engine.interfaces import Evaluator
 
 DEFAULT_WEIGHTS = {
@@ -125,6 +128,8 @@ def _evaluate_breakdown(
     config: EvaluationConfig,
     material_weights: Mapping[int, float],
 ) -> EvaluationBreakdown:
+    if config.phase_enabled:
+        return _evaluate_tapered_breakdown(board, config, material_weights)
     material_raw = _evaluate_material_balance(board, material_weights)
     pst_raw = evaluate_piece_square_tables(board)
     material_contribution = material_raw if config.material_enabled else 0.0
@@ -161,3 +166,47 @@ def evaluate(board: chess.Board, weights: Mapping[int | str, float] | None = Non
     """Backward-compatible helper returning the default handcrafted eval score."""
 
     return HandcraftedEvaluator(weights=weights).evaluate(board)
+
+
+def _evaluate_tapered_breakdown(
+    board: chess.Board,
+    config: EvaluationConfig,
+    material_weights: Mapping[int, float],
+) -> EvaluationBreakdown:
+    phase = middlegame_phase(board)
+    endgame_weights = {PIECE_KEY_MAP[key]: value
+                       for key, value in config.endgame_piece_values.items()}
+    raw = {
+        "middlegame": (_evaluate_material_balance(board, material_weights),
+                       evaluate_piece_square_tables(board)),
+        "endgame": (_evaluate_material_balance(board, endgame_weights),
+                    evaluate_endgame_piece_square_tables(board)),
+    }
+    stage_terms = {}
+    for stage, (material, pst) in raw.items():
+        weight = config.pst_weight if stage == "middlegame" else config.endgame_pst_weight
+        stage_terms[stage] = {
+            "material": EvaluationTerm(material, 1.0, material if config.material_enabled else 0.0,
+                                       config.material_enabled, "pawn balance", "positive favors White",
+                                       stage, "piece values include material only"),
+            "piece_square": EvaluationTerm(pst, weight, pst * weight if config.pst_enabled else 0.0,
+                                           config.pst_enabled, "pawn positional bonus",
+                                           "positive favors White", stage,
+                                           "may overlap future location-based features"),
+        }
+    # Endpoint contributions are weighted before interpolation; raw PST and weight
+    # cannot be interpolated separately without introducing cross terms.
+    terms = {}
+    for name in ("material", "piece_square"):
+        mg, eg = stage_terms["middlegame"][name], stage_terms["endgame"][name]
+        contribution = phase * mg.contribution + (1 - phase) * eg.contribution
+        terms[name] = EvaluationTerm(
+            phase * mg.raw_value * mg.weight + (1 - phase) * eg.raw_value * eg.weight,
+            1.0, contribution, mg.enabled, mg.unit, mg.direction, "tapered",
+            mg.overlap_risk,
+        )
+    return EvaluationBreakdown(
+        terms=terms, total_score=sum(term.contribution for term in terms.values()),
+        phase={"enabled": True, "model_version": PHASE_MODEL_VERSION, "middlegame": phase, "endgame": 1 - phase},
+        stage_terms=stage_terms,
+    )

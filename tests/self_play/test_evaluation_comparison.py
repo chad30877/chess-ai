@@ -33,7 +33,8 @@ class EvaluationComparisonTest(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.baseline_config = EvaluationConfig(pst_weight=1.0)
-        self.candidate_config = EvaluationConfig(piece_values={"N": 4.0}, pst_weight=0.25)
+        self.candidate_config = EvaluationConfig(piece_values={"N": 4.0}, pst_weight=0.25,
+                                                 phase_enabled=True, endgame_pst_weight=0.75)
         self.baseline = ComparisonParticipant.greedy("stable", self.baseline_config)
         self.candidate = ComparisonParticipant.greedy("candidate", self.candidate_config)
 
@@ -65,6 +66,9 @@ class EvaluationComparisonTest(unittest.TestCase):
             ["piece_values"]["N"],
             4.0,
         )
+        evaluator = dict(settings["participants"]["candidate"]["evaluator"])
+        evaluator.pop("type")
+        self.assertEqual(EvaluationConfig.from_dict(evaluator), self.candidate_config)
         pair = comparison["pairs"][0]
         self.assertEqual(pair["initial_fen"], chess.Board(WHITE_WIN_FEN).fen())
         self.assertEqual(pair["seed"], 42)
@@ -172,6 +176,9 @@ class EvaluationComparisonTest(unittest.TestCase):
         batch = next(batch_root.iterdir())
         manifest = json.loads((batch / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["counts"]["saved_games"], 2)
+        saved = dict(manifest["settings"]["comparison"]["participants"]["candidate"]["evaluator"])
+        saved.pop("type")
+        self.assertEqual(EvaluationConfig.from_dict(saved), self.candidate_config)
         rejected = subprocess.run(
             [*command, "--time-ms", "100"], cwd=ROOT,
             capture_output=True, text=True, timeout=30,

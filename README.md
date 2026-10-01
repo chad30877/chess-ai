@@ -15,7 +15,7 @@
 
 後續任務順序與驗收以 [開發計畫](docs/開發計畫.md) 為準；測試分類與執行方式見 [測試導覽](tests/README.md)。四份功能文件區分目前實作與未來規劃。
 
-**2026-09-10 P1–P5、P6/S0–S4 與 S5/PVS、aspiration 完成：** 已移除舊 ML，完成測試／engine 分類、版本化評分設定、成對比較批次、終局／歷史正確性、基本 move ordering、quiescence、迭代加深與時間／取消、含歷史隔離的置換表，以及 PVS／aspiration 窄窗搜尋。Random 基準、PNG 備援與通用對局資料保留；P6 其餘子項與 P7 尚未實作。
+**2026-10-01 P1–P5、P6/S0–S4、S5/PVS、aspiration 與 E1 完成：** 已移除舊 ML，完成測試／engine 分類、版本化評分設定、成對比較批次、終局／歷史正確性、基本 move ordering、quiescence、迭代加深與時間／取消、含歷史隔離的置換表，以及 PVS／aspiration 窄窗搜尋與可選的中局／殘局平滑評分。Random 基準、PNG 備援與通用對局資料保留；P6 其餘子項與 P7 尚未實作。
 
 ## 各區塊怎麼串接？
 
@@ -148,6 +148,8 @@ uv pip install --python "./.venv/Scripts/python.exe" chess pygame
 
 ## 驗證紀錄
 
+P6/E1 新增可選分階段評分：依 N/B=1、R=2、Q=4 的剩餘子力單位（初始 24）混合中局／殘局各自加權的分數；殘局 PST v1 僅改國王中央活動。設定 schema v2 保存兩階段權重與表／階段模型版本，仍讀取 v1；預設關閉以維持既有評分。分項輸出包含階段比例與兩階段原始值／貢獻。新增 10 個案例並更新 P5 批次／CLI 保存驗證，完整 **165 個測試全部通過**，`git diff --check` 通過；此為功能驗收，尚未證明棋力提升。可比較設定見 [分階段評分](docs/搜尋與評分.md#e1-分階段評分)。
+
 P6/S5 第二小段新增 root aspiration window：depth 2 起預設以上一輪完整分數正負 1 pawn 搜尋，fail-high／fail-low 或等於邊界即完整重搜；可用 `aspiration_window=None` 停用，重搜中止仍回傳上一完整深度。新增 7 個案例後完整 **155 個測試全部通過**，`git diff --check` 通過。固定 depth 3 戰術回歸維持 `d1g4` 與 -5 分，節點由 427 降至 423；差距很小，不視為普遍加速或棋力證明。
 
 P6/S5 第一小段新增 PVS：每個一般節點第一手走完整視窗，後續走法以相鄰浮點邊界 scout，只有改善但未 cutoff 時完整重搜；可關閉作標準 Alpha-Beta 基準，結果另提供 scout／重搜統計。新增 5 個案例後完整 **148 個測試全部通過**，`git diff --check` 通過。固定 depth 3、關閉 quiescence／TT 的戰術回歸維持 `d1g4` 與 -5 分，節點由 483 降至 455；該小段未混入 aspiration、LMR 或 Null move，也不把單一案例當成棋力證明。
@@ -194,6 +196,6 @@ uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/pyth
 
 依 [開發計畫](docs/開發計畫.md) 執行：P1 移除舊 ML（已完成）→ P2 測試分類（已完成）→ P3 engine 分類（已完成）→ P4 獨立權重及設定保存（已完成）→ P5 比較流程（已完成）→ P6 特徵／搜尋逐項擴充 → P7 評估自動調參。
 
-目前已依序完成 P6/S0 終局與歷史正確性、S1 基本 move ordering、S2 quiescence、S3 迭代加深與時間／取消；下一階段仍依 P6 每次只選一個評分或搜尋子項。每階段依 AGENTS.md 完成相關測試、全部驗證與獨立 commit，並更新文件狀態。
+目前已完成 P6/S0–S4、S5/PVS／aspiration 與 E1 分階段評分；下一階段仍依 P6 每次只選一個評分或搜尋子項。每階段依 AGENTS.md 完成相關測試、全部驗證與獨立 commit，並更新文件狀態。
 
 目前 UI 真人模式、自動對戰與日期回放已完成，保留現有功能；名稱／標籤搜尋、悔棋、索引快取及中斷修復另行安排。資源圖片與舊對局資料本輪不清理。
