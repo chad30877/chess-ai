@@ -2,14 +2,14 @@
 
 [回到專案總覽](../README.md) · [開發計畫](../docs/開發計畫.md)
 
-更新日期：2026-10-01。P2 已完成，測試依責任分類，沿用 unittest。P3 更新 engine 匯入／patch 路徑後為 91 個測試；P4 增至 98 個，P5 增至 105 個，P6/S0 增至 114 個，S1 增至 119 個，S2 增至 125 個，S3 增至 130 個，S4 增至 143 個，S5/PVS 增至 148 個，S5/aspiration 新增 7 個案例，E1 新增 10 個分階段案例並更新比較保存測試，目前完整 165 個測試通過。
+更新日期：2026-10-01。P2 已完成，測試依責任分類，沿用 unittest。P3 更新 engine 匯入／patch 路徑後為 91 個測試；P4 增至 98 個，P5 增至 105 個，P6/S0 增至 114 個，S1 增至 119 個，S2 增至 125 個，S3 增至 130 個，S4 增至 143 個，S5/PVS 增至 148 個，S5/aspiration 新增 7 個案例，E1 新增 10 個分階段案例並更新比較保存測試，E2 新增 15 個兵形案例並更新比較保存測試，目前完整 180 個測試通過。
 
 ## 目前覆蓋
 
 | 檔案 | 責任 |
 | --- | --- |
 | rules/test_game_rules.py | 共用棋規、特殊走法、重複局面歷史、終局與上限 |
-| evaluation/test_evaluation_config.py、evaluation/test_evaluator_semantics.py、evaluation/test_piece_square_tables.py、evaluation/test_tapered_evaluation.py | 評分設定驗證／往返、分項加總、評分視角、子力與 PST、鏡射、階段混合／邊界、v1 相容與 v2 保存 |
+| evaluation/test_evaluation_config.py、evaluation/test_evaluator_semantics.py、evaluation/test_piece_square_tables.py、evaluation/test_tapered_evaluation.py、evaluation/test_pawn_structure.py | 評分設定驗證／往返、分項加總、評分視角、子力與 PST、鏡射、階段混合／邊界、兵形定義／推進單位、獨立開關／權重、v1／v2 相容與 v3 保存 |
 | search/test_alphabeta_player.py、search/test_alphabeta_searcher.py、search/test_aspiration.py、search/test_greedy_terminal_scoring.py、search/test_iterative_deepening.py、search/test_move_ordering.py、search/test_pvs.py、search/test_quiescence.py、search/test_search_types.py、search/test_transposition.py | 搜尋委派、Minimax 比對、共用終局、基本／TT 排序、PVS／aspiration 窄窗與重搜、quiescence、迭代加深、逾時／取消、置換 key／界限／失效、分支歷史、根棋盤隔離與參數 |
 | self_play/test_batch_generation.py | 批次、CSV／JSONL、相容與失敗保存 |
 | self_play/test_batch_ui_storage.py | UI 批次保存、日期流水號、種子與跨午夜分類 |

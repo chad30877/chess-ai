@@ -7,7 +7,9 @@ from numbers import Real
 from types import MappingProxyType
 
 
-EVALUATION_CONFIG_VERSION = 2
+EVALUATION_CONFIG_VERSION = 3
+PAWN_FEATURE_VERSION = 1
+PAWN_TERM_NAMES = ("isolated_pawns", "doubled_pawns", "passed_pawns")
 ENDGAME_PST_TABLE_VERSION = 1
 PHASE_MODEL_VERSION = 1
 PST_TABLE_VERSION = 1
@@ -55,6 +57,35 @@ def _normalize_piece_values(values: Mapping[str, object] | None) -> dict[str, fl
 
 
 @dataclass(frozen=True)
+class PawnTermConfig:
+    """Non-negative pawn-unit prices; feature signs are defined by the model."""
+
+    enabled: bool = False
+    weight: float = 0.0
+    endgame_weight: float = 0.0
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "enabled", _boolean(self.enabled, "pawn term enabled"))
+        for name in ("weight", "endgame_weight"):
+            object.__setattr__(self, name, _finite_number(
+                getattr(self, name), f"pawn term {name}", non_negative=True,
+            ))
+
+    def to_dict(self) -> dict:
+        return {"enabled": self.enabled, "weight": self.weight,
+                "endgame_weight": self.endgame_weight, "feature_version": PAWN_FEATURE_VERSION}
+
+
+def _default_pawn_terms() -> dict[str, PawnTermConfig]:
+    # Experimental starting prices, disabled until explicitly selected.
+    return {
+        "isolated_pawns": PawnTermConfig(weight=0.15, endgame_weight=0.20),
+        "doubled_pawns": PawnTermConfig(weight=0.10, endgame_weight=0.15),
+        "passed_pawns": PawnTermConfig(weight=0.05, endgame_weight=0.10),
+    }
+
+
+@dataclass(frozen=True)
 class EvaluationConfig:
     """The complete settings needed to reproduce a handcrafted evaluation."""
 
@@ -66,6 +97,7 @@ class EvaluationConfig:
     phase_enabled: bool = False
     endgame_piece_values: Mapping[str, float] | None = None
     endgame_pst_weight: float = 1.0
+    pawn_terms: Mapping[str, PawnTermConfig] = field(default_factory=_default_pawn_terms)
 
     def __post_init__(self) -> None:
         if isinstance(self.version, bool) or self.version != EVALUATION_CONFIG_VERSION:
@@ -88,6 +120,14 @@ class EvaluationConfig:
         object.__setattr__(self, "pst_weight", _finite_number(
             self.pst_weight, "pst_weight", non_negative=True,
         ))
+        if not isinstance(self.pawn_terms, Mapping):
+            raise ValueError("pawn_terms must be a mapping")
+        normalized = _default_pawn_terms()
+        for name, settings in self.pawn_terms.items():
+            if name not in PAWN_TERM_NAMES or not isinstance(settings, PawnTermConfig):
+                raise ValueError(f"Unsupported pawn term or settings: {name}")
+            normalized[name] = settings
+        object.__setattr__(self, "pawn_terms", MappingProxyType(normalized))
 
     @classmethod
     def material_only(
@@ -115,6 +155,7 @@ class EvaluationConfig:
                     "endgame_weight": self.endgame_pst_weight,
                     "endgame_table_version": ENDGAME_PST_TABLE_VERSION,
                 },
+                **{name: settings.to_dict() for name, settings in self.pawn_terms.items()},
             },
         }
 
@@ -123,10 +164,10 @@ class EvaluationConfig:
         if not isinstance(payload, Mapping):
             raise ValueError("Evaluation config must be an object")
         version = payload.get("version")
-        if isinstance(version, bool) or version not in (1, 2):
+        if isinstance(version, bool) or version not in (1, 2, 3):
             raise ValueError(f"Unsupported evaluation config version: {version}")
         expected = {"version", "perspective", "score_unit", "terms"}
-        if version == 2:
+        if version >= 2:
             expected.add("phase")
         if set(payload) != expected:
             raise ValueError("Evaluation config fields do not match declared version")
@@ -135,13 +176,16 @@ class EvaluationConfig:
         if payload["score_unit"] != "pawn":
             raise ValueError("Evaluation score_unit must be pawn")
         terms = payload["terms"]
-        if not isinstance(terms, Mapping) or set(terms) != {"material", "piece_square"}:
-            raise ValueError("Evaluation terms must contain material and piece_square")
+        term_names = {"material", "piece_square"}
+        if version == 3:
+            term_names.update(PAWN_TERM_NAMES)
+        if not isinstance(terms, Mapping) or set(terms) != term_names:
+            raise ValueError("Evaluation terms do not match declared version")
         material = terms["material"]
         piece_square = terms["piece_square"]
         material_fields = {"enabled", "weight", "piece_values"}
         pst_fields = {"enabled", "weight", "table_version"}
-        if version == 2:
+        if version >= 2:
             material_fields.add("endgame_piece_values")
             pst_fields.update({"endgame_weight", "endgame_table_version"})
         if not isinstance(material, Mapping) or set(material) != material_fields:
@@ -159,7 +203,7 @@ class EvaluationConfig:
         phase_enabled = False
         endgame_values = piece_values
         endgame_weight = piece_square["weight"]
-        if version == 2:
+        if version >= 2:
             phase = payload["phase"]
             if not isinstance(phase, Mapping) or set(phase) != {"enabled", "model_version"}:
                 raise ValueError("Invalid phase model fields")
@@ -173,7 +217,23 @@ class EvaluationConfig:
             eg_version = piece_square["endgame_table_version"]
             if isinstance(eg_version, bool) or eg_version != ENDGAME_PST_TABLE_VERSION:
                 raise ValueError("Unsupported endgame PST table version")
+        pawn_terms = _default_pawn_terms()
+        if version == 3:
+            for name in PAWN_TERM_NAMES:
+                settings = terms[name]
+                if not isinstance(settings, Mapping) or set(settings) != {
+                    "enabled", "weight", "endgame_weight", "feature_version",
+                }:
+                    raise ValueError(f"Invalid pawn term fields: {name}")
+                feature_version = settings["feature_version"]
+                if isinstance(feature_version, bool) or feature_version != PAWN_FEATURE_VERSION:
+                    raise ValueError(f"Unsupported pawn feature version: {feature_version}")
+                pawn_terms[name] = PawnTermConfig(
+                    enabled=settings["enabled"], weight=settings["weight"],
+                    endgame_weight=settings["endgame_weight"],
+                )
         return cls(
+            pawn_terms=pawn_terms,
             phase_enabled=phase_enabled,
             endgame_piece_values=endgame_values,
             endgame_pst_weight=endgame_weight,

@@ -117,13 +117,13 @@ class TaperedEvaluationTest(unittest.TestCase):
             self.assertEqual(payload["version"], 1)
             config = EvaluationConfig.from_dict(payload)
             self.assertFalse(config.phase_enabled)
-            self.assertEqual(config.to_dict()["version"], 2)
+            self.assertEqual(config.to_dict()["version"], 3)
             self.assertEqual(config, EvaluationConfig.from_dict(config.to_dict()))
             board = chess.Board("7k/8/8/8/3K4/8/8/Q7 w - - 0 1")
             legacy = HandcraftedEvaluator(config=EvaluationConfig(pst_weight=config.pst_weight))
             self.assertEqual(HandcraftedEvaluator(config=config).evaluate(board), legacy.evaluate(board))
 
-    def test_v2_roundtrip_immutable_and_actual_player_snapshot(self):
+    def test_current_config_roundtrip_immutable_and_actual_player_snapshot(self):
         config = EvaluationConfig(phase_enabled=True, endgame_piece_values={"N": 4},
                                   pst_weight=.3, endgame_pst_weight=.8)
         self.assertEqual(config, EvaluationConfig.from_dict(json.loads(json.dumps(config.to_dict()))))

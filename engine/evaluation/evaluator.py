@@ -17,6 +17,7 @@ from engine.evaluation.config import (
 from engine.evaluation.pst import (
     evaluate_piece_square_tables, evaluate_endgame_piece_square_tables, middlegame_phase,
 )
+from engine.evaluation.pawn_structure import pawn_structure_balance
 from engine.interfaces import Evaluator
 
 DEFAULT_WEIGHTS = {
@@ -156,6 +157,7 @@ def _evaluate_breakdown(
             overlap_risk="may overlap future location-based features",
         ),
     }
+    terms.update(_pawn_terms(config, "middlegame", pawn_structure_balance(board)))
     return EvaluationBreakdown(
         terms=terms,
         total_score=sum(term.contribution for term in terms.values()),
@@ -183,6 +185,7 @@ def _evaluate_tapered_breakdown(
                     evaluate_endgame_piece_square_tables(board)),
     }
     stage_terms = {}
+    pawn_raw = pawn_structure_balance(board)
     for stage, (material, pst) in raw.items():
         weight = config.pst_weight if stage == "middlegame" else config.endgame_pst_weight
         stage_terms[stage] = {
@@ -194,15 +197,18 @@ def _evaluate_tapered_breakdown(
                                            "positive favors White", stage,
                                            "may overlap future location-based features"),
         }
+        stage_terms[stage].update(_pawn_terms(config, stage, pawn_raw))
     # Endpoint contributions are weighted before interpolation; raw PST and weight
     # cannot be interpolated separately without introducing cross terms.
     terms = {}
-    for name in ("material", "piece_square"):
+    for name in stage_terms["middlegame"]:
         mg, eg = stage_terms["middlegame"][name], stage_terms["endgame"][name]
         contribution = phase * mg.contribution + (1 - phase) * eg.contribution
         terms[name] = EvaluationTerm(
             phase * mg.raw_value * mg.weight + (1 - phase) * eg.raw_value * eg.weight,
-            1.0, contribution, mg.enabled, mg.unit, mg.direction, "tapered",
+            1.0, contribution, mg.enabled,
+            "pawn weighted feature contribution" if name in config.pawn_terms else mg.unit,
+            mg.direction, "tapered",
             mg.overlap_risk,
         )
     return EvaluationBreakdown(
@@ -210,3 +216,27 @@ def _evaluate_tapered_breakdown(
         phase={"enabled": True, "model_version": PHASE_MODEL_VERSION, "middlegame": phase, "endgame": 1 - phase},
         stage_terms=stage_terms,
     )
+
+
+def _pawn_terms(
+    config: EvaluationConfig, stage: str, raw: Mapping[str, float],
+) -> dict[str, EvaluationTerm]:
+    metadata = {
+        "isolated_pawns": ("isolated pawn count balance (Black minus White)",
+                           "may overlap doubled-pawn penalties and pawn PST"),
+        "doubled_pawns": ("extra pawns per file balance (Black minus White)",
+                          "may overlap isolated-pawn penalties and pawn PST"),
+        "passed_pawns": ("passed pawn rank units balance (White minus Black; ranks 2..7=1..6)",
+                         "advancement overlaps pawn PST; isolated passers can also incur penalties"),
+    }
+    terms = {}
+    for name, settings in config.pawn_terms.items():
+        weight = settings.endgame_weight if stage == "endgame" else settings.weight
+        unit, overlap = metadata[name]
+        terms[name] = EvaluationTerm(
+            raw_value=raw[name], weight=weight,
+            contribution=raw[name] * weight if settings.enabled else 0.0,
+            enabled=settings.enabled, unit=unit, direction="positive favors White",
+            stage=stage if config.phase_enabled else "all", overlap_risk=overlap,
+        )
+    return terms

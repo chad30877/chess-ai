@@ -10,7 +10,7 @@ import unittest
 
 import chess
 
-from engine.evaluation.config import EvaluationConfig
+from engine.evaluation.config import EvaluationConfig, PawnTermConfig
 from engine.sessions.evaluation_comparison import (
     ComparisonParticipant,
     run_evaluation_comparison,
@@ -34,7 +34,12 @@ class EvaluationComparisonTest(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.baseline_config = EvaluationConfig(pst_weight=1.0)
         self.candidate_config = EvaluationConfig(piece_values={"N": 4.0}, pst_weight=0.25,
-                                                 phase_enabled=True, endgame_pst_weight=0.75)
+                                                 phase_enabled=True, endgame_pst_weight=0.75,
+                                                 pawn_terms={
+                                                     "isolated_pawns": PawnTermConfig(True, .2, .3),
+                                                     "doubled_pawns": PawnTermConfig(True, .1, .2),
+                                                     "passed_pawns": PawnTermConfig(True, .03, .07),
+                                                 })
         self.baseline = ComparisonParticipant.greedy("stable", self.baseline_config)
         self.candidate = ComparisonParticipant.greedy("candidate", self.candidate_config)
 
