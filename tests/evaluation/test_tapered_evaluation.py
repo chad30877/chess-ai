@@ -52,7 +52,7 @@ class TaperedEvaluationTest(unittest.TestCase):
         self.assertAlmostEqual(result.total_score, expected_mg / 6 + expected_eg * 5 / 6)
         self.assertAlmostEqual(sum(term.contribution for term in result.terms.values()), result.total_score)
         for term in result.terms.values():
-            self.assertAlmostEqual(term.raw_value * term.weight, term.contribution)
+            self.assertAlmostEqual(term.raw_value * term.weight if term.enabled else 0, term.contribution)
         self.assertEqual(result.to_dict()["stage_terms"]["endgame"]["piece_square"]["weight"], 3)
 
     def test_phase_changes_linearly_without_material_price_dependency(self):
@@ -117,7 +117,7 @@ class TaperedEvaluationTest(unittest.TestCase):
             self.assertEqual(payload["version"], 1)
             config = EvaluationConfig.from_dict(payload)
             self.assertFalse(config.phase_enabled)
-            self.assertEqual(config.to_dict()["version"], 3)
+            self.assertEqual(config.to_dict()["version"], 4)
             self.assertEqual(config, EvaluationConfig.from_dict(config.to_dict()))
             board = chess.Board("7k/8/8/8/3K4/8/8/Q7 w - - 0 1")
             legacy = HandcraftedEvaluator(config=EvaluationConfig(pst_weight=config.pst_weight))

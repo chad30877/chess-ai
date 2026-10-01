@@ -7,7 +7,10 @@ from numbers import Real
 from types import MappingProxyType
 
 
-EVALUATION_CONFIG_VERSION = 3
+EVALUATION_CONFIG_VERSION = 4
+MOBILITY_FEATURE_VERSION = 1
+MOBILITY_TERM_NAMES = ("pawn_mobility", "knight_mobility", "bishop_mobility",
+                       "rook_mobility", "queen_mobility", "king_mobility")
 PAWN_FEATURE_VERSION = 1
 PAWN_TERM_NAMES = ("isolated_pawns", "doubled_pawns", "passed_pawns")
 ENDGAME_PST_TABLE_VERSION = 1
@@ -86,6 +89,32 @@ def _default_pawn_terms() -> dict[str, PawnTermConfig]:
 
 
 @dataclass(frozen=True)
+class MobilityTermConfig:
+    """Pawn-unit price per geometric attack destination, with independent stages."""
+
+    enabled: bool = False
+    weight: float = 0.0
+    endgame_weight: float = 0.0
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "enabled", _boolean(self.enabled, "mobility term enabled"))
+        for name in ("weight", "endgame_weight"):
+            object.__setattr__(self, name, _finite_number(
+                getattr(self, name), f"mobility term {name}", non_negative=True,
+            ))
+
+    def to_dict(self) -> dict:
+        return {"enabled": self.enabled, "weight": self.weight,
+                "endgame_weight": self.endgame_weight, "feature_version": MOBILITY_FEATURE_VERSION}
+
+
+def _default_mobility_terms() -> dict[str, MobilityTermConfig]:
+    prices = ((.01, .01), (.03, .03), (.03, .03), (.02, .03), (.01, .02), (.01, .02))
+    return {name: MobilityTermConfig(weight=mg, endgame_weight=eg)
+            for name, (mg, eg) in zip(MOBILITY_TERM_NAMES, prices)}
+
+
+@dataclass(frozen=True)
 class EvaluationConfig:
     """The complete settings needed to reproduce a handcrafted evaluation."""
 
@@ -98,6 +127,7 @@ class EvaluationConfig:
     endgame_piece_values: Mapping[str, float] | None = None
     endgame_pst_weight: float = 1.0
     pawn_terms: Mapping[str, PawnTermConfig] = field(default_factory=_default_pawn_terms)
+    mobility_terms: Mapping[str, MobilityTermConfig] = field(default_factory=_default_mobility_terms)
 
     def __post_init__(self) -> None:
         if isinstance(self.version, bool) or self.version != EVALUATION_CONFIG_VERSION:
@@ -128,6 +158,14 @@ class EvaluationConfig:
                 raise ValueError(f"Unsupported pawn term or settings: {name}")
             normalized[name] = settings
         object.__setattr__(self, "pawn_terms", MappingProxyType(normalized))
+        if not isinstance(self.mobility_terms, Mapping):
+            raise ValueError("mobility_terms must be a mapping")
+        normalized_mobility = _default_mobility_terms()
+        for name, settings in self.mobility_terms.items():
+            if name not in MOBILITY_TERM_NAMES or not isinstance(settings, MobilityTermConfig):
+                raise ValueError(f"Unsupported mobility term or settings: {name}")
+            normalized_mobility[name] = settings
+        object.__setattr__(self, "mobility_terms", MappingProxyType(normalized_mobility))
 
     @classmethod
     def material_only(
@@ -156,6 +194,7 @@ class EvaluationConfig:
                     "endgame_table_version": ENDGAME_PST_TABLE_VERSION,
                 },
                 **{name: settings.to_dict() for name, settings in self.pawn_terms.items()},
+                **{name: settings.to_dict() for name, settings in self.mobility_terms.items()},
             },
         }
 
@@ -164,7 +203,7 @@ class EvaluationConfig:
         if not isinstance(payload, Mapping):
             raise ValueError("Evaluation config must be an object")
         version = payload.get("version")
-        if isinstance(version, bool) or version not in (1, 2, 3):
+        if isinstance(version, bool) or version not in (1, 2, 3, 4):
             raise ValueError(f"Unsupported evaluation config version: {version}")
         expected = {"version", "perspective", "score_unit", "terms"}
         if version >= 2:
@@ -177,8 +216,10 @@ class EvaluationConfig:
             raise ValueError("Evaluation score_unit must be pawn")
         terms = payload["terms"]
         term_names = {"material", "piece_square"}
-        if version == 3:
+        if version >= 3:
             term_names.update(PAWN_TERM_NAMES)
+        if version == 4:
+            term_names.update(MOBILITY_TERM_NAMES)
         if not isinstance(terms, Mapping) or set(terms) != term_names:
             raise ValueError("Evaluation terms do not match declared version")
         material = terms["material"]
@@ -218,7 +259,7 @@ class EvaluationConfig:
             if isinstance(eg_version, bool) or eg_version != ENDGAME_PST_TABLE_VERSION:
                 raise ValueError("Unsupported endgame PST table version")
         pawn_terms = _default_pawn_terms()
-        if version == 3:
+        if version >= 3:
             for name in PAWN_TERM_NAMES:
                 settings = terms[name]
                 if not isinstance(settings, Mapping) or set(settings) != {
@@ -232,7 +273,23 @@ class EvaluationConfig:
                     enabled=settings["enabled"], weight=settings["weight"],
                     endgame_weight=settings["endgame_weight"],
                 )
+        mobility_terms = _default_mobility_terms()
+        if version == 4:
+            for name in MOBILITY_TERM_NAMES:
+                settings = terms[name]
+                if not isinstance(settings, Mapping) or set(settings) != {
+                    "enabled", "weight", "endgame_weight", "feature_version",
+                }:
+                    raise ValueError(f"Invalid mobility term fields: {name}")
+                feature_version = settings["feature_version"]
+                if isinstance(feature_version, bool) or feature_version != MOBILITY_FEATURE_VERSION:
+                    raise ValueError(f"Unsupported mobility feature version: {feature_version}")
+                mobility_terms[name] = MobilityTermConfig(
+                    enabled=settings["enabled"], weight=settings["weight"],
+                    endgame_weight=settings["endgame_weight"],
+                )
         return cls(
+            mobility_terms=mobility_terms,
             pawn_terms=pawn_terms,
             phase_enabled=phase_enabled,
             endgame_piece_values=endgame_values,
