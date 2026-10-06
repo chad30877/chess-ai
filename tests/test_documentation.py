@@ -48,6 +48,18 @@ def heading_anchors(text: str) -> set[str]:
 
 
 class DocumentationTest(unittest.TestCase):
+    def test_development_plan_preserves_public_milestone_anchors(self):
+        """Keep inbound milestone links stable when completed tasks are condensed."""
+        plan = PROJECT_ROOT / "docs" / "開發計畫.md"
+        anchors = heading_anchors(plan.read_text(encoding="utf-8"))
+        for anchor in (
+            "p1-移除舊-ml",
+            "p4-建立可調評分設定",
+            "p6-分批擴充評分與搜尋",
+        ):
+            with self.subTest(anchor=anchor):
+                self.assertIn(anchor, anchors)
+
     def test_code_fences_are_closed(self):
         for path in documentation_files():
             with self.subTest(document=path.relative_to(PROJECT_ROOT)):
