@@ -2,7 +2,7 @@
 
 [回到專案總覽](../README.md) · [開發計畫](../docs/開發計畫.md)
 
-更新日期：2026-10-06。P2 已完成，測試依責任分類，沿用 unittest。P3 更新 engine 匯入／patch 路徑後為 91 個測試；P4 增至 98 個，P5 增至 105 個，P6/S0 增至 114 個，S1 增至 119 個，S2 增至 125 個，S3 增至 130 個，S4 增至 143 個，S5/PVS 增至 148 個，S5/aspiration 新增 7 個案例，E1 新增 10 個分階段案例並更新比較保存測試，E2 新增 15 個兵形案例並更新比較保存測試，E3 新增 12 個活動力案例並更新比較保存測試，E4 新增 13 個國王安全案例並更新比較保存測試，E5 新增 12 個棋子協調案例並更新比較保存測試，Alpha-Beta 比較新增 10 個整合案例，目前完整 227 個測試通過。
+更新日期：2026-10-06。P2 已完成，測試依責任分類，沿用 unittest。P3 更新 engine 匯入／patch 路徑後為 91 個測試；P4 增至 98 個，P5 增至 105 個，P6/S0 增至 114 個，S1 增至 119 個，S2 增至 125 個，S3 增至 130 個，S4 增至 143 個，S5/PVS 增至 148 個，S5/aspiration 新增 7 個案例，E1 新增 10 個分階段案例並更新比較保存測試，E2 新增 15 個兵形案例並更新比較保存測試，E3 新增 12 個活動力案例並更新比較保存測試，E4 新增 13 個國王安全案例並更新比較保存測試，E5 新增 12 個棋子協調案例並更新比較保存測試，Alpha-Beta 比較新增 10 個整合案例，移除 Markdown 文件測試後，目前保留 225 個程式測試。
 
 ## 目前覆蓋
 
@@ -23,7 +23,6 @@
 | self_play/test_cli_roundtrip.py | CLI 多程序生成、CSV 棋譜匯出及回放結果一致 |
 | test_discovery.py | 遞迴發現涵蓋所有測試模組、使用 tests 命名空間且案例不重複 |
 | helpers/executors.py | 共用 ManualExecutor，由測試控制背景工作完成時機 |
-| test_documentation.py | 文件本機連結／標題錨點與程式碼區塊完整性 |
 
 ## 執行方式
 
@@ -33,19 +32,13 @@
 & "./.venv/Scripts/python.exe" -m unittest discover -s tests -t . -v
 ```
 
-只檢查文件：
-
-```powershell
-& "./.venv/Scripts/python.exe" -m unittest discover -s tests -t . -p test_documentation.py -v
-```
-
 環境設定見 [README](../README.md#環境設定)。UI 自動測試使用 dummy 驅動，不代表實體桌面 DPI、所有平台或真人目視驗證已完成。`scripts/test.py` 是手動 FEN 除錯工具，不是這套測試入口。
 
 ## 分類與共用工具
 
 `rules/` 管共用棋規，`evaluation/` 管靜態評分，`search/` 管搜尋，`self_play/` 管自動對戰、批次保存與 CLI，`replay/` 管回放狀態，`ui/` 管介面與即時對局。跨區塊整合案例依主要責任歸類；例如批次 UI 保存放在 self_play，保留整個測試類別與驗證內容。
 
-共用 `ManualExecutor` 位於 `helpers/executors.py`；介面與即時對局測試都從 `tests.helpers.executors` 匯入，不再互相匯入測試檔。僅單一檔案使用的測試工具留在該檔。文件與 discovery 測試留根目錄；tests 與各子目錄均以 `__init__.py` 標記為套件。
+共用 `ManualExecutor` 位於 `helpers/executors.py`；介面與即時對局測試都從 `tests.helpers.executors` 匯入，不再互相匯入測試檔。僅單一檔案使用的測試工具留在該檔。匯入與 discovery 測試留根目錄；tests 與各子目錄均以 `__init__.py` 標記為套件。
 
 執行 discovery 時加上 `-t .`，以專案根目錄為匯入起點，讓 UI 測試使用 `tests.ui`，避免與正式程式的 `ui` 套件同名衝突。單一分類與單一模組可分別執行：
 
@@ -58,4 +51,4 @@ P2 搬移前後已逐一比對 88 個原有案例 ID（只移除新增的套件�
 
 ## 驗證界線
 
-正確性測試、執行時間／節點量測、棋力對戰是不同證據。例行測試採小型且有界案例；長時間棋力與調參實驗另行執行並記錄設定。每次程式或文件改動依 AGENTS.md 更新相關測試，完整驗證後 commit。
+正確性測試、執行時間／節點量測、棋力對戰是不同證據。例行測試採小型且有界案例；長時間棋力與調參實驗另行執行並記錄設定。程式改動依 AGENTS.md 更新相關測試，完整驗證後 commit。依使用者決定，Markdown 文件由使用者人工檢閱，不建立文件連結、標題錨點或格式的自動測試。
