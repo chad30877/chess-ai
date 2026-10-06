@@ -2,7 +2,7 @@
 
 [回到專案總覽](../README.md) · [開發計畫](../docs/開發計畫.md)
 
-更新日期：2026-10-01。P2 已完成，測試依責任分類，沿用 unittest。P3 更新 engine 匯入／patch 路徑後為 91 個測試；P4 增至 98 個，P5 增至 105 個，P6/S0 增至 114 個，S1 增至 119 個，S2 增至 125 個，S3 增至 130 個，S4 增至 143 個，S5/PVS 增至 148 個，S5/aspiration 新增 7 個案例，E1 新增 10 個分階段案例並更新比較保存測試，E2 新增 15 個兵形案例並更新比較保存測試，E3 新增 12 個活動力案例並更新比較保存測試，E4 新增 13 個國王安全案例並更新比較保存測試，E5 新增 12 個棋子協調案例並更新比較保存測試，目前完整 217 個測試通過。
+更新日期：2026-10-06。P2 已完成，測試依責任分類，沿用 unittest。P3 更新 engine 匯入／patch 路徑後為 91 個測試；P4 增至 98 個，P5 增至 105 個，P6/S0 增至 114 個，S1 增至 119 個，S2 增至 125 個，S3 增至 130 個，S4 增至 143 個，S5/PVS 增至 148 個，S5/aspiration 新增 7 個案例，E1 新增 10 個分階段案例並更新比較保存測試，E2 新增 15 個兵形案例並更新比較保存測試，E3 新增 12 個活動力案例並更新比較保存測試，E4 新增 13 個國王安全案例並更新比較保存測試，E5 新增 12 個棋子協調案例並更新比較保存測試，Alpha-Beta 比較新增 10 個整合案例，目前完整 227 個測試通過。
 
 ## 目前覆蓋
 
@@ -17,6 +17,7 @@
 | ui/test_live_session.py | 背景選步、暫停／停止、真人回合與歷史 |
 | ui/test_chess_application.py | Pygame 事件、模式、真人落子、回放查找與縮放 |
 | self_play/test_engine_match.py | Random／material CLI 完整對戰、原子力語意、種子、輪替／統計與舊選項拒絕 |
+| self_play/test_alphabeta_comparison.py | Alpha-Beta 實際深度／合法落子、完整設定／規則保存、配對種子、不一致搜尋拒絕、失敗保存、CLI 與 Greedy 相容 |
 | self_play/test_evaluation_comparison.py | 設定 A/B 同局面交換黑白、種子重現、Random baseline、未完成統計、CLI 與範例設定 |
 | test_engine_imports.py | 各 engine 模組與 UI 入口於獨立程序載入，檢查循環匯入 |
 | self_play/test_cli_roundtrip.py | CLI 多程序生成、CSV 棋譜匯出及回放結果一致 |

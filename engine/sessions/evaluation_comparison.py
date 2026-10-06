@@ -8,14 +8,40 @@ from time import perf_counter
 import chess
 
 from engine.evaluation.config import EvaluationConfig
-from engine.players import GreedyPlayer, RandomPlayer
+from engine.evaluation.evaluator import HandcraftedEvaluator
+from engine.players import AlphaBetaPlayer, GreedyPlayer, RandomPlayer
+from engine.search import SearchLimits
 from engine.sessions.self_play import PlayedGame, play_game
 from engine.storage.batch_storage import BatchWriter
 from engine.strategy_config import strategy_config
 
 
-COMPARISON_SCHEMA_VERSION = 1
+COMPARISON_SCHEMA_VERSION = 2
 FIXED_DEPTH_BUDGET = {"mode": "fixed_depth", "depth_plies": 1}
+
+
+@dataclass(frozen=True)
+class ComparisonSearchConfig:
+    """Shared fixed-depth Alpha-Beta settings for evaluation comparisons."""
+
+    depth_plies: int = 2
+    move_ordering: bool = True
+    quiescence_depth: int = 4
+    use_transposition_table: bool = True
+    use_pvs: bool = True
+    aspiration_window: float | None = 1.0
+
+    def __post_init__(self) -> None:
+        # Use the engine's own validators rather than a second set of rules.
+        self.create_player(EvaluationConfig(), claim_draw=False)
+
+    def create_player(self, config: EvaluationConfig, *, claim_draw: bool) -> AlphaBetaPlayer:
+        return AlphaBetaPlayer.from_evaluator(
+            HandcraftedEvaluator(config=config), limits=SearchLimits(max_depth=self.depth_plies),
+            claim_draw=claim_draw, move_ordering=self.move_ordering,
+            quiescence_depth=self.quiescence_depth, use_transposition_table=self.use_transposition_table,
+            use_pvs=self.use_pvs, aspiration_window=self.aspiration_window,
+        )
 
 
 @dataclass(frozen=True)
@@ -25,17 +51,23 @@ class ComparisonParticipant:
     label: str
     strategy: str
     evaluation_config: EvaluationConfig | None = None
+    search_config: ComparisonSearchConfig | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.label, str) or not self.label.strip():
             raise ValueError("Comparison participant label must not be empty")
         object.__setattr__(self, "label", self.label.strip())
-        if self.strategy not in ("greedy", "random"):
-            raise ValueError("Comparison participant strategy must be greedy or random")
-        if self.strategy == "greedy" and not isinstance(self.evaluation_config, EvaluationConfig):
-            raise ValueError("Greedy comparison participant requires an EvaluationConfig")
+        if self.strategy not in ("greedy", "random", "alphabeta"):
+            raise ValueError("Comparison participant strategy must be greedy, random or alphabeta")
+        if self.strategy in ("greedy", "alphabeta") and not isinstance(self.evaluation_config, EvaluationConfig):
+            raise ValueError("Evaluated comparison participant requires an EvaluationConfig")
         if self.strategy == "random" and self.evaluation_config is not None:
             raise ValueError("Random comparison participant cannot have evaluation settings")
+        if self.strategy == "alphabeta":
+            if not isinstance(self.search_config, ComparisonSearchConfig):
+                raise ValueError("AlphaBeta participant requires a ComparisonSearchConfig")
+        elif self.search_config is not None:
+            raise ValueError("Only AlphaBeta participants can have search settings")
 
     @classmethod
     def greedy(cls, label: str, config: EvaluationConfig) -> "ComparisonParticipant":
@@ -45,7 +77,15 @@ class ComparisonParticipant:
     def random_baseline(cls, label: str = "Random") -> "ComparisonParticipant":
         return cls(label=label, strategy="random")
 
+    @classmethod
+    def alphabeta(
+        cls, label: str, config: EvaluationConfig, *, search: ComparisonSearchConfig | None = None,
+    ) -> "ComparisonParticipant":
+        return cls(label, "alphabeta", config, search if search is not None else ComparisonSearchConfig())
+
     def create_player(self, rng: random.Random, *, claim_draw: bool = False):
+        if self.strategy == "alphabeta":
+            return self.search_config.create_player(self.evaluation_config, claim_draw=claim_draw)
         if self.strategy == "greedy":
             return GreedyPlayer(
                 config=self.evaluation_config,
@@ -54,9 +94,10 @@ class ComparisonParticipant:
             )
         return RandomPlayer(rng=rng)
 
-    def settings_snapshot(self) -> dict:
-        player = self.create_player(random.Random(0))
-        strategy_name = "Greedy" if self.strategy == "greedy" else "Random"
+    def settings_snapshot(self, *, claim_draw: bool = False, player=None) -> dict:
+        if player is None:
+            player = self.create_player(random.Random(0), claim_draw=claim_draw)
+        strategy_name = {"greedy": "Greedy", "random": "Random", "alphabeta": "AlphaBeta"}[self.strategy]
         return {"label": self.label, **strategy_config(strategy_name, player)}
 
 
@@ -167,11 +208,26 @@ def run_evaluation_comparison(
     if not isinstance(claim_draw, bool):
         raise ValueError("claim_draw must be a boolean")
     positions = _normalized_positions(initial_fens)
+    evaluated = [side for side in (baseline, candidate) if side.strategy != "random"]
+    if len(evaluated) == 2 and (
+        evaluated[0].strategy != evaluated[1].strategy
+        or evaluated[0].search_config != evaluated[1].search_config
+    ):
+        raise ValueError("Evaluation comparisons require identical strategies and search settings")
+    budget = dict(FIXED_DEPTH_BUDGET)
     pair_count = len(positions) * repetitions
     participant_settings = {
-        "baseline": baseline.settings_snapshot(),
-        "candidate": candidate.settings_snapshot(),
+        "baseline": baseline.settings_snapshot(claim_draw=claim_draw),
+        "candidate": candidate.settings_snapshot(claim_draw=claim_draw),
     }
+    actual_searches = [settings["search"] for settings in participant_settings.values()
+                       if settings["strategy"] == "AlphaBeta"]
+    if actual_searches:
+        if any(search != actual_searches[0] for search in actual_searches):
+            raise ValueError("Actual AlphaBeta search settings must be identical")
+        if actual_searches[0]["claim_draw"] != claim_draw:
+            raise ValueError("Actual AlphaBeta draw policy must match game rules")
+        budget["depth_plies"] = actual_searches[0]["max_depth"]
     settings = {
         "num_games": pair_count * 2,
         "comparison": {
@@ -179,7 +235,7 @@ def run_evaluation_comparison(
             "kind": "evaluation",
             "pairing": "same_position_color_swap",
             "participants": participant_settings,
-            "budget": dict(FIXED_DEPTH_BUDGET),
+            "budget": budget,
             "base_seed": base_seed,
             "seed_derivation": "base_seed + pair_number - 1; reset for each color-swapped game",
             "initial_fens": positions,
@@ -212,11 +268,17 @@ def run_evaluation_comparison(
                 for white, black, candidate_is_white in arrangements:
                     game_number += 1
                     rng = random.Random(pair_seed)
+                    white_player = white.create_player(rng, claim_draw=claim_draw)
+                    black_player = black.create_player(rng, claim_draw=claim_draw)
+                    for participant, player in ((white, white_player), (black, black_player)):
+                        key = "candidate" if participant is candidate else "baseline"
+                        if participant.settings_snapshot(player=player) != participant_settings[key]:
+                            raise ValueError("Actual player settings changed during comparison")
                     started = perf_counter()
                     game = play_game(
                         game_number,
-                        white.create_player(rng, claim_draw=claim_draw),
-                        black.create_player(rng, claim_draw=claim_draw),
+                        white_player,
+                        black_player,
                         white.label,
                         black.label,
                         initial_fen=initial_fen,
@@ -253,7 +315,7 @@ def run_evaluation_comparison(
             "schema_version": COMPARISON_SCHEMA_VERSION,
             "batch_id": writer.batch_id,
             "kind": "evaluation",
-            "budget": dict(FIXED_DEPTH_BUDGET),
+            "budget": budget,
             "participants": participant_settings,
             "pairs": pair_records,
             "stats": {
