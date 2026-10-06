@@ -21,6 +21,7 @@ from engine.replay.replay_loader import load_replay_json
 from ui.board_view import BOARD_PIXELS, WINDOW_HEIGHT, BoardView
 from ui.controls import ACCENT, BACKGROUND, BORDER, MUTED, PANEL, TEXT, Button, draw_text, ui_font
 from ui.move_list_view import MOVE_LIST_WIDTH, MoveListView
+from ui.comparison_view import ComparisonView
 
 HEADER_HEIGHT = 56
 LOGICAL_SIZE = (900, 768)
@@ -65,6 +66,7 @@ class ChessApplication:
         self.running = True
         self.buttons: list[Button] = []
         self.browser: ReplayCatalog | None = None
+        self.comparison_view: ComparisonView | None = None
         self.confirm_action: str | None = None
         self.confirm_was_running = False
         self.message = ""
@@ -123,6 +125,7 @@ class ChessApplication:
         self.saved_path = None
         self.numeric_focus = None
         self.browser = ReplayCatalog(PROJECT_ROOT / "data") if mode == "replay" else None
+        self.comparison_view = ComparisonView(PROJECT_ROOT / "data") if mode == "comparison" else None
         self.replay_items = []
         self.replay_is_local_game = False
         self.selected, self.promotions = None, []
@@ -286,6 +289,12 @@ class ChessApplication:
         if self.browser:
             self._browser_action(action)
             return
+        if action == "comparison_results" and self.comparison_view:
+            self.mode = "comparison"
+            return
+        if self.mode == "comparison" and action.startswith("comparison_"):
+            self.comparison_view.action(action, self)
+            return
         if action == "view_batch" and self.batch:
             batch_id = self.batch.snapshot()["batch_id"]
             self.browser = ReplayCatalog(PROJECT_ROOT / "data")
@@ -419,6 +428,21 @@ class ChessApplication:
             elif event.key == pygame.K_RETURN:
                 self._browser_action("browser_open")
             return
+        if self.mode == "comparison" and event.type in (pygame.KEYDOWN, pygame.MOUSEWHEEL):
+            if event.type == pygame.MOUSEWHEEL:
+                action = "comparison_prev" if event.y > 0 else "comparison_next"
+                if self.comparison_view.settings_side:
+                    self.dispatch(action)
+                else:
+                    self.comparison_view.scroll(-event.y)
+            elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                if self.comparison_view.summary:
+                    self.dispatch("comparison_back")
+                else:
+                    self.request_leave("home")
+            elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                self.dispatch("comparison_prev" if event.key == pygame.K_LEFT else "comparison_next")
+            return
         if event.type == pygame.KEYDOWN:
             if self.confirm_action:
                 if event.key == pygame.K_ESCAPE:
@@ -446,6 +470,8 @@ class ChessApplication:
                     self.dispatch(button.action)
                     return
             if self.browser or self.confirm_action or self.promotions:
+                return
+            if self.mode == "comparison":
                 return
             if self.mode == "human":
                 self.click_square(self.board_view.screen_to_square(event.pos, self.flipped))
@@ -486,20 +512,23 @@ class ChessApplication:
                 ("auto", "批次自動對戰", "設定雙方 AI 與生成場次"),
                 ("human", "真人下棋", "選擇執白或執黑，挑戰 AI"),
                 ("replay", "棋譜回放", "依日期、批次選擇對局"),
+                ("comparison", "棋力比較", "查看比較結果、設定與棋譜"),
             ]):
-                x = 64 + 260 * i
-                self.draw_rect(PANEL, (x, 288, 244, 176), border_radius=10)
-                self.text(subtitle, x + 12, 322, muted=True, width=220)
-                self.button("mode:" + mode, title, (x + 12, 392, 220, 48), primary=mode == "auto")
-            self.text("棋譜回放也可使用 --replay 直接開啟指定檔案。", 64, 522, muted=True)
+                x, y = 64 + 396 * (i % 2), 260 + 184 * (i // 2)
+                self.draw_rect(PANEL, (x, y, 376, 160), border_radius=10)
+                self.text(subtitle, x + 16, y + 28, muted=True, width=344)
+                self.button("mode:" + mode, title, (x + 16, y + 88, 344, 48), primary=mode == "auto")
+            self.text("棋譜回放也可使用 --replay 直接開啟指定檔案。", 64, 660, muted=True)
         elif self.mode == "auto":
             self._render_batch()
+        elif self.mode == "comparison":
+            self.comparison_view.render(self)
         else:
             self._render_game()
         self.draw_rect(PANEL, (0, 0, LOGICAL_SIZE[0], HEADER_HEIGHT))
         self.text("Chess AI", 18, 10, large=True)
         if self.mode != "home":
-            if self.mode != "auto":
+            if self.mode not in ("auto", "comparison"):
                 self.button("flip", "翻轉 F", (664, 10, 104, 36))
             self.button("home", "回首頁", (780, 10, 104, 36))
         if self.confirm_action:
@@ -601,7 +630,14 @@ class ChessApplication:
         if self.replay_is_local_game:
             self.button("export", "匯出本局", (x + 121, 320, 111, 38))
         else:
-            self.button("sample", "範例棋譜", (x + 121, 320, 111, 38))
+            if self.comparison_view and self.comparison_view.summary:
+                self.button("comparison_results", "返回比較", (x + 121, 320, 111, 38))
+            else:
+                self.button("sample", "範例棋譜", (x + 121, 320, 111, 38))
+
+    @staticmethod
+    def comparison_reason(reason):
+        return REASONS.get(reason, reason)
 
     def _modal(self, rect):
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)

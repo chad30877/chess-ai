@@ -18,6 +18,8 @@ from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.replay.replay_loader import load_replay_json
 from tests.helpers.executors import ManualExecutor
 from engine.replay.replay_catalog import ReplayCatalog
+from engine.evaluation.config import EvaluationConfig
+from engine.sessions.evaluation_comparison import ComparisonParticipant, run_evaluation_comparison
 
 
 class ChessApplicationTest(unittest.TestCase):
@@ -50,12 +52,13 @@ class ChessApplicationTest(unittest.TestCase):
         x, y = self.app.board_view._square_to_screen(square, self.app.flipped)
         self.app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(x + 40, y + 40)))
 
-    def test_startup_has_home_and_three_modes_without_default_game(self):
+    def test_startup_has_home_and_four_modes_without_default_game(self):
         self.app.render()
         self.assertEqual(self.app.mode, "home")
         self.assertIsNone(self.app.replay)
         self.assertIsNone(self.app.live)
-        self.assertEqual({b.action for b in self.app.buttons}, {"mode:auto", "mode:human", "mode:replay"})
+        self.assertEqual({b.action for b in self.app.buttons},
+                         {"mode:auto", "mode:human", "mode:replay", "mode:comparison"})
         self.click("mode:auto")
         self.assertIsNone(self.app.live)
         self.click("white")
@@ -285,6 +288,92 @@ class ChessApplicationTest(unittest.TestCase):
         self.assertEqual(app.mode, "replay")
         self.assertIsNone(app.replay)
         self.assertIn("無法開啟", app.message)
+
+    def comparison_batch(self, **kwargs):
+        return run_evaluation_comparison(
+            baseline=ComparisonParticipant.alphabeta("stable", EvaluationConfig()),
+            candidate=ComparisonParticipant.alphabeta("phase", EvaluationConfig(phase_enabled=True)),
+            initial_fens=["7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"],
+            batch_root=self.project / "data/batches", **kwargs,
+        )
+
+    def test_comparison_results_settings_and_replay_return(self):
+        result = self.comparison_batch(repetitions=3)
+        self.click("mode:comparison")
+        self.click("comparison_batch:0")
+        view = self.app.comparison_view
+        self.assertEqual(view.summary.batch_id, result.path.name)
+        self.assertEqual(view.summary.score_rate, 0.5)
+        self.click("comparison_settings:candidate")
+        self.assertTrue(view.summary.participants["candidate"]["evaluator"]["phase"]["enabled"])
+        self.click("comparison_next")
+        self.assertGreater(view.settings_offset, 0)
+        self.click("comparison_back")
+        self.click("comparison_next")
+        self.assertEqual(view.offset, 1)
+        self.click("comparison_game:5")
+        self.assertEqual(self.app.mode, "replay")
+        self.assertEqual(self.app.replay_data["metadata"]["game_id"], view.summary.games[5].game_id)
+        self.click("comparison_results")
+        self.assertEqual(self.app.mode, "comparison")
+        self.assertIs(self.app.comparison_view, view)
+        self.assertEqual(view.offset, 1)
+        self.click("comparison_back")
+        self.assertIsNone(view.summary)
+        self.click("home")
+        self.assertIsNone(self.app.comparison_view)
+
+    def test_comparison_empty_missing_summary_and_refresh(self):
+        self.click("mode:comparison")
+        self.assertEqual(self.app.comparison_view.catalog.entries, [])
+        result = self.comparison_batch()
+        (result.path / "comparison.json").unlink()
+        self.click("comparison_refresh")
+        self.assertEqual(len(self.app.comparison_view.catalog.errors), 1)
+        self.assertEqual(self.app.comparison_view.catalog.entries, [])
+        self.click("home")
+        self.click("mode:replay")
+        self.assertEqual(len(self.app.browser.entries), 2)
+
+    def test_comparison_missing_and_invalid_replays_keep_result_screen(self):
+        result = self.comparison_batch()
+        self.click("mode:comparison")
+        self.click("comparison_batch:0")
+        first = self.app.comparison_view.summary.games[0]
+        first.path.write_text("{", encoding="utf-8")
+        self.click("comparison_game:0")
+        self.assertEqual(self.app.mode, "comparison")
+        self.assertIn("無法開啟棋譜", self.app.comparison_view.message)
+        first.path.unlink()
+        self.click("comparison_back")
+        self.click("comparison_refresh")
+        self.click("comparison_batch:0")
+        self.app.render()
+        button = next(b for b in self.app.buttons if b.action == "comparison_game:0")
+        self.assertFalse(button.enabled)
+        self.assertEqual(self.app.comparison_view.summary.score_rate, 0.5)
+
+    def test_comparison_candidate_labels_zero_score_and_resizing(self):
+        run_evaluation_comparison(
+            baseline=ComparisonParticipant.greedy("stable", EvaluationConfig()),
+            candidate=ComparisonParticipant.greedy("candidate", EvaluationConfig()),
+            batch_root=self.project / "data/batches", max_plies=0,
+        )
+        self.click("mode:comparison")
+        self.click("comparison_batch:0")
+        self.assertIsNone(self.app.comparison_view.summary.score_rate)
+        for size in ((900, 768), APP_SIZE, (1800, 1536)):
+            with self.subTest(size=size):
+                self.app.resize(pygame.Surface(size))
+                with patch.object(self.app, "text", wraps=self.app.text) as labels:
+                    self.app.render()
+                self.assertTrue(any("得分率：無資料" in str(call.args[0]) for call in labels.call_args_list))
+                for button in self.app.buttons:
+                    self.assertTrue(self.app.screen.get_rect().contains(button.rect))
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.assertIsNone(self.app.comparison_view.summary)
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.assertEqual(self.app.mode, "home")
 
 
 if __name__ == "__main__":
