@@ -55,7 +55,9 @@ class DocumentationTest(unittest.TestCase):
         for anchor in (
             "p1-移除舊-ml",
             "p4-建立可調評分設定",
+            "p5-建立設定比較流程",
             "p6-分批擴充評分與搜尋",
+            "p7-評估自動調參",
         ):
             with self.subTest(anchor=anchor):
                 self.assertIn(anchor, anchors)
