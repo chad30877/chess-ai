@@ -17,7 +17,6 @@ from apps.chess_application import APP_SIZE, HEADER_HEIGHT, ChessApplication
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.replay.replay_loader import load_replay_json
 from tests.helpers.executors import ManualExecutor
-from engine.replay.replay_catalog import ReplayCatalog
 from engine.evaluation.config import EvaluationConfig
 from engine.sessions.evaluation_comparison import ComparisonParticipant, run_evaluation_comparison
 from engine.sessions.comparison_run import ComparisonRun
@@ -54,13 +53,13 @@ class ChessApplicationTest(unittest.TestCase):
         x, y = self.app.board_view._square_to_screen(square, self.app.flipped)
         self.app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(x + 40, y + 40)))
 
-    def test_startup_has_home_and_four_modes_without_default_game(self):
+    def test_startup_has_home_and_three_modes_without_default_game(self):
         self.app.render()
         self.assertEqual(self.app.mode, "home")
         self.assertIsNone(self.app.replay)
         self.assertIsNone(self.app.live)
         self.assertEqual({b.action for b in self.app.buttons},
-                         {"mode:auto", "mode:human", "mode:replay", "mode:comparison"})
+                         {"mode:auto", "mode:human", "mode:records"})
         self.click("mode:auto")
         self.assertIsNone(self.app.live)
         self.click("white")
@@ -232,7 +231,7 @@ class ChessApplicationTest(unittest.TestCase):
         self.click("last")
         self.assertEqual(self.app.replay.current_fen(), self.app.live.board.fen())
         self.click("open")
-        self.assertIsNone(self.app.browser)
+        self.assertIsNone(self.app.records_view)
 
     def test_catalog_navigation_invalid_json_and_sample_remain_usable(self):
         folder = self.project / "data/replays"
@@ -242,22 +241,23 @@ class ChessApplicationTest(unittest.TestCase):
         valid = folder / "20260909_000001.json"
         valid.write_text(json.dumps(sample), encoding="utf-8")
         (folder / "bad.json").write_text("{", encoding="utf-8")
-        self.click("mode:replay")
-        self.assertEqual(self.app.browser.skipped, 1)
-        self.click("entry:0")
-        self.assertEqual(self.app.browser.level, "group")
-        self.click("entry:0")
-        self.assertEqual(self.app.browser.level, "game")
-        self.click("entry:0")
-        # A replay can disappear after the index was read without losing the browser.
+        self.click("mode:records")
+        self.assertEqual(len(self.app.records_view.catalog.entries), 2)
+        self.click("records_dates")
+        self.click("records_date:1")
+        self.assertEqual(self.app.records_view.date, "2026-09-09")
+        self.click("records_entry:0")
+        # 索引建立後棋譜消失，仍保留來源清單與先前回放。
         valid.unlink()
-        self.click("browser_open")
-        self.assertTrue(self.app.browser.error)
+        self.click("records_game:0")
+        self.assertIn("無法開啟", self.app.records_view.message)
         valid.write_text(json.dumps(sample), encoding="utf-8")
-        self.click("browser_open")
-        self.assertIsNone(self.app.browser)
+        self.click("records_game:0")
         self.assertEqual(self.app.replay.total_ply(), 6)
-        self.click("sample")
+        self.click("records_results")
+        self.assertEqual(self.app.records_view.date, "2026-09-09")
+        self.assertEqual(self.app.records_view.selected_game, "20260909_000001")
+        self.app.dispatch("sample")
         self.assertEqual(self.app.replay.total_ply(), 6)
 
     def test_numeric_batch_settings_and_native_resize(self):
@@ -323,61 +323,65 @@ class ChessApplicationTest(unittest.TestCase):
             batch_root=self.project / "data/batches", **kwargs,
         )
 
-    def test_comparison_results_settings_and_replay_return(self):
+    def test_records_results_settings_and_replay_return(self):
         result = self.comparison_batch(repetitions=3)
-        self.click("mode:comparison")
-        self.click("comparison_batch:0")
-        view = self.app.comparison_view
+        self.click("mode:records")
+        self.click("records_entry:0")
+        view = self.app.records_view
         self.assertEqual(view.summary.batch_id, result.path.name)
-        self.assertEqual(view.summary.score_rate, 0.5)
-        self.click("comparison_settings:candidate")
-        self.assertTrue(view.summary.participants["candidate"]["evaluator"]["phase"]["enabled"])
-        self.click("comparison_next")
+        self.assertEqual(view.summary.comparison.score_rate, 0.5)
+        self.click("records_settings:candidate")
+        self.assertTrue(view.summary.comparison.participants["candidate"]["evaluator"]["phase"]["enabled"])
+        self.click("records_next")
         self.assertGreater(view.settings_offset, 0)
-        self.click("comparison_back")
-        self.click("comparison_next")
+        self.click("records_back")
+        self.click("records_next")
         self.assertEqual(view.offset, 1)
-        self.click("comparison_game:5")
+        self.click("records_game:5")
         self.assertEqual(self.app.mode, "replay")
         self.assertEqual(self.app.replay_data["metadata"]["game_id"], view.summary.games[5].game_id)
-        self.click("comparison_results")
-        self.assertEqual(self.app.mode, "comparison")
-        self.assertIs(self.app.comparison_view, view)
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.assertEqual(self.app.mode, "records")
+        self.assertIs(self.app.records_view, view)
         self.assertEqual(view.offset, 1)
-        self.click("comparison_back")
+        self.click("records_back")
         self.assertIsNone(view.summary)
         self.click("home")
-        self.assertIsNone(self.app.comparison_view)
+        self.assertIsNone(self.app.records_view)
 
     def test_comparison_empty_missing_summary_and_refresh(self):
-        self.click("mode:comparison")
-        self.assertEqual(self.app.comparison_view.catalog.entries, [])
+        self.click("mode:records")
+        self.assertEqual(self.app.records_view.catalog.entries, [])
         result = self.comparison_batch()
         (result.path / "comparison.json").unlink()
-        self.click("comparison_refresh")
-        self.assertEqual(len(self.app.comparison_view.catalog.errors), 1)
-        self.assertEqual(self.app.comparison_view.catalog.entries, [])
-        self.click("home")
-        self.click("mode:replay")
-        self.assertEqual(len(self.app.browser.entries), 2)
+        self.click("records_refresh")
+        entry = self.app.records_view.catalog.entries[0]
+        self.assertEqual(entry.kind, "comparison_unavailable")
+        self.assertEqual(len(entry.games), 2)
+        self.assertIsNone(entry.comparison)
+        self.click("records_entry:0")
+        self.click("records_game:0")
+        self.assertEqual(self.app.mode, "replay")
+        self.click("records_results")
+        self.assertIn("比較摘要缺漏或損壞", self.app.records_view.summary.error)
 
     def test_comparison_missing_and_invalid_replays_keep_result_screen(self):
         result = self.comparison_batch()
-        self.click("mode:comparison")
-        self.click("comparison_batch:0")
-        first = self.app.comparison_view.summary.games[0]
+        self.click("mode:records")
+        self.click("records_entry:0")
+        first = self.app.records_view.summary.games[0]
         first.path.write_text("{", encoding="utf-8")
-        self.click("comparison_game:0")
-        self.assertEqual(self.app.mode, "comparison")
-        self.assertIn("無法開啟棋譜", self.app.comparison_view.message)
+        self.click("records_game:0")
+        self.assertEqual(self.app.mode, "records")
+        self.assertIn("無法開啟棋譜", self.app.records_view.message)
         first.path.unlink()
-        self.click("comparison_back")
-        self.click("comparison_refresh")
-        self.click("comparison_batch:0")
+        self.click("records_back")
+        self.click("records_refresh")
+        self.click("records_entry:0")
         self.app.render()
-        button = next(b for b in self.app.buttons if b.action == "comparison_game:0")
+        button = next(b for b in self.app.buttons if b.action == "records_game:0")
         self.assertFalse(button.enabled)
-        self.assertEqual(self.app.comparison_view.summary.score_rate, 0.5)
+        self.assertEqual(self.app.records_view.summary.comparison.score_rate, 0.5)
 
     def test_comparison_candidate_labels_zero_score_and_resizing(self):
         run_evaluation_comparison(
@@ -385,9 +389,9 @@ class ChessApplicationTest(unittest.TestCase):
             candidate=ComparisonParticipant.greedy("candidate", EvaluationConfig()),
             batch_root=self.project / "data/batches", max_plies=0,
         )
-        self.click("mode:comparison")
-        self.click("comparison_batch:0")
-        self.assertIsNone(self.app.comparison_view.summary.score_rate)
+        self.click("mode:records")
+        self.click("records_entry:0")
+        self.assertIsNone(self.app.records_view.summary.comparison.score_rate)
         for size in ((900, 768), APP_SIZE, (1800, 1536)):
             with self.subTest(size=size):
                 self.app.resize(pygame.Surface(size))
@@ -397,9 +401,129 @@ class ChessApplicationTest(unittest.TestCase):
                 for button in self.app.buttons:
                     self.assertTrue(self.app.screen.get_rect().contains(button.rect))
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
-        self.assertIsNone(self.app.comparison_view.summary)
+        self.assertIsNone(self.app.records_view.summary)
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
         self.assertEqual(self.app.mode, "home")
+
+    def standalone_records(self, count=1, *, metadata=None, moves=None):
+        folder = self.project / "data/replays"
+        folder.mkdir(parents=True, exist_ok=True)
+        for index in range(count):
+            payload = {"initial_fen": chess.STARTING_FEN, "moves_uci": moves or [], "result": "*",
+                       "metadata": metadata or {"game_id": f"plain-{index}", "started_at": "2026-09-09T12:00:00+08:00"}}
+            (folder / f"plain-{index}.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    def test_records_restore_date_list_page_selection_and_settings_after_playback(self):
+        self.standalone_records(8)
+        self.click("mode:records")
+        self.click("records_dates")
+        self.click("records_date:1")
+        self.click("records_next")
+        view = self.app.records_view
+        self.assertEqual(view.offset, 3)
+        self.click("records_entry:7")
+        selected = view.selected
+        self.click("records_settings:all")
+        self.click("records_back")
+        self.click("records_game:0")
+        self.click("records_results")
+        self.assertEqual(view.selected, selected)
+        self.assertEqual(view.selected_game, view.summary.games[0].game_id)
+        self.click("records_back")
+        self.assertEqual((view.date, view.offset, view.highlight_key), ("2026-09-09", 3, selected))
+        self.app.render()
+        self.assertTrue(next(b for b in self.app.buttons if b.action == "records_entry:7").primary)
+
+    def test_general_batch_uses_common_summary_without_candidate_statistics(self):
+        from engine.sessions.batch_run import BatchRun, BatchSettings
+        run = BatchRun(BatchSettings(games=2, max_plies=0, white="Greedy", black="Random"),
+                       self.project / "data/batches", self.executor)
+        self.app.batch = run
+        self.executor.finish()
+        self.click("mode:records")
+        self.click("records_entry:0")
+        view = self.app.records_view
+        with patch.object(self.app, "draw_label", wraps=self.app.draw_label) as labels:
+            self.app.render()
+        text = "\n".join(str(call.args[1]) for call in labels.call_args_list)
+        self.assertIn("白方：Greedy", text)
+        self.assertIn("黑方：Random", text)
+        self.assertIn("未完成 2", text)
+        self.assertIn("耗時：未記錄", text)
+        self.assertNotIn("候選", text)
+        self.assertNotIn("得分率", text)
+        self.click("records_settings:all")
+        self.assertEqual(view.summary.settings["color_assignment"], "fixed")
+        self.click("records_back")
+        self.click("records_game:0")
+        self.click("records_results")
+        self.assertIs(self.app.records_view, view)
+
+    def test_standalone_missing_information_and_illegal_moves_preserve_existing_replay(self):
+        self.standalone_records(metadata={"game_id": "unknown"}, moves=["e2e5"])
+        self.app.dispatch("sample")
+        original = self.app.replay
+        self.click("open")
+        self.click("records_entry:0")
+        with patch.object(self.app, "draw_label", wraps=self.app.draw_label) as labels:
+            self.app.render()
+        text = "\n".join(str(call.args[1]) for call in labels.call_args_list)
+        self.assertIn("白方：未記錄", text)
+        self.assertIn("黑方：未記錄", text)
+        self.assertIn("耗時：未記錄", text)
+        self.click("records_settings:all")
+        with patch.object(self.app, "draw_label", wraps=self.app.draw_label) as labels:
+            self.app.render()
+        self.assertTrue(any('"設定": "未記錄"' in str(call.args[1]) for call in labels.call_args_list))
+        self.click("records_back")
+        self.click("records_game:0")
+        self.assertEqual(self.app.mode, "records")
+        self.assertIs(self.app.replay, original)
+        self.assertIn("Illegal move", self.app.records_view.message)
+        self.assertEqual(self.app.records_view.selected_game, "unknown")
+
+    def test_records_lookup_during_batch_returns_progress_without_dropping_worker(self):
+        self.standalone_records()
+        self.click("mode:auto")
+        self.click("start")
+        run = self.app.batch
+        self.app.open_replay(self.project / "data/replays/plain-0.json", return_to="batch")
+        self.click("open")
+        view = self.app.records_view
+        self.app.render()
+        self.assertFalse(next(b for b in self.app.buttons if b.action == "comparison_new").enabled)
+        self.app.dispatch("comparison_new")
+        self.assertIs(self.app.batch, run)
+        self.click("records_entry:0")
+        self.click("records_game:0")
+        self.click("records_results")
+        self.click("records_back")
+        self.click("records_back")
+        self.assertEqual(self.app.mode, "auto")
+        self.assertIs(self.app.batch, run)
+        self.assertFalse(run.future.done())
+        self.assertEqual(run.snapshot()["status"], "running")
+
+    def test_missing_standalone_result_is_not_replaced_by_loader_default_in_display(self):
+        folder = self.project / "data/replays"
+        folder.mkdir(parents=True)
+        (folder / "missing-result.json").write_text(json.dumps({
+            "initial_fen": chess.STARTING_FEN, "moves_uci": []}), encoding="utf-8")
+        self.click("mode:records")
+        self.click("records_entry:0")
+        self.click("records_game:0")
+        with patch.object(self.app, "draw_label", wraps=self.app.draw_label) as labels:
+            self.app.render()
+        self.assertTrue(any("結果：未記錄" in str(call.args[1]) for call in labels.call_args_list))
+
+    def test_valid_comparison_can_inspect_full_saved_batch_settings(self):
+        self.comparison_batch()
+        self.click("mode:records")
+        self.click("records_entry:0")
+        self.click("records_settings:all")
+        settings = self.app.records_view.summary.settings["comparison"]
+        self.assertIn("base_seed", settings)
+        self.assertIn("initial_fens", settings)
 
     def prepare_comparison_configs(self):
         folder = self.project / "configs/evaluation"
@@ -416,7 +540,7 @@ class ChessApplicationTest(unittest.TestCase):
     def test_comparison_setup_background_save_and_results(self):
         self.prepare_comparison_configs()
         (self.project / "openings.txt").write_text("# 測試開局\n7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\n", encoding="utf-8")
-        self.click("mode:comparison")
+        self.click("mode:records")
         self.click("comparison_new")
         self.enter_comparison_field("openings", "openings.txt")
         self.enter_comparison_field("depth", "3")
@@ -435,10 +559,10 @@ class ChessApplicationTest(unittest.TestCase):
         self.executor.finish()
         self.assertEqual(run.snapshot()["completed_pairs"], 2)
         self.click("batch_results")
-        summary = self.app.comparison_view.summary
+        summary = self.app.records_view.summary
         self.assertEqual(summary.name, "UI 比較")
-        self.assertEqual(summary.budget["depth_plies"], 3)
-        self.assertTrue(summary.participants["candidate"]["evaluator"]["phase"]["enabled"])
+        self.assertEqual(summary.comparison.budget["depth_plies"], 3)
+        self.assertTrue(summary.comparison.participants["candidate"]["evaluator"]["phase"]["enabled"])
         manifest = json.loads((Path(run.snapshot()["path"]) / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["settings"]["comparison"]["base_seed"], 42)
         self.assertIn("phase", manifest["tags"])
@@ -462,11 +586,11 @@ class ChessApplicationTest(unittest.TestCase):
         self.click("batch_mode:evaluation")
         self.assertEqual(self.app.evaluation_fields.options()["baseline"].search_config.depth_plies, 3)
         self.click("home")
-        self.click("mode:comparison")
-        self.assertFalse(hasattr(self.app.comparison_view, "setup"))
+        self.click("mode:records")
+        self.assertFalse(hasattr(self.app.records_view, "setup"))
         self.click("comparison_new")
         self.assertEqual((self.app.mode, self.app.batch_mode), ("auto", "evaluation"))
-        self.assertIsNone(self.app.comparison_view)
+        self.assertIsNone(self.app.records_view)
         self.enter_comparison_field("max_plies", "0")
         self.click("start")
         self.app.render()
@@ -480,11 +604,11 @@ class ChessApplicationTest(unittest.TestCase):
 
     def test_settings_diff_uses_saved_settings_after_source_changes(self):
         self.comparison_batch()
-        self.click("mode:comparison")
-        self.click("comparison_batch:0")
+        self.click("mode:records")
+        self.click("records_entry:0")
         self.prepare_comparison_configs()
         (self.project / "configs/evaluation/example_tapered.json").write_text("{}", encoding="utf-8")
-        self.click("comparison_settings:diff")
+        self.click("records_settings:diff")
         with patch.object(self.app, "draw_label", wraps=self.app.draw_label) as labels:
             self.app.render()
         text = "\n".join(str(call.args[1]) for call in labels.call_args_list)
@@ -492,12 +616,12 @@ class ChessApplicationTest(unittest.TestCase):
         self.assertIn('"基準": false', text)
         self.assertIn('"候選": true', text)
         self.assertNotIn('"label"', text)
-        self.click("comparison_back")
-        self.assertIsNone(self.app.comparison_view.settings_side)
+        self.click("records_back")
+        self.assertIsNone(self.app.records_view.settings_side)
 
     def test_comparison_setup_invalid_inputs_create_no_batch(self):
         self.prepare_comparison_configs()
-        self.click("mode:comparison")
+        self.click("mode:records")
         self.click("comparison_new")
         for field, value in (("depth", "0"), ("seed", "-1"), ("repetitions", "0"),
                              ("openings", "missing.txt"), ("max_plies", "-1")):
@@ -519,7 +643,7 @@ class ChessApplicationTest(unittest.TestCase):
 
     def test_comparison_leave_cancel_and_confirm_wait_for_save(self):
         self.prepare_comparison_configs()
-        self.click("mode:comparison")
+        self.click("mode:records")
         self.click("comparison_new")
         self.click("start")
         run = self.app.batch
@@ -540,7 +664,7 @@ class ChessApplicationTest(unittest.TestCase):
     def test_comparison_watch_saved_game_during_run_and_stop(self):
         self.prepare_comparison_configs()
         (self.project / "openings.txt").write_text("7k/6Q1/5K2/8/8/8/8/8 b - - 0 1", encoding="utf-8")
-        self.click("mode:comparison")
+        self.click("mode:records")
         self.click("comparison_new")
         self.enter_comparison_field("openings", "openings.txt")
         self.click("start")
@@ -561,12 +685,12 @@ class ChessApplicationTest(unittest.TestCase):
         run = self.app.batch
         self.assertEqual(run.snapshot()["status"], "stopped")
         self.click("batch_results")
-        self.assertEqual(self.app.comparison_view.summary.incomplete_pairs, 1)
-        self.assertIsNone(self.app.comparison_view.summary.paired_score_rate)
+        self.assertEqual(self.app.records_view.summary.comparison.incomplete_pairs, 1)
+        self.assertIsNone(self.app.records_view.summary.comparison.paired_score_rate)
 
     def test_comparison_worker_error_is_visible_and_saved(self):
         self.prepare_comparison_configs()
-        self.click("mode:comparison")
+        self.click("mode:records")
         self.click("comparison_new")
         self.click("start")
         with patch("engine.sessions.evaluation_comparison.play_game", side_effect=RuntimeError("測試搜尋錯誤")):
@@ -574,7 +698,7 @@ class ChessApplicationTest(unittest.TestCase):
         self.assertEqual(self.app.batch.snapshot()["status"], "failed")
         self.assertIn("測試搜尋錯誤", self.app.batch.snapshot()["error"])
         self.click("batch_results")
-        summary = self.app.comparison_view.summary
+        summary = self.app.records_view.summary
         self.assertEqual(summary.status, "failed")
         self.assertIn("測試搜尋錯誤", summary.error)
         self.assertEqual(summary.games, ())

@@ -11,19 +11,18 @@ from time import monotonic
 import chess
 import pygame
 
-from apps.play_ui import build_move_items, build_replay_info, create_session, get_replay_data
+from apps.play_ui import build_move_items, create_session, get_replay_data
 from engine.game import create_board
 from engine.storage.data_ids import TAIPEI, allocate_id, date_key, now_iso
 from engine.sessions.batch_run import BatchSettings
 from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
-from engine.replay.replay_catalog import ReplayCatalog, result_badges
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.replay.replay_loader import load_replay_json
 from ui.board_view import BOARD_PIXELS, WINDOW_HEIGHT, BoardView
 from ui.controls import ACCENT, BACKGROUND, BORDER, MUTED, PANEL, TEXT, Button, draw_text, ui_font
 from ui.move_list_view import MOVE_LIST_WIDTH, MoveListView
-from ui.comparison_view import ComparisonView
+from ui.records_view import RecordsView
 
 HEADER_HEIGHT = 56
 LOGICAL_SIZE = (900, 768)
@@ -68,8 +67,10 @@ class ChessApplication:
         self.flipped = False
         self.running = True
         self.buttons: list[Button] = []
-        self.browser: ReplayCatalog | None = None
-        self.comparison_view: ComparisonView | None = None
+        self.records_view: RecordsView | None = None
+        self.replay_return = None
+        self.replay_record = None
+        self.records_return_mode = None
         self.batch_mode = "general"
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
         self.confirm_action: str | None = None
@@ -131,8 +132,10 @@ class ChessApplication:
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
         self.saved_path = None
         self.numeric_focus = None
-        self.browser = ReplayCatalog(PROJECT_ROOT / "data") if mode == "replay" else None
-        self.comparison_view = ComparisonView(PROJECT_ROOT / "data") if mode == "comparison" else None
+        self.records_view = RecordsView(PROJECT_ROOT / "data") if mode == "records" else None
+        self.replay_return = None
+        self.replay_record = None
+        self.records_return_mode = None
         self.replay_items = []
         self.replay_is_local_game = False
         self.selected, self.promotions = None, []
@@ -175,15 +178,19 @@ class ChessApplication:
         session, _ = create_session(data)
         self.replay, self.replay_data, self.replay_items = session, data, items
         self.replay_source, self.replay_is_local_game = source, local_game
+        self.replay_record = None
+        self.replay_return = None
         self.mode = "replay"
         self.selected, self.promotions = None, []
         self.move_view.scroll_offset = 0
         self.message = ""
         self._last_ply = -1
 
-    def open_replay(self, path: str | Path) -> bool:
+    def open_replay(self, path: str | Path, *, return_to=None, record=None) -> bool:
         try:
             self._set_replay(load_replay_json(str(path)), str(path))
+            self.replay_return = return_to
+            self.replay_record = record
             return True
         except (OSError, ValueError, KeyError, TypeError) as exc:
             self.message = f"無法開啟棋譜：{exc}"
@@ -309,29 +316,22 @@ class ChessApplication:
             elif action == "cancel_promotion":
                 self.promotions, self.selected = [], None
             return
-        if self.browser:
-            self._browser_action(action)
-            return
         if action == "batch_progress" and self.batch:
             self.mode = "auto"
             return
         if action == "batch_watch" and self.batch:
             path = self.batch.snapshot()["last_replay"]
             if path:
-                self.open_replay(path)
+                self.open_replay(path, return_to="batch")
             return
-        if action == "batch_results" and self.batch and self.batch.future.done():
-            self.comparison_view = ComparisonView(PROJECT_ROOT / "data")
-            batch_id = self.batch.snapshot()["batch_id"]
-            self.comparison_view.selected = next((i for i, item in enumerate(self.comparison_view.catalog.entries)
-                                                  if item.batch_id == batch_id), None)
-            self.mode = "comparison"
+        if action in ("batch_results", "view_batch") and self.batch and self.batch.future.done():
+            self.show_records(batch_id=self.batch.snapshot()["batch_id"])
             return
-        if action == "comparison_results" and self.comparison_view:
-            self.mode = "comparison"
+        if action == "records_results" and self.records_view:
+            self.mode = "records"
             return
-        if self.mode == "comparison" and action.startswith("comparison_"):
-            self.comparison_view.action(action, self)
+        if self.mode == "records" and (action.startswith("records_") or action == "comparison_new"):
+            self.records_view.action(action, self)
             return
         if self.mode == "auto" and self.batch is None:
             if action.startswith("batch_mode:"):
@@ -344,13 +344,6 @@ class ChessApplication:
                 if self._commit_number():
                     self.evaluation_fields.action(action, self)
                 return
-        if action == "view_batch" and self.batch:
-            batch_id = self.batch.snapshot()["batch_id"]
-            self.browser = ReplayCatalog(PROJECT_ROOT / "data")
-            entries = [e for e in self.browser.entries if e.group == batch_id]
-            if entries:
-                self.browser.date, self.browser.group = entries[0].date, batch_id
-            return
         if self.batch and action in ("pause", "stop"):
             if action == "stop":
                 self.batch.stop()
@@ -405,9 +398,11 @@ class ChessApplication:
             if self.replay_is_local_game and not self.saved:
                 self.message = "請先匯出本局，或返回首頁後再開啟其他棋譜。"
             else:
-                self.browser = ReplayCatalog(PROJECT_ROOT / "data")
+                self.show_records()
         elif action == "sample":
             self._set_replay(get_replay_data(None), "內建範例（6 手）")
+            self.replay_return = None
+            self.replay_record = None
         elif self.replay and action in ("first", "prev", "next", "last"):
             getattr(self.replay, action)()
 
@@ -433,23 +428,16 @@ class ChessApplication:
         self.message = ""
         return True
 
-    def _browser_action(self, action: str):
-        browser = self.browser
-        if action == "browser_cancel":
-            self.browser = None
-        elif action == "browser_up":
-            browser.back()
-        elif action == "browser_refresh":
-            browser.refresh()
-        elif action == "browser_open":
-            entry = browser.selected_entry()
+    def show_records(self, *, batch_id=None):
+        # 查找不替換執行中的批次或目前回放；返回來源時沿用原狀態。
+        self.records_return_mode = "auto" if self.batch else (self.mode if self.mode == "replay" else None)
+        if self.records_view is None or batch_id is not None:
+            self.records_view = RecordsView(PROJECT_ROOT / "data")
+        if batch_id is not None:
+            entry = next((item for item in self.records_view.catalog.entries if item.batch_id == batch_id), None)
             if entry:
-                if self.open_replay(entry.path):
-                    self.browser = None
-                else:
-                    browser.error = "此對局無法播放，請選擇其他對局。"
-        elif action.startswith("entry:"):
-            browser.choose(int(action.split(":")[1]))
+                self.records_view.select(entry.key)
+        self.mode = "records"
 
     def handle_event(self, event):
         if event.type == pygame.QUIT:
@@ -471,16 +459,6 @@ class ChessApplication:
                 self.numeric_focus = None
                 pygame.key.stop_text_input()
             return
-        if self.browser and event.type in (pygame.KEYDOWN, pygame.MOUSEWHEEL):
-            if event.type == pygame.MOUSEWHEEL:
-                self.browser.scroll(-event.y)
-            elif event.key == pygame.K_ESCAPE:
-                self.browser = None
-            elif event.key == pygame.K_BACKSPACE:
-                self.browser.back()
-            elif event.key == pygame.K_RETURN:
-                self._browser_action("browser_open")
-            return
         setup = self.evaluation_fields if self.mode == "auto" and self.batch is None and self.batch_mode == "evaluation" else None
         if setup and setup.focus and not self.confirm_action and event.type in (pygame.TEXTINPUT, pygame.KEYDOWN):
             if event.type == pygame.TEXTINPUT:
@@ -496,20 +474,16 @@ class ChessApplication:
                 setup.focus = None
                 pygame.key.stop_text_input()
             return
-        if self.mode == "comparison" and not self.confirm_action and event.type in (pygame.KEYDOWN, pygame.MOUSEWHEEL):
+        if self.mode == "records" and not self.confirm_action and event.type in (pygame.KEYDOWN, pygame.MOUSEWHEEL):
             if event.type == pygame.MOUSEWHEEL:
-                action = "comparison_prev" if event.y > 0 else "comparison_next"
-                if self.comparison_view.settings_side:
-                    self.dispatch(action)
+                if self.records_view.settings_side:
+                    self.dispatch("records_prev" if event.y > 0 else "records_next")
                 else:
-                    self.comparison_view.scroll(-event.y)
+                    self.records_view.scroll(-event.y)
             elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-                if self.comparison_view.summary:
-                    self.dispatch("comparison_back")
-                else:
-                    self.request_leave("home")
+                self.dispatch("records_back")
             elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-                self.dispatch("comparison_prev" if event.key == pygame.K_LEFT else "comparison_next")
+                self.dispatch("records_prev" if event.key == pygame.K_LEFT else "records_next")
             return
         if event.type == pygame.KEYDOWN:
             if self.confirm_action:
@@ -521,7 +495,10 @@ class ChessApplication:
                     self.dispatch("cancel_promotion")
                 return
             if event.key == pygame.K_ESCAPE:
-                self.request_leave("home")
+                if self.mode == "replay" and self.replay_return == "records":
+                    self.dispatch("records_results")
+                else:
+                    self.request_leave("home")
             elif event.key == pygame.K_f:
                 self.flipped = not self.flipped
             elif self.mode == "replay" and self.replay:
@@ -537,9 +514,9 @@ class ChessApplication:
                 if button.enabled and button.rect.collidepoint(event.pos):
                     self.dispatch(button.action)
                     return
-            if self.browser or self.confirm_action or self.promotions:
+            if self.confirm_action or self.promotions:
                 return
-            if self.mode == "comparison":
+            if self.mode == "records":
                 return
             if self.mode == "human":
                 self.click_square(self.board_view.screen_to_square(event.pos, self.flipped))
@@ -549,7 +526,7 @@ class ChessApplication:
                     ply = self.move_view.handle_click(event.pos)
                     if ply is not None:
                         self.replay.goto_ply(ply)
-        if self.browser or self.confirm_action or self.promotions:
+        if self.confirm_action or self.promotions:
             return
         items, _ = self.current_moves()
         if event.type == pygame.MOUSEBUTTONUP:
@@ -579,8 +556,7 @@ class ChessApplication:
             for i, (mode, title, subtitle) in enumerate([
                 ("auto", "批次自動對戰", "設定雙方 AI 與生成場次"),
                 ("human", "真人下棋", "選擇執白或執黑，挑戰 AI"),
-                ("replay", "棋譜回放", "依日期、批次選擇對局"),
-                ("comparison", "棋力比較", "查看比較結果、設定與棋譜"),
+                ("records", "對局紀錄", "查找比較、一般批次與非批次棋譜"),
             ]):
                 x, y = 64 + 396 * (i % 2), 260 + 184 * (i // 2)
                 self.draw_rect(PANEL, (x, y, 376, 160), border_radius=10)
@@ -589,22 +565,20 @@ class ChessApplication:
             self.text("棋譜回放也可使用 --replay 直接開啟指定檔案。", 64, 660, muted=True)
         elif self.mode == "auto":
             self._render_batch()
-        elif self.mode == "comparison":
-            self.comparison_view.render(self)
+        elif self.mode == "records":
+            self.records_view.render(self)
         else:
             self._render_game()
         self.draw_rect(PANEL, (0, 0, LOGICAL_SIZE[0], HEADER_HEIGHT))
         self.text("Chess AI", 18, 10, large=True)
         if self.mode != "home":
-            if self.mode not in ("auto", "comparison"):
+            if self.mode not in ("auto", "records"):
                 self.button("flip", "翻轉 F", (664, 10, 104, 36))
             self.button("home", "回首頁", (780, 10, 104, 36))
         if self.confirm_action:
             self._render_confirmation()
         elif self.promotions:
             self._render_promotion()
-        elif self.browser:
-            self._render_browser()
 
     def _render_game(self):
         items, ply = self.current_moves()
@@ -685,7 +659,10 @@ class ChessApplication:
         label = datetime.fromisoformat(timestamp).astimezone(TAIPEI).strftime("%Y-%m-%d %H:%M:%S") if date_key(timestamp) != "日期不詳" else "日期時間不詳"
         self.draw_label(self.small_font, label if self.replay_data else "尚未選擇對局", (x, 113), MUTED, 230)
         if self.replay_data:
-            info = build_replay_info(self.replay_data)
+            metadata = self.replay_data.get("metadata", {})
+            info = {key: metadata.get(key) or "未記錄" for key in ("white_player", "black_player", "game_id")}
+            result = self.replay_record.result if self.replay_record is not None else self.replay_data.get("result")
+            info["result"] = result or "未記錄"
             for i, (label, key) in enumerate([("白方", "white_player"), ("黑方", "black_player"),
                                               ("結果", "result"), ("編號", "game_id")]):
                 self.draw_label(self.small_font, f"{label}：{info[key]}", (x, 141 + i * 24), TEXT, 230)
@@ -698,9 +675,9 @@ class ChessApplication:
         if self.replay_is_local_game:
             self.button("export", "匯出本局", (x + 121, 320, 111, 38))
         else:
-            if self.comparison_view and self.comparison_view.summary:
-                self.button("comparison_results", "返回比較", (x + 121, 320, 111, 38))
-            elif self.batch:
+            if self.replay_return == "records" and self.records_view:
+                self.button("records_results", "返回紀錄", (x + 121, 320, 111, 38))
+            elif self.replay_return == "batch" and self.batch:
                 self.button("batch_progress", "返回批次", (x + 121, 320, 111, 38))
             else:
                 self.button("sample", "範例棋譜", (x + 121, 320, 111, 38))
@@ -793,42 +770,8 @@ class ChessApplication:
                 self.button("pause", "繼續" if status == "paused" else "暫停", (64, 562, 240, 44), enabled=status != "stopping")
             self.button("stop", "停止並保存", (596, 562, 240, 44), enabled=status in ("running", "paused"))
         else:
-            self.button("batch_results" if comparison else "view_batch", "查看本批次結果" if comparison else "查看本批次棋譜",
+            self.button("batch_results" if comparison else "view_batch", "查看本批次結果" if comparison else "查看本批次紀錄",
                         (460, 562, 376, 44), enabled=bool(state["path"]) if comparison else state["saved_games"] > 0, primary=True)
             self.button("restart", "設定下一批", (64, 672, 376, 40))
         self.button("batch_watch", "回放最近保存棋局", (64 if not active else 320, 562, 376 if not active else 260, 44),
                     enabled=bool(state["last_replay"]))
-
-    def _render_browser(self):
-        browser = self.browser
-        self._modal((70, 90, 760, 630))
-        self.text("選擇回放對局", 94, 111, large=True)
-        group_label = "非批次" if browser.group == "standalone" else browser.group
-        breadcrumb = "日期" + ("  ›  " + browser.date if browser.date else "") + ("  ›  " + group_label if group_label else "")
-        self.text(breadcrumb, 94, 160, muted=True, width=710)
-        options = browser.options()
-        for row, index in enumerate(range(browser.offset, min(len(options), browser.offset + browser.PAGE_SIZE))):
-            option = options[index]
-            y = 208 + row * 72
-            if browser.level != "game":
-                label = option if browser.level == "date" else option[1]
-                self.button(f"entry:{index}", label, (94, y, 712, 62))
-            else:
-                self.button(f"entry:{index}", "", (94, y, 712, 62))
-                if browser.selected == index:
-                    self.draw_rect((48, 63, 80), (94, y, 712, 62), border_radius=6)
-                    self.draw_rect((140, 174, 205), (94, y, 712, 62), 2, border_radius=6)
-                self.draw_label(self.small_font, f"{option.time_label} · {option.game_id}", (108, y + 5), MUTED, 675)
-                white_badge, black_badge = result_badges(option.result)
-                for x, side, player, badge in [(108, "白方", option.white, white_badge), (452, "黑方", option.black, black_badge)]:
-                    self.draw_label(self.font, f"{side} · {'真人' if player == 'Human' else player}", (x, y + 30), TEXT, 232)
-                    self.draw_label(self.font, badge[0], (x + 242, y + 30), badge[1], 95)
-        if not options:
-            self.text("目前沒有可選擇的對局。", 108, 238, muted=True)
-        detail = browser.error or (f"已略過 {browser.skipped} 筆無法讀取的資料。" if browser.skipped else "依日期、批次或非批次選擇對局，再按播放。")
-        self.draw_label(self.small_font, detail, (94, 582), MUTED, 712)
-        self.draw_label(self.small_font, f"{len(options)} 個項目 · 滾輪捲動", (94, 610), MUTED)
-        self.button("browser_up", "上一層", (94, 658, 152, 38), enabled=browser.level != "date")
-        self.button("browser_refresh", "重新整理", (258, 658, 152, 38))
-        self.button("browser_cancel", "關閉", (422, 658, 152, 38))
-        self.button("browser_open", "播放", (586, 658, 220, 38), primary=True, enabled=browser.selected_entry() is not None)

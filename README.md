@@ -11,7 +11,7 @@
 | [自動對戰](docs/自動對戰.md) | 讓整盤棋跑完，設定對戰雙方與黑白輪替、統計、輸出資料 | 已有精簡 v2 批次保存、CLI 多程序生成與 UI 批次進度 |
 | [評分調整與實驗](docs/評分調整與實驗.md) | 獨立權重、手動比較與未來調參策略 | 可調設定與成對交換黑白比較流程已完成 |
 | [搜尋與評分](docs/搜尋與評分.md) | 決定每一步怎麼選，包含 Greedy、Alpha-Beta、子力與 PST | 搜尋核心、時間／取消、置換表與 PVS／aspiration 已實作，尚未接入對戰 CLI |
-| [使用者介面（UI）](docs/使用者介面.md) | 棋盤顯示、使用者操作與對局查找 | 已有批次生成、真人對 AI、日期回放，以及棋力比較設定／背景執行／停止與結果檢視 |
+| [使用者介面（UI）](docs/使用者介面.md) | 棋盤顯示、使用者操作與對局查找 | 已有共用批次生成、真人對 AI 與統一「對局紀錄」查找、設定檢視及回放 |
 
 後續任務順序與驗收以 [開發計畫](docs/開發計畫.md) 為準；測試分類與執行方式見 [測試導覽](tests/README.md)。四份功能文件區分目前實作與未來規劃。
 
@@ -39,7 +39,7 @@ flowchart TD
 - **共用棋規**：底層維持 `chess.Board`，`engine/game.py` 提供棋盤建立、合法走法、落子、終局與結果。自動對戰、真人落子、棋譜載入與回放已接入，未改搜尋演算法或評分權重。
 - **歷史保存**：回放保留完整走法堆疊，跳步後可由 `current_board()`、`current_outcome()`／`current_result()` 取得帶歷史的局面與結果；FEN 快取僅供顯示。P6/S0 後搜尋與 Greedy 分支也保留完整 move stack，重複局面沿用對局的申請和棋政策。
 - **棋規與執行設定分開**：預設不自動申請和棋；生成可用 `--claim-draw` 開啟，政策保存於批次與棋譜。`--max-plies` 是執行上限，截斷記為 `status=truncated`、`result=*`，不當作和棋。
-- **批次是保存單位**：每次生成建立 `data/batches/<日期_流水號>/`，內含 `manifest.json`、`games.csv`、`positions.csv` 或 JSONL，以及各盤回放 JSON。schema v2 以 manifest 管設定／進度、games 管每盤時間／一次種子、回放 JSON 管走法、positions 管逐手局面。名稱與標籤選填，移除雜湊與空預留欄位；UI 已可依日期 → 批次／非批次 → 對局查找。
+- **批次是保存單位**：每次生成建立 `data/batches/<日期_流水號>/`，內含 `manifest.json`、`games.csv`、`positions.csv` 或 JSONL，以及各盤回放 JSON。schema v2 以 manifest 管設定／進度、games 管每盤時間／一次種子、回放 JSON 管走法、positions 管逐手局面。名稱與標籤選填，移除雜湊與空預留欄位；UI 由「對局紀錄」統一查找比較、一般批次與非批次棋譜，可按日期篩選。
 - **舊資料保留**：不搬移舊檔；生成器預設只寫新批次，明確指定 `--output <新檔名>` 可另外輸出原八欄逐手資料，若檔案已存在則拒絕覆寫。CSV／JSONL 生成與 CSV 棋譜匯出保留，回放仍使用 `--replay`。
 
 共用核心的使用方式見 [自動對戰](docs/自動對戰.md#共用棋規規劃) 與 [UI](docs/使用者介面.md#共用棋規規劃)；批次格式以 [自動對戰的批次資料規劃](docs/自動對戰.md#批次資料規劃) 為主要說明。
@@ -65,7 +65,7 @@ flowchart TD
 | `configs/evaluation/` | 穩定設定與未驗證的比較範例 | 建立或選擇手工評分比較設定 |
 | `apps/play_ui.py` | UI 啟動與既有回放輔助函式 | 一般啟動首頁或指定 --replay |
 | `apps/chess_application.py` | 首頁、對戰／回放畫面及事件控制 | 操作流程、暫停、真人輸入、確認與匯出 |
-| `engine/sessions/batch_execution.py`、`engine/replay/replay_catalog.py` | 共用背景批次控制、日期與對局查找 | 模式派發、暫停／停止、回放選單 |
+| `engine/sessions/batch_execution.py`、`engine/replay/records_catalog.py` | 共用背景批次控制、日期與對局查找 | 模式派發、暫停／停止、紀錄查找 |
 | `engine/storage/data_ids.py` | 台北時間與持久每日流水號 | 新資料命名與避免覆寫 |
 | `engine/sessions/live_session.py` | 單盤即時狀態與背景 AI 選步協調 | 棋局生命週期、回合限制與終局 |
 | `ui/` | 棋盤、走法列表、對局資訊的畫面呈現 | 顯示方式、配色、排列與捲動 |
@@ -111,7 +111,7 @@ uv pip install --python "./.venv/Scripts/python.exe" chess pygame
 
 ## 快速開始
 
-啟動 UI，從首頁選擇批次自動對戰、真人下棋、棋譜回放或棋力比較：
+啟動 UI，從首頁選擇批次自動對戰、真人下棋或對局紀錄：
 
 ```powershell
 & "./.venv/Scripts/python.exe" -m apps.play_ui
@@ -123,7 +123,7 @@ uv pip install --python "./.venv/Scripts/python.exe" chess pygame
 
 耗時與吞吐量可用 `python -m tools.benchmark_batches` 比較同一有限工作量的 1／4／8 個 worker；預設一般 16 局、比較 8 組配對、每局最多 12 手、搜尋深度 2，包含程序啟動與保存成本，使用暫存批次，不覆寫既有資料。
 
-棋力比較負責既有比較批次的設定差異、完整配對統計與回放；「新增比較」會轉到批次設定並預選評分比較。一般批次仍可從日期回放查找，不會事後被認定為公平比較。
+「對局紀錄」共用日期查找、分頁、設定摘要與回放：比較批次保留候選／基準差異與完整配對統計，一般批次顯示白勝／和／黑勝與未完成，非批次只顯示保存資料，缺少設定或耗時標示未記錄。缺漏比較摘要仍可查看已保存棋局，但不套用比較統計；回放返回保留來源與位置。「新增比較」沿用批次設定捷徑，預選評分比較。
 
 回放流程是**日期 → 批次或非批次 → 對局 → 播放**，顯示對手、時間與對戰編號。綠色「勝」跟隨勝方，中性「敗／和」及琥珀「未完成」分開表示；尚未判定輾壓或略勝。
 
