@@ -11,9 +11,12 @@ class BatchExecution:
     def __init__(self, executor, *, requested_games, **progress):
         self._condition = Condition()
         self._paused = self._stopped = False
+        self._process_events = None
         self._state = dict(status="running", current_game=0, saved_games=0,
                            requested_games=requested_games, batch_id="", path="", error="",
-                           completed_games=0, unfinished=0, last_replay=None, **progress)
+                           completed_games=0, unfinished=0, last_replay=None,
+                           waiting_work=0, running_work=0, finished_work=0, finished_games=0)
+        self._state.update(progress)
         self.future = executor.submit(self._run)
 
     def snapshot(self):
@@ -34,6 +37,8 @@ class BatchExecution:
             if self.can_pause and self._state["status"] == "running":
                 self._paused = True
                 self._state["status"] = "paused"
+                if self._process_events:
+                    self._process_events[1].clear()
                 self._condition.notify_all()
 
     def resume(self):
@@ -41,6 +46,8 @@ class BatchExecution:
             if self._state["status"] == "paused" and not self._stopped:
                 self._paused = False
                 self._state["status"] = "running"
+                if self._process_events:
+                    self._process_events[1].set()
                 self._condition.notify_all()
 
     def stop(self):
@@ -48,7 +55,27 @@ class BatchExecution:
             if self._state["status"] in ("running", "paused"):
                 self._stopped = True
                 self._state["status"] = "stopping"
+                if self._process_events:
+                    self._process_events[0].set()
+                    self._process_events[1].set()
                 self._condition.notify_all()
+
+    def _bind_process_control(self, stop, resume):
+        with self._condition:
+            self._process_events = (stop, resume) if stop is not None else None
+            if self._process_events:
+                if self._stopped:
+                    stop.set()
+                if self._paused and not self._stopped:
+                    resume.clear()
+
+    def _dispatch_control(self):
+        with self._condition:
+            return not self._stopped
+
+    def _is_paused(self):
+        with self._condition:
+            return self._paused and not self._stopped
 
     def _control(self):
         with self._condition:
@@ -72,7 +99,7 @@ class BatchExecution:
         try:
             return self._execute()
         except Exception as exc:
-            self._progress(dict(status="failed", error=f"{type(exc).__name__}: {exc}"))
+            self._progress(dict(status="failed", running_work=0, error=f"{type(exc).__name__}: {exc}"))
             return None
 
 

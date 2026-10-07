@@ -69,7 +69,7 @@ class BatchUIStorageTest(unittest.TestCase):
         saved_evaluator = manifest["settings"]["strategies"]["white"]["evaluator"]
         self.assertEqual(saved_evaluator["terms"]["material"]["piece_values"]["N"], 4.0)
         self.assertEqual(saved_evaluator["terms"]["piece_square"]["weight"], 0.5)
-        forbidden = {"source_sha256", "pst_sha256", "pst_source", "runtime", "rng", "seed_derivation",
+        forbidden = {"source_sha256", "pst_sha256", "pst_source", "runtime", "rng",
                      "legacy_export", "class", "label", "final_fen", "num_games"}
         def check(value):
             if isinstance(value, dict):
@@ -121,7 +121,7 @@ class BatchUIStorageTest(unittest.TestCase):
                     if not release.wait(5):
                         raise RuntimeError("test synchronization timeout")
                 return next(iter(board.legal_moves))
-        with patch("engine.sessions.batch_run.RandomPlayer", ControlledPlayer), ThreadPoolExecutor(max_workers=1) as executor:
+        with patch("engine.sessions.batch_workers.RandomPlayer", ControlledPlayer), ThreadPoolExecutor(max_workers=1) as executor:
             run = BatchRun(BatchSettings(white="Random", black="Random", games=2, max_plies=4),
                            self.root / "batches", executor)
             try:

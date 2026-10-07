@@ -42,6 +42,7 @@ class ChessApplicationTest(unittest.TestCase):
         self.addCleanup(project_patch.stop)
         self.executor = ManualExecutor()
         self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
+        self.app.batch_workers = 1
         self.addCleanup(self.app.close)
 
     def click(self, action):
@@ -281,6 +282,30 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.render()
         start = next(b for b in self.app.buttons if b.action == "start")
         self.assertEqual(start.rect.width, 1200)
+
+    def test_shared_worker_field_default_validation_and_capacity(self):
+        app = ChessApplication(self.screen, executor=self.executor)
+        self.addCleanup(app.close)
+        self.assertEqual(app.batch_workers, 4)
+        self.prepare_comparison_configs()
+        self.click("mode:auto")
+        self.click("workers")
+        self.app.numeric_text = "0"
+        self.click("start")
+        self.assertIsNone(self.app.batch)
+        self.assertIn("同時對戰場數", self.app.message)
+        self.app.numeric_text = "8"
+        self.app._commit_number()
+        self.click("batch_mode:evaluation")
+        self.assertEqual(self.app.batch_workers, 8)
+        self.enter_comparison_field("max_plies", "0")
+        self.click("start")
+        self.executor.finish()
+        state = self.app.batch.snapshot()
+        self.assertEqual((state["requested_workers"], state["actual_workers"]), (8, 1))
+        self.assertEqual((state["finished_games"], state["saved_games"]), (2, 2))
+        manifest = json.loads((Path(state["path"]) / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual((manifest["settings"]["requested_workers"], manifest["settings"]["workers"]), (8, 1))
 
     def test_invalid_cli_replay_shows_error_screen(self):
         app = ChessApplication(self.screen, "missing-replay.json", executor=self.executor)

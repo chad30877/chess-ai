@@ -56,6 +56,7 @@ class ChessApplication:
         self.human_color, self.opponent = chess.WHITE, "Greedy"
         self.interval = 1.0
         self.batch_interval = 0.0
+        self.batch_workers = 4
         self.game_count = 20
         self.batch = None
         self.pending_leave = None
@@ -149,7 +150,9 @@ class ChessApplication:
                 try:
                     settings = (self.evaluation_fields.options() if self.batch_mode == "evaluation"
                                 else BatchSettings(white=self.white, black=self.black,
-                                                   games=self.game_count, interval=self.batch_interval))
+                                                   games=self.game_count, interval=self.batch_interval, workers=self.batch_workers))
+                    if self.batch_mode == "evaluation":
+                        settings["workers"] = self.batch_workers
                     self.batch = start_batch(self.batch_mode, settings, PROJECT_ROOT / "data/batches", self.executor)
                     self.message = ""
                 except (OSError, ValueError, TypeError, KeyError) as exc:
@@ -338,7 +341,8 @@ class ChessApplication:
                     self.message = ""
                 return
             if self.batch_mode == "evaluation" and action.startswith("comparison_"):
-                self.evaluation_fields.action(action, self)
+                if self._commit_number():
+                    self.evaluation_fields.action(action, self)
                 return
         if action == "view_batch" and self.batch:
             batch_id = self.batch.snapshot()["batch_id"]
@@ -355,10 +359,12 @@ class ChessApplication:
             else:
                 self.batch.pause()
             return
-        if self.mode == "auto" and action in ("interval", "count") and self.batch is None:
+        if self.mode == "auto" and action in ("interval", "count", "workers") and self.batch is None:
+            self.evaluation_fields.commit()
             if self._commit_number():
                 self.numeric_focus = action
-                self.numeric_text = str(self.game_count) if action == "count" else f"{self.batch_interval:g}"
+                self.numeric_text = (str(self.batch_workers) if action == "workers" else
+                                     str(self.game_count) if action == "count" else f"{self.batch_interval:g}")
                 pygame.key.start_text_input()
             return
         if action.startswith("mode:"):
@@ -409,16 +415,18 @@ class ChessApplication:
         if self.numeric_focus is None:
             return True
         try:
-            value = int(self.numeric_text) if self.numeric_focus == "count" else float(self.numeric_text)
+            value = int(self.numeric_text) if self.numeric_focus in ("count", "workers") else float(self.numeric_text)
             import math
-            if not math.isfinite(value) or (value < 1 if self.numeric_focus == "count" else value < 0):
+            if not math.isfinite(value) or (value < 1 if self.numeric_focus in ("count", "workers") else value < 0):
                 raise ValueError()
-            if self.numeric_focus == "count":
+            if self.numeric_focus == "workers":
+                self.batch_workers = value
+            elif self.numeric_focus == "count":
                 self.game_count = value
             else:
                 self.batch_interval = value
         except (ValueError, OverflowError):
-            self.message = "場次需為正整數；場間間隔需為非負秒數。"
+            self.message = "場次與同時對戰場數需為正整數；場間間隔需為非負秒數。"
             return False
         self.numeric_focus = None
         pygame.key.stop_text_input()
@@ -744,8 +752,16 @@ class ChessApplication:
                     if self.numeric_focus == action:
                         value = self.numeric_text + " |"
                     self.button(action, value, (340, y, 360, 44), primary=self.numeric_focus == action)
-                self.text("數字欄位可輸入，Ctrl+A 清空，Enter 確認。", 100, 510, muted=True)
+                self.text("數字欄位可輸入，Ctrl+A 清空，Enter 確認。", 100, 532, muted=True)
                 self.button("start", "開始生成", (100, 564, 600, 48), primary=True)
+            if self.batch_mode == "evaluation":
+                self.draw_label(self.small_font, "同時對戰場數（每個程序執行一組配對）", (460, 515), width=376)
+                worker_rect = (460, 540, 376, 39)
+            else:
+                self.text("同時對戰場數", 100, 490)
+                worker_rect = (340, 481, 360, 44)
+            value = self.numeric_text + " |" if self.numeric_focus == "workers" else str(self.batch_workers)
+            self.button("workers", value, worker_rect, primary=self.numeric_focus == "workers")
             self.text(self.message, 64, 642, width=772, muted=True)
             return
         state = self.batch.snapshot()
@@ -755,18 +771,21 @@ class ChessApplication:
         comparison = self.batch.mode == "evaluation"
         self.text(("評分比較　｜　" if comparison else "一般對戰　｜　") + labels[status], 64, 139, large=True)
         self.text(state["batch_id"] or "準備建立批次…", 64, 187, muted=True)
-        self.text(f"目前第 {state['current_game']} / {state['requested_games']} 局　｜　已保存 {state['saved_games']} 局", 64, 241)
+        self.text(f"已派發至第 {state['current_game']} / {state['requested_games']} 局　｜　已保存 {state['saved_games']} 局", 64, 241)
         self.draw_rect(BORDER, (64, 282, 772, 16), border_radius=6)
         width = round(772 * state["saved_games"] / state["requested_games"])
         if width:
             self.draw_rect(ACCENT, (64, 282, width, 16), border_radius=6)
-        self.text(f"正常完成 {state['completed_games']} 局　｜　未完成 {state['unfinished']} 局", 64, 320)
+        self.draw_label(self.small_font, f"要求 {state['requested_workers']} ／ 實際 {state['actual_workers']} 個程序", (64, 211), MUTED)
+        unit = "組配對" if comparison else "局"
+        self.text(f"等待 {state['waiting_work']}　｜　執行中 {state['running_work']}　｜　已結束 {state['finished_work']} {unit}", 64, 320)
+        self.text(f"已回報 {state['finished_games']} 局　｜　正常完成 {state['completed_games']}　｜　未完成 {state['unfinished']}", 64, 350)
         if comparison:
-            self.text(f"完整配對 {state['completed_pairs']}　｜　不完整配對 {state['incomplete_pairs']}　｜　預定 {state['requested_pairs']} 對", 64, 362)
+            self.text(f"完整配對 {state['completed_pairs']}　｜　不完整配對 {state['incomplete_pairs']}　｜　預定 {state['requested_pairs']} 對", 64, 386)
             rate = "無資料" if state["paired_score_rate"] is None else f"{state['paired_score_rate']:.1%}"
-            self.text(f"候選累積得分率：{rate}（僅含兩局正常完成的配對）", 64, 404, width=772)
+            self.text(f"候選累積得分率：{rate}（僅含兩局正常完成的配對）", 64, 424, width=772)
         self.text("評分比較支援停止，不提供暫停；停止保留當盤已落子的走法。" if comparison else
-                  "一般對戰可在落子邊界暫停；停止保留當盤已落子的走法。", 64, 456, muted=True, width=772)
+                  "一般對戰暫停所有席位；每席位保存後等待場間間隔再派發。", 64, 469, muted=True, width=772)
         self.text(state["error"], 64, 505, width=772)
         active = not self.batch.future.done()
         if active:

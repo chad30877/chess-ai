@@ -109,7 +109,7 @@ class BatchWriter:
             self.__exit__(type(exc), exc, exc.__traceback__)
             raise
 
-    def add_game(self, game: PlayedGame, seed: int) -> str:
+    def add_game(self, game: PlayedGame, seed: int, *, execution: dict | None = None) -> str:
         expected_id = self.manifest["counts"]["saved_games"] + 1
         if game.game_id != expected_id or expected_id > self.manifest["counts"]["requested_games"]:
             raise ValueError(f"Expected game_id {expected_id} within requested game count")
@@ -131,6 +131,9 @@ class BatchWriter:
                 "game_id", "started_at", "finished_at", "white_player", "black_player", "status", "termination")},
         }
         replay["metadata"].update(batch_id=self.batch_id, rules=rules)
+        if execution is not None:
+            # 發布序號連續；固定工作編號獨立於並行完成順序。
+            replay["metadata"]["execution"] = execution
         # If a recoverable write fails, roll back this game's rows and replay.
         offsets = self.games_file.tell(), self.positions_file.tell()
         old_counts = self.manifest["counts"].copy()
