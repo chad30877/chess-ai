@@ -67,6 +67,42 @@ class AlphaBetaComparisonTest(unittest.TestCase):
         self.assertEqual(result.candidate_stats.unfinished, 2)
         self.assertEqual(result.candidate_stats.draws, 0)
 
+    def test_early_terminal_search_completes_color_pairs_with_and_without_table(self):
+        for table in (False, True):
+            with self.subTest(table=table):
+                search_config = ComparisonSearchConfig(depth_plies=2, use_transposition_table=table)
+                baseline = ComparisonParticipant.alphabeta("stable", EvaluationConfig(), search=search_config)
+                candidate = ComparisonParticipant.alphabeta("candidate", EvaluationConfig(phase_enabled=True), search=search_config)
+                original = AlphaBetaSearcher.search
+                calls = []
+                def search(searcher, board, limits=None):
+                    before = board.fen(), list(board.move_stack)
+                    result = original(searcher, board, limits)
+                    self.assertEqual((result.completed_depth, result.depth_reached), (2, 1))
+                    self.assertEqual((board.fen(), board.move_stack), before)
+                    calls.append(result)
+                    return result
+                with patch.object(AlphaBetaSearcher, "search", search):
+                    result = self.run_comparison(
+                        baseline=baseline, candidate=candidate, repetitions=2, max_plies=None,
+                        initial_fens=["7k/8/8/8/8/8/8/KR6 w - - 149 75"], control=lambda: True,
+                    )
+                self.assertEqual(len(calls), 4)
+                self.assertEqual(result.candidate_stats.draws, 4)
+                self.assertEqual(result.candidate_stats.unfinished, 0)
+                manifest = read(result.path / "manifest.json")
+                self.assertEqual(manifest["status"], "completed")
+                self.assertEqual(manifest["counts"]["saved_games"], 4)
+                summary = read(result.path / "comparison.json")
+                self.assertEqual(summary["progress"]["completed_pairs"], 2)
+                for pair in summary["pairs"]:
+                    self.assertEqual([game["candidate_color"] for game in pair["games"]], ["black", "white"])
+                    for game in pair["games"]:
+                        self.assertEqual(game["termination"], "seventyfive_moves")
+                        replay = read(result.path / "replays" / f"{game['game_id']}.json")
+                        self.assertEqual(len(replay["moves_uci"]), 1)
+                        self.assertEqual(replay["result"], "1/2-1/2")
+
     def test_schema_budget_configs_rules_and_color_pairs_are_saved_consistently(self):
         result = self.run_comparison(claim_draw=True)
         manifest = read(result.path / "manifest.json")

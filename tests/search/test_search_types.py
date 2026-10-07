@@ -103,15 +103,15 @@ class SearchResultTest(unittest.TestCase):
             SearchResult(best_move=None, score=0.0, completed_depth=-1)
 
         with self.assertRaises(ValueError):
-            SearchResult(
-                best_move=None,
-                score=0.0,
-                depth_reached=1,
-                completed_depth=2,
-            )
-
-        with self.assertRaises(ValueError):
             SearchResult(best_move=None, score=0.0, stop_reason="unknown")
+
+    def test_completed_iteration_and_visited_depth_are_independent(self):
+        for completed, visited in ((2, 1), (1, 4), (0, 0)):
+            with self.subTest(completed=completed, visited=visited):
+                result = SearchResult(best_move=None, score=0.0, completed_depth=completed,
+                                      depth_reached=visited)
+                self.assertEqual(result.completed_depth, completed)
+                self.assertEqual(result.depth_reached, visited)
 
 
 if __name__ == "__main__":

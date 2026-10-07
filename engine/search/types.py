@@ -59,6 +59,8 @@ class SearchResult:
     `completed_depth` is the deepest fully completed regular iterative-deepening
     iteration; it excludes quiescence extensions. `stop_reason` is ``timeout``
     or ``cancelled`` when a cooperative stop returned an earlier result.
+    完成的迭代深度與實際走訪深度互相獨立：所有分支提前終局時，
+    completed_depth 可以大於 depth_reached；後者仍保留真實走訪深度。
     """
 
     best_move: chess.Move | None
@@ -96,8 +98,6 @@ class SearchResult:
             raise ValueError("aspiration_researches must be non-negative.")
         if self.completed_depth < 0:
             raise ValueError("completed_depth must be non-negative.")
-        if self.completed_depth > self.depth_reached:
-            raise ValueError("completed_depth cannot exceed depth_reached.")
         if self.stop_reason not in (None, "timeout", "cancelled"):
             raise ValueError("stop_reason must be timeout, cancelled, or None.")
 

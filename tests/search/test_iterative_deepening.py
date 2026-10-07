@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import chess
 
-from engine.evaluation.evaluator import MaterialEvaluator
+from engine.evaluation.evaluator import HandcraftedEvaluator, MaterialEvaluator
 from engine.search import AlphaBetaSearcher, SearchLimits
 
 
@@ -108,6 +108,58 @@ class IterativeDeepeningTest(unittest.TestCase):
         self.assertEqual(result.completed_depth, 0)
         self.assertIsNone(result.stop_reason)
         self.assertEqual(stop.calls, 0)
+
+    def early_terminal_board(self):
+        # 保留一手真實歷史，重現指定 FEN 的七十五步終局邊界。
+        board = chess.Board("6k1/8/8/8/8/8/8/KR6 b - - 148 74")
+        board.push_uci("g8h8")
+        self.assertEqual(board.fen(), "7k/8/8/8/8/8/8/KR6 w - - 149 75")
+        return board
+
+    def test_all_branches_terminal_complete_iterations_without_inflating_visited_depth(self):
+        for table in (False, True):
+            for quiescence in (0, 4):
+                with self.subTest(table=table, quiescence=quiescence):
+                    board = self.early_terminal_board()
+                    before = board.fen(), list(board.move_stack)
+                    searcher = AlphaBetaSearcher(HandcraftedEvaluator(), use_transposition_table=table,
+                                                quiescence_depth=quiescence)
+                    result = searcher.search(board, SearchLimits(max_depth=2))
+                    self.assertEqual((result.completed_depth, result.depth_reached), (2, 1))
+                    self.assertEqual(result.score, 0.0)
+                    self.assertIsNone(result.stop_reason)
+                    self.assertIn(result.best_move, board.legal_moves)
+                    child = board.copy(stack=True)
+                    child.push(result.best_move)
+                    self.assertEqual(child.outcome().termination, chess.Termination.SEVENTYFIVE_MOVES)
+                    self.assertEqual((board.fen(), board.move_stack), before)
+                    if table:
+                        self.assertGreater(result.transposition_hits, 0)
+                        self.assertGreater(result.transposition_stores, 0)
+                    else:
+                        self.assertEqual(result.transposition_hits, 0)
+                    terminal = searcher.search(child, SearchLimits(max_depth=2))
+                    self.assertEqual((terminal.completed_depth, terminal.depth_reached), (0, 0))
+
+    def test_stop_after_shallow_terminal_iterations_preserves_last_completed_result(self):
+        for table in (False, True):
+            for reason in ("cancelled", "timeout"):
+                with self.subTest(table=table, reason=reason):
+                    board = self.early_terminal_board()
+                    before = board.fen(), list(board.move_stack)
+                    searcher = AlphaBetaSearcher(HandcraftedEvaluator(), use_transposition_table=table)
+                    expected = searcher.search(board, SearchLimits(max_depth=2))
+                    if reason == "cancelled":
+                        result = searcher.search(board, SearchLimits(
+                            max_depth=3, stop_requested=StopOnCall(expected.nodes_searched + 1)))
+                    else:
+                        clock = StepClock(expected.nodes_searched + 2)
+                        with patch("engine.search.alphabeta.monotonic", side_effect=clock):
+                            result = searcher.search(board, SearchLimits(max_depth=3, time_ms=500))
+                    self.assertEqual((result.completed_depth, result.depth_reached), (2, 1))
+                    self.assertEqual((result.best_move, result.score), (expected.best_move, expected.score))
+                    self.assertEqual(result.stop_reason, reason)
+                    self.assertEqual((board.fen(), board.move_stack), before)
 
 
 if __name__ == "__main__":
