@@ -1,0 +1,17 @@
+# E1 第一輪：初輪觀察組；固定 8 個不同局面，禁止依結果替換。
+# 1. 西班牙：e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7
+r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 4 6
+# 2. 義大利：e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6
+r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQK2R w KQkq - 0 6
+# 3. 蘇格蘭：e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Nf6 Nc3 Bb4
+r1bqk2r/pppp1ppp/2n2n2/8/1b1NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 3 6
+# 4. 拒后翼棄兵：d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O
+rnbq1rk1/ppp1bppp/4pn2/3p2B1/2PP4/2N1P3/PP3PPP/R2QKBNR w KQ - 1 6
+# 5. 斯拉夫：d4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4 a4 Bf5
+rn1qkb1r/pp2pppp/2p2n2/5b2/P1pP4/2N2N2/1P2PPPP/R1BQKB1R w KQkq - 1 6
+# 6. 法蘭西：e4 e6 d4 d5 Nc3 Bb4 e5 c5 a3 Bxc3+
+rnbqk1nr/pp3ppp/4p3/2ppP3/3P4/P1b5/1PP2PPP/R1BQKBNR w KQkq - 0 6
+# 7. 卡羅康：e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6
+rn1qkbnr/pp2pppp/2p3b1/8/3P4/6N1/PPP2PPP/R1BQKBNR w KQkq - 3 6
+# 8. 西西里：e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6
+rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6

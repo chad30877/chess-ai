@@ -1,0 +1,433 @@
+{
+  "experiment": "E1 第一輪分階段評分驗證",
+  "code_revision": "a9d2246a239d6d7ddfd585e4fcdfc1834e81c022",
+  "conditions": {
+    "depth_plies": 2,
+    "workers": 4,
+    "base_seed": 10000,
+    "repetitions": 1,
+    "max_plies": null,
+    "claim_draw": false,
+    "total_games": 32
+  },
+  "participants": {
+    "baseline": {
+      "label": "baseline",
+      "strategy": "AlphaBeta",
+      "evaluator": {
+        "type": "handcrafted",
+        "version": 6,
+        "phase": {
+          "enabled": false,
+          "model_version": 1
+        },
+        "perspective": "white",
+        "score_unit": "pawn",
+        "terms": {
+          "material": {
+            "enabled": true,
+            "weight": 1.0,
+            "piece_values": {
+              "P": 1.0,
+              "N": 3.0,
+              "B": 3.0,
+              "R": 5.0,
+              "Q": 9.0
+            },
+            "endgame_piece_values": {
+              "P": 1.0,
+              "N": 3.0,
+              "B": 3.0,
+              "R": 5.0,
+              "Q": 9.0
+            }
+          },
+          "piece_square": {
+            "enabled": true,
+            "weight": 1.0,
+            "table_version": 1,
+            "endgame_weight": 1.0,
+            "endgame_table_version": 1
+          },
+          "isolated_pawns": {
+            "enabled": false,
+            "weight": 0.15,
+            "endgame_weight": 0.2,
+            "feature_version": 1
+          },
+          "doubled_pawns": {
+            "enabled": false,
+            "weight": 0.1,
+            "endgame_weight": 0.15,
+            "feature_version": 1
+          },
+          "passed_pawns": {
+            "enabled": false,
+            "weight": 0.05,
+            "endgame_weight": 0.1,
+            "feature_version": 1
+          },
+          "pawn_mobility": {
+            "enabled": false,
+            "weight": 0.01,
+            "endgame_weight": 0.01,
+            "feature_version": 1
+          },
+          "knight_mobility": {
+            "enabled": false,
+            "weight": 0.03,
+            "endgame_weight": 0.03,
+            "feature_version": 1
+          },
+          "bishop_mobility": {
+            "enabled": false,
+            "weight": 0.03,
+            "endgame_weight": 0.03,
+            "feature_version": 1
+          },
+          "rook_mobility": {
+            "enabled": false,
+            "weight": 0.02,
+            "endgame_weight": 0.03,
+            "feature_version": 1
+          },
+          "queen_mobility": {
+            "enabled": false,
+            "weight": 0.01,
+            "endgame_weight": 0.02,
+            "feature_version": 1
+          },
+          "king_mobility": {
+            "enabled": false,
+            "weight": 0.01,
+            "endgame_weight": 0.02,
+            "feature_version": 1
+          },
+          "king_pawn_shield": {
+            "enabled": false,
+            "weight": 0.1,
+            "endgame_weight": 0.0,
+            "feature_version": 1
+          },
+          "king_zone_attacks": {
+            "enabled": false,
+            "weight": 0.05,
+            "endgame_weight": 0.0,
+            "feature_version": 1
+          },
+          "king_file_exposure": {
+            "enabled": false,
+            "weight": 0.08,
+            "endgame_weight": 0.0,
+            "feature_version": 1
+          },
+          "bishop_pair": {
+            "enabled": false,
+            "weight": 0.3,
+            "endgame_weight": 0.4,
+            "feature_version": 1
+          },
+          "rook_open_file": {
+            "enabled": false,
+            "weight": 0.15,
+            "endgame_weight": 0.2,
+            "feature_version": 1
+          },
+          "rook_half_open_file": {
+            "enabled": false,
+            "weight": 0.1,
+            "endgame_weight": 0.15,
+            "feature_version": 1
+          }
+        }
+      },
+      "search": {
+        "schema_version": 1,
+        "algorithm": "alpha_beta",
+        "max_depth": 2,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      }
+    },
+    "candidate": {
+      "label": "candidate",
+      "strategy": "AlphaBeta",
+      "evaluator": {
+        "type": "handcrafted",
+        "version": 6,
+        "phase": {
+          "enabled": true,
+          "model_version": 1
+        },
+        "perspective": "white",
+        "score_unit": "pawn",
+        "terms": {
+          "material": {
+            "enabled": true,
+            "weight": 1.0,
+            "piece_values": {
+              "P": 1.0,
+              "N": 3.0,
+              "B": 3.0,
+              "R": 5.0,
+              "Q": 9.0
+            },
+            "endgame_piece_values": {
+              "P": 1.0,
+              "N": 3.0,
+              "B": 3.0,
+              "R": 5.0,
+              "Q": 9.0
+            }
+          },
+          "piece_square": {
+            "enabled": true,
+            "weight": 1.0,
+            "table_version": 1,
+            "endgame_weight": 1.0,
+            "endgame_table_version": 1
+          },
+          "isolated_pawns": {
+            "enabled": false,
+            "weight": 0.15,
+            "endgame_weight": 0.2,
+            "feature_version": 1
+          },
+          "doubled_pawns": {
+            "enabled": false,
+            "weight": 0.1,
+            "endgame_weight": 0.15,
+            "feature_version": 1
+          },
+          "passed_pawns": {
+            "enabled": false,
+            "weight": 0.05,
+            "endgame_weight": 0.1,
+            "feature_version": 1
+          },
+          "pawn_mobility": {
+            "enabled": false,
+            "weight": 0.01,
+            "endgame_weight": 0.01,
+            "feature_version": 1
+          },
+          "knight_mobility": {
+            "enabled": false,
+            "weight": 0.03,
+            "endgame_weight": 0.03,
+            "feature_version": 1
+          },
+          "bishop_mobility": {
+            "enabled": false,
+            "weight": 0.03,
+            "endgame_weight": 0.03,
+            "feature_version": 1
+          },
+          "rook_mobility": {
+            "enabled": false,
+            "weight": 0.02,
+            "endgame_weight": 0.03,
+            "feature_version": 1
+          },
+          "queen_mobility": {
+            "enabled": false,
+            "weight": 0.01,
+            "endgame_weight": 0.02,
+            "feature_version": 1
+          },
+          "king_mobility": {
+            "enabled": false,
+            "weight": 0.01,
+            "endgame_weight": 0.02,
+            "feature_version": 1
+          },
+          "king_pawn_shield": {
+            "enabled": false,
+            "weight": 0.1,
+            "endgame_weight": 0.0,
+            "feature_version": 1
+          },
+          "king_zone_attacks": {
+            "enabled": false,
+            "weight": 0.05,
+            "endgame_weight": 0.0,
+            "feature_version": 1
+          },
+          "king_file_exposure": {
+            "enabled": false,
+            "weight": 0.08,
+            "endgame_weight": 0.0,
+            "feature_version": 1
+          },
+          "bishop_pair": {
+            "enabled": false,
+            "weight": 0.3,
+            "endgame_weight": 0.4,
+            "feature_version": 1
+          },
+          "rook_open_file": {
+            "enabled": false,
+            "weight": 0.15,
+            "endgame_weight": 0.2,
+            "feature_version": 1
+          },
+          "rook_half_open_file": {
+            "enabled": false,
+            "weight": 0.1,
+            "endgame_weight": 0.15,
+            "feature_version": 1
+          }
+        }
+      },
+      "search": {
+        "schema_version": 1,
+        "algorithm": "alpha_beta",
+        "max_depth": 2,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      }
+    }
+  },
+  "actual_differences": {
+    "evaluator.phase.enabled": [
+      false,
+      true
+    ]
+  },
+  "groups": {
+    "observation": {
+      "openings_file": "configs/openings/e1_round1_observation.txt",
+      "sha256": "40f048c4c999f2c10b5da53a91759353ef03cc89793c08c0b1aae542a76b5355",
+      "positions": [
+        {
+          "position_number": 1,
+          "name": "西班牙",
+          "moves_san": "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7",
+          "fen": "r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 4 6"
+        },
+        {
+          "position_number": 2,
+          "name": "義大利",
+          "moves_san": "e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6",
+          "fen": "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQK2R w KQkq - 0 6"
+        },
+        {
+          "position_number": 3,
+          "name": "蘇格蘭",
+          "moves_san": "e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Nf6 Nc3 Bb4",
+          "fen": "r1bqk2r/pppp1ppp/2n2n2/8/1b1NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 3 6"
+        },
+        {
+          "position_number": 4,
+          "name": "拒后翼棄兵",
+          "moves_san": "d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O",
+          "fen": "rnbq1rk1/ppp1bppp/4pn2/3p2B1/2PP4/2N1P3/PP3PPP/R2QKBNR w KQ - 1 6"
+        },
+        {
+          "position_number": 5,
+          "name": "斯拉夫",
+          "moves_san": "d4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4 a4 Bf5",
+          "fen": "rn1qkb1r/pp2pppp/2p2n2/5b2/P1pP4/2N2N2/1P2PPPP/R1BQKB1R w KQkq - 1 6"
+        },
+        {
+          "position_number": 6,
+          "name": "法蘭西",
+          "moves_san": "e4 e6 d4 d5 Nc3 Bb4 e5 c5 a3 Bxc3+",
+          "fen": "rnbqk1nr/pp3ppp/4p3/2ppP3/3P4/P1b5/1PP2PPP/R1BQKBNR w KQkq - 0 6"
+        },
+        {
+          "position_number": 7,
+          "name": "卡羅康",
+          "moves_san": "e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6",
+          "fen": "rn1qkbnr/pp2pppp/2p3b1/8/3P4/6N1/PPP2PPP/R1BQKBNR w KQkq - 3 6"
+        },
+        {
+          "position_number": 8,
+          "name": "西西里",
+          "moves_san": "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6",
+          "fen": "rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 6"
+        }
+      ]
+    },
+    "validation": {
+      "openings_file": "configs/openings/e1_round1_validation.txt",
+      "sha256": "4dfc4911aff91907532f32238bf1bd2b315cd410aa317f4ed381e30fb64ce75c",
+      "positions": [
+        {
+          "position_number": 1,
+          "name": "英格蘭",
+          "moves_san": "c4 e5 Nc3 Nf6 g3 d5 cxd5 Nxd5 Bg2 Nb6",
+          "fen": "rnbqkb1r/ppp2ppp/1n6/4p3/8/2N3P1/PP1PPPBP/R1BQK1NR w KQkq - 2 6"
+        },
+        {
+          "position_number": 2,
+          "name": "雷蒂",
+          "moves_san": "Nf3 d5 g3 Nf6 Bg2 g6 O-O Bg7 d3 O-O",
+          "fen": "rnbq1rk1/ppp1ppbp/5np1/3p4/8/3P1NP1/PPP1PPBP/RNBQ1RK1 w - - 1 6"
+        },
+        {
+          "position_number": 3,
+          "name": "加泰隆",
+          "moves_san": "d4 Nf6 c4 e6 g3 d5 Bg2 Be7 Nf3 O-O",
+          "fen": "rnbq1rk1/ppp1bppp/4pn2/3p4/2PP4/5NP1/PP2PPBP/RNBQK2R w KQ - 4 6"
+        },
+        {
+          "position_number": 4,
+          "name": "古印度",
+          "moves_san": "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O",
+          "fen": "rnbq1rk1/ppp1ppbp/3p1np1/8/2PPP3/2N2N2/PP3PPP/R1BQKB1R w KQ - 2 6"
+        },
+        {
+          "position_number": 5,
+          "name": "尼姆佐印度",
+          "moves_san": "d4 Nf6 c4 e6 Nc3 Bb4 e3 O-O Bd3 d5",
+          "fen": "rnbq1rk1/ppp2ppp/4pn2/3p4/1bPP4/2NBP3/PP3PPP/R1BQK1NR w KQ - 0 6"
+        },
+        {
+          "position_number": 6,
+          "name": "格林菲爾德",
+          "moves_san": "d4 Nf6 c4 g6 Nc3 d5 cxd5 Nxd5 e4 Nxc3",
+          "fen": "rnbqkb1r/ppp1pp1p/6p1/8/3PP3/2n5/PP3PPP/R1BQKBNR w KQkq - 0 6"
+        },
+        {
+          "position_number": 7,
+          "name": "荷蘭",
+          "moves_san": "d4 f5 c4 Nf6 g3 e6 Bg2 Be7 Nf3 O-O",
+          "fen": "rnbq1rk1/ppppb1pp/4pn2/5p2/2PP4/5NP1/PP2PPBP/RNBQK2R w KQ - 4 6"
+        },
+        {
+          "position_number": 8,
+          "name": "斯堪地那維亞",
+          "moves_san": "e4 d5 exd5 Qxd5 Nc3 Qa5 d4 Nf6 Nf3 c6",
+          "fen": "rnb1kb1r/pp2pppp/2p2n2/q7/3P4/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 6"
+        }
+      ]
+    }
+  },
+  "source_configs": {
+    "baseline": {
+      "path": "configs/evaluation/stable.json",
+      "sha256": "b179217d3af516a63717febe79f9fc85d4f0dee1d34b461c0a4c0af083cce42d"
+    },
+    "candidate": {
+      "path": "configs/evaluation/example_tapered.json",
+      "sha256": "e8b4c1302b53980c29c641e8fedea59ce6735ce2365ec837196a24f70777ff4b"
+    }
+  },
+  "selection": "事先人工選取常見開局走法至第 5 回合黑方走完；兩組各含不同兵形、發展及交換，未依引擎結果篩選。比較盤面、輪到方、易位權及有效吃過路兵資訊，16 局面無重複。",
+  "limitations": "FEN 保留半回合計數及易位權等，沒有開局走法堆疊；先前重複局面歷史不帶入對戰。兩組局面獨立，但同源開局與小樣本並非統計獨立性保證。",
+  "decision_rule": "32 局只作初輪觀察與獨立組核對，不輸出 Elo 或信賴區間；不修改預設或權重。若跨組不一致或沒有一致優勢，維持關閉；若有值得追蹤的現象，另行擴大局面集及預算驗證。",
+  "environment": {
+    "python": "3.12.13",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu_count": 16
+  }
+}
