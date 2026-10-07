@@ -1,9 +1,10 @@
-"""Read-only comparison result screens, sharing the application's scaled controls."""
+"""比較設定、背景進度與結果頁，沿用主程式的縮放控制項。"""
 
 import json
 
 from engine.replay.comparison_catalog import ComparisonCatalog
 from ui.controls import MUTED, TEXT
+from ui.comparison_setup import ComparisonSetup, render_comparison_progress
 
 
 OUTCOMES = {"win": "勝", "draw": "和", "loss": "敗", "unfinished": "未完成"}
@@ -21,6 +22,8 @@ class ComparisonView:
         self.settings_side = None
         self.settings_offset = 0
         self.message = ""
+        self.creating = False
+        self.setup = ComparisonSetup(root.parent)
 
     @property
     def summary(self):
@@ -31,6 +34,31 @@ class ComparisonView:
         self.offset = max(0, min(self.offset + amount, max(0, total - self.PAGE_SIZE)))
 
     def action(self, action, app):
+        if action == "comparison_new":
+            if app.comparison_run and not app.comparison_run.future.done():
+                return
+            app.comparison_run = None
+            self.creating = True
+            self.setup = ComparisonSetup(self.catalog.root.parent)
+            return
+        if self.creating:
+            self.setup.action(action, app)
+            return
+        if action == "comparison_stop" and app.comparison_run:
+            app.comparison_run.stop()
+            return
+        if action == "comparison_watch" and app.comparison_run:
+            path = app.comparison_run.snapshot()["last_replay"]
+            if path:
+                app.open_replay(path)
+            return
+        if action == "comparison_finished" and app.comparison_run and app.comparison_run.future.done():
+            batch_id = app.comparison_run.snapshot()["batch_id"]
+            self.catalog.refresh()
+            self.selected = next((i for i, item in enumerate(self.catalog.entries) if item.batch_id == batch_id), None)
+            self.offset = 0
+            app.comparison_run = None
+            return
         if action == "comparison_refresh":
             self.catalog.refresh()
             self.selected = None
@@ -64,6 +92,13 @@ class ComparisonView:
                 self.message = app.message
 
     def render(self, app):
+        if self.creating:
+            app.text("棋力比較", 64, 80, large=True)
+            self.setup.render(app)
+            return
+        if app.comparison_run:
+            render_comparison_progress(app)
+            return
         app.text("棋力比較", 64, 80, large=True)
         if self.settings_side:
             self._settings(app)
@@ -83,17 +118,18 @@ class ComparisonView:
                     app.draw_label(app.small_font, error, (64, y + 8), COLORS["unfinished"], 772)
                     app.text("此批次無法顯示比較摘要；可用棋譜回放查找已保存棋局。", 64, y + 33, muted=True, width=772)
             if not total:
-                app.text("尚無比較結果。請先以比較 CLI 產生批次。", 64, 196, muted=True)
+                app.text("尚無比較結果。可建立新的固定深度比較。", 64, 196, muted=True)
             app.text(f"{len(entries)} 個比較批次　｜　{len(self.catalog.errors)} 筆資料問題", 64, 600, muted=True)
             app.button("comparison_refresh", "重新整理", (64, 672, 180, 40))
+            app.button("comparison_new", "新增比較", (258, 672, 180, 40), primary=True)
         else:
             app.text(f"{summary.batch_id}　{summary.name}", 64, 124, width=772)
             candidate, baseline = summary.participants["candidate"], summary.participants["baseline"]
             app.text(f"候選：{candidate['label']} ({candidate['strategy']})　vs　基準：{baseline['label']} ({baseline['strategy']})", 64, 157, width=772)
             status = {"completed": "完成", "generating": "產生中", "stopped": "已停止", "failed": "失敗"}.get(summary.status, summary.status)
             app.text(f"固定一般深度：{summary.budget['depth_plies']} ply　｜　批次：{status}　｜　對局總耗時：{summary.elapsed_seconds:.3f} 秒", 64, 190, width=772)
-            rate = "無資料" if summary.score_rate is None else f"{summary.score_rate:.1%}"
-            app.text(f"候選方：{summary.wins} 勝　{summary.draws} 和　{summary.losses} 敗　{summary.unfinished} 未完成　｜　得分率：{rate}", 64, 225, width=772)
+            rate = "無資料" if summary.paired_score_rate is None else f"{summary.paired_score_rate:.1%}"
+            app.text(f"候選方：{summary.wins} 勝　{summary.draws} 和　{summary.losses} 敗　{summary.unfinished} 未完成　｜　完整配對得分率：{rate}", 64, 225, width=772)
             completed = summary.wins + summary.draws + summary.losses
             x = 64
             for outcome, count in (("win", summary.wins), ("draw", summary.draws), ("loss", summary.losses)):
@@ -111,7 +147,8 @@ class ComparisonView:
                 if game.path is None:
                     label += "　棋譜缺漏"
                 app.button(f"comparison_game:{index}", label, (64, y, 772, 43), enabled=game.path is not None)
-            app.draw_label(app.small_font, self.message or "點選棋局回放。得分率僅計正常完成對局；小樣本不代表棋力提升。", (64, 610), MUTED, 772)
+            app.draw_label(app.small_font, f"完整配對：{summary.completed_pairs}　｜　不完整配對：{summary.incomplete_pairs}", (64, 596), MUTED, 772)
+            app.draw_label(app.small_font, self.message or summary.error or "點選棋局回放。得分率僅計兩局正常完成的配對；小樣本不代表棋力提升。", (64, 625), MUTED, 772)
             app.button("comparison_back", "返回批次清單", (64, 672, 200, 40))
             total = len(summary.games)
         app.button("comparison_prev", "上一頁", (460, 672, 180, 40), enabled=self.offset > 0)
@@ -120,7 +157,7 @@ class ComparisonView:
     def _settings(self, app):
         side = self.settings_side
         app.text("候選完整設定" if side == "candidate" else "基準完整設定", 64, 125)
-        # Wrap by rendered width so every saved value is reachable, including long strings.
+        # 依實際文字寬度換行，確保長字串也能完整讀取。
         lines = []
         for line in json.dumps(self.summary.participants[side], ensure_ascii=False, indent=2).splitlines():
             current = ""

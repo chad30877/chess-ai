@@ -20,6 +20,7 @@ from tests.helpers.executors import ManualExecutor
 from engine.replay.replay_catalog import ReplayCatalog
 from engine.evaluation.config import EvaluationConfig
 from engine.sessions.evaluation_comparison import ComparisonParticipant, run_evaluation_comparison
+from engine.sessions.comparison_run import ComparisonRun
 
 
 class ChessApplicationTest(unittest.TestCase):
@@ -374,6 +375,132 @@ class ChessApplicationTest(unittest.TestCase):
         self.assertIsNone(self.app.comparison_view.summary)
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
         self.assertEqual(self.app.mode, "home")
+
+    def prepare_comparison_configs(self):
+        folder = self.project / "configs/evaluation"
+        folder.mkdir(parents=True)
+        (folder / "stable.json").write_text(json.dumps(EvaluationConfig().to_dict()), encoding="utf-8")
+        (folder / "example_tapered.json").write_text(json.dumps(EvaluationConfig(phase_enabled=True).to_dict()), encoding="utf-8")
+
+    def enter_comparison_field(self, key, value):
+        self.click(f"comparison_field:{key}")
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
+        self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=value))
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+
+    def test_comparison_setup_background_save_and_results(self):
+        self.prepare_comparison_configs()
+        (self.project / "openings.txt").write_text("# 測試開局\n7k/6Q1/5K2/8/8/8/8/8 b - - 0 1\n", encoding="utf-8")
+        self.click("mode:comparison")
+        self.click("comparison_new")
+        self.enter_comparison_field("openings", "openings.txt")
+        self.enter_comparison_field("depth", "3")
+        self.enter_comparison_field("repetitions", "2")
+        self.enter_comparison_field("seed", "42")
+        self.enter_comparison_field("name", "UI 比較")
+        self.enter_comparison_field("tags", "smoke,phase")
+        self.click("comparison_start")
+        run = self.app.comparison_run
+        self.assertFalse(run.future.done())
+        self.app.render()
+        self.assertNotIn("comparison_start", {b.action for b in self.app.buttons})
+        self.assertIn("comparison_stop", {b.action for b in self.app.buttons})
+        # 啟動後修改來源檔，不應改變已解析的實際玩家設定。
+        (self.project / "configs/evaluation/example_tapered.json").write_text("{}", encoding="utf-8")
+        self.executor.finish()
+        self.assertEqual(run.snapshot()["completed_pairs"], 2)
+        self.click("comparison_finished")
+        summary = self.app.comparison_view.summary
+        self.assertEqual(summary.name, "UI 比較")
+        self.assertEqual(summary.budget["depth_plies"], 3)
+        self.assertTrue(summary.participants["candidate"]["evaluator"]["phase"]["enabled"])
+        manifest = json.loads((Path(run.snapshot()["path"]) / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["settings"]["comparison"]["base_seed"], 42)
+        self.assertIn("phase", manifest["tags"])
+
+    def test_comparison_setup_invalid_inputs_create_no_batch(self):
+        self.prepare_comparison_configs()
+        self.click("mode:comparison")
+        self.click("comparison_new")
+        for field, value in (("depth", "0"), ("seed", "-1"), ("repetitions", "0"),
+                             ("openings", "missing.txt"), ("max_plies", "-1")):
+            with self.subTest(field=field):
+                setup = self.app.comparison_view.setup
+                original = setup.values[field]
+                self.enter_comparison_field(field, value)
+                self.click("comparison_start")
+                self.assertIsNone(self.app.comparison_run)
+                self.assertIn("無法開始", setup.message)
+                self.assertFalse((self.project / "data/batches").exists())
+                setup.values[field] = original
+        self.click("comparison_file:baseline")
+        self.assertEqual(self.app.comparison_view.setup.baseline.name, "example_tapered.json")
+        for size in ((900, 768), APP_SIZE, (1800, 1536)):
+            self.app.resize(pygame.Surface(size))
+            self.app.render()
+            self.assertTrue(all(self.app.screen.get_rect().contains(button.rect) for button in self.app.buttons))
+
+    def test_comparison_leave_cancel_and_confirm_wait_for_save(self):
+        self.prepare_comparison_configs()
+        self.click("mode:comparison")
+        self.click("comparison_new")
+        self.click("comparison_start")
+        run = self.app.comparison_run
+        self.click("home")
+        self.assertEqual(run.snapshot()["status"], "running")
+        self.click("cancel")
+        self.assertIsNone(self.app.confirm_action)
+        self.app.handle_event(pygame.event.Event(pygame.QUIT))
+        self.click("confirm")
+        self.assertTrue(self.app.running)
+        self.assertEqual(self.app.pending_leave, "quit")
+        self.assertEqual(run.snapshot()["status"], "stopping")
+        self.executor.finish()
+        self.app.tick()
+        self.assertFalse(self.app.running)
+        self.assertEqual(run.snapshot()["status"], "stopped")
+
+    def test_comparison_watch_saved_game_during_run_and_stop(self):
+        self.prepare_comparison_configs()
+        (self.project / "openings.txt").write_text("7k/6Q1/5K2/8/8/8/8/8 b - - 0 1", encoding="utf-8")
+        self.click("mode:comparison")
+        self.click("comparison_new")
+        self.enter_comparison_field("openings", "openings.txt")
+        self.click("comparison_start")
+        progress = ComparisonRun._progress
+        watched = False
+        def watch(run, state):
+            nonlocal watched
+            progress(run, state)
+            if state["saved_games"] == 1 and not watched:
+                watched = True
+                self.click("comparison_watch")
+                self.assertEqual(self.app.mode, "replay")
+                self.click("comparison_results")
+                self.click("comparison_stop")
+        with patch.object(ComparisonRun, "_progress", watch):
+            self.executor.finish()
+        self.assertTrue(watched)
+        run = self.app.comparison_run
+        self.assertEqual(run.snapshot()["status"], "stopped")
+        self.click("comparison_finished")
+        self.assertEqual(self.app.comparison_view.summary.incomplete_pairs, 1)
+        self.assertIsNone(self.app.comparison_view.summary.paired_score_rate)
+
+    def test_comparison_worker_error_is_visible_and_saved(self):
+        self.prepare_comparison_configs()
+        self.click("mode:comparison")
+        self.click("comparison_new")
+        self.click("comparison_start")
+        with patch("engine.sessions.evaluation_comparison.play_game", side_effect=RuntimeError("測試搜尋錯誤")):
+            self.executor.finish()
+        self.assertEqual(self.app.comparison_run.snapshot()["status"], "failed")
+        self.assertIn("測試搜尋錯誤", self.app.comparison_run.snapshot()["error"])
+        self.click("comparison_finished")
+        summary = self.app.comparison_view.summary
+        self.assertEqual(summary.status, "failed")
+        self.assertIn("測試搜尋錯誤", summary.error)
+        self.assertEqual(summary.games, ())
 
 
 if __name__ == "__main__":

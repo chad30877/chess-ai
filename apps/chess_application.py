@@ -67,6 +67,7 @@ class ChessApplication:
         self.buttons: list[Button] = []
         self.browser: ReplayCatalog | None = None
         self.comparison_view: ComparisonView | None = None
+        self.comparison_run = None
         self.confirm_action: str | None = None
         self.confirm_was_running = False
         self.message = ""
@@ -106,6 +107,10 @@ class ChessApplication:
                   round(width * self.scale) if width else None)
 
     def close(self):
+        if self.comparison_run:
+            self.comparison_run.stop()
+            if self._owns_executor:
+                self.comparison_run.future.result()
         if self.batch:
             self.batch.stop()
             # Never cancel a queued batch: its worker must publish the final manifest.
@@ -122,6 +127,7 @@ class ChessApplication:
         self.mode = mode
         self.live = self.replay = self.replay_data = None
         self.batch = None
+        self.comparison_run = None
         self.saved_path = None
         self.numeric_focus = None
         self.browser = ReplayCatalog(PROJECT_ROOT / "data") if mode == "replay" else None
@@ -201,6 +207,8 @@ class ChessApplication:
             return None
 
     def needs_confirmation(self) -> bool:
+        if self.comparison_run and not self.comparison_run.future.done():
+            return True
         if self.batch and self.batch.snapshot()["status"] in ("running", "paused", "stopping"):
             return True
         return self.live is not None and (self.live.active or (bool(self.live.move_items) and not self.saved))
@@ -210,13 +218,19 @@ class ChessApplication:
             return
         if self.needs_confirmation():
             self.confirm_action = action
-            self.confirm_was_running = (self.batch.snapshot()["status"] if self.batch else self.live.status) == "running"
-            (self.batch or self.live).pause()
+            self.confirm_was_running = False
+            if not self.comparison_run:
+                self.confirm_was_running = (self.batch.snapshot()["status"] if self.batch else self.live.status) == "running"
+                (self.batch or self.live).pause()
             self.move_view.handle_mouse_up()
         else:
             self._leave(action)
 
     def _leave(self, action: str):
+        if self.comparison_run and not self.comparison_run.future.done():
+            self.comparison_run.stop()
+            self.pending_leave = action
+            return
         if self.batch and not self.batch.future.done():
             self.batch.stop()
             self.pending_leave = action
@@ -249,7 +263,8 @@ class ChessApplication:
         self.selected = square if self.live.legal_from(square) else None
 
     def tick(self):
-        if self.pending_leave and self.batch and self.batch.future.done():
+        worker = self.comparison_run or self.batch
+        if self.pending_leave and worker and worker.future.done():
             action, self.pending_leave = self.pending_leave, None
             self._leave(action)
         if self.live and self.mode in ("auto", "human") and not self.confirm_action and not self.promotions:
@@ -428,7 +443,30 @@ class ChessApplication:
             elif event.key == pygame.K_RETURN:
                 self._browser_action("browser_open")
             return
-        if self.mode == "comparison" and event.type in (pygame.KEYDOWN, pygame.MOUSEWHEEL):
+        setup = self.comparison_view.setup if self.mode == "comparison" and self.comparison_view and self.comparison_view.creating else None
+        if setup and setup.focus and not self.confirm_action and event.type in (pygame.TEXTINPUT, pygame.KEYDOWN):
+            if event.type == pygame.TEXTINPUT:
+                setup.draft += event.text
+            elif event.key == pygame.K_BACKSPACE:
+                setup.draft = setup.draft[:-1]
+            elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
+                setup.draft = ""
+            elif event.key == pygame.K_RETURN:
+                setup.commit()
+                pygame.key.stop_text_input()
+            elif event.key == pygame.K_ESCAPE:
+                setup.focus = None
+                pygame.key.stop_text_input()
+            return
+        if self.mode == "comparison" and not self.confirm_action and event.type in (pygame.KEYDOWN, pygame.MOUSEWHEEL):
+            if self.comparison_run:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.request_leave("home")
+                return
+            if self.comparison_view.creating:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.dispatch("comparison_cancel_setup")
+                return
             if event.type == pygame.MOUSEWHEEL:
                 action = "comparison_prev" if event.y > 0 else "comparison_next"
                 if self.comparison_view.settings_side:
@@ -630,7 +668,7 @@ class ChessApplication:
         if self.replay_is_local_game:
             self.button("export", "匯出本局", (x + 121, 320, 111, 38))
         else:
-            if self.comparison_view and self.comparison_view.summary:
+            if self.comparison_view and (self.comparison_view.summary or self.comparison_run):
                 self.button("comparison_results", "返回比較", (x + 121, 320, 111, 38))
             else:
                 self.button("sample", "範例棋譜", (x + 121, 320, 111, 38))
@@ -650,8 +688,8 @@ class ChessApplication:
     def _render_confirmation(self):
         self._modal((210, 260, 480, 230))
         self.text("離開目前對局？", 238, 287, large=True)
-        self.text("停止後將保留已保存對局與本局走法。" if self.batch else "未保存的棋譜將不會保留。", 238, 340)
-        self.text("確認後等待目前落子與保存完成。" if self.batch else "取消後可繼續，或先停止並保存棋譜。", 238, 373, muted=True)
+        self.text("停止後將保留已保存對局與本局走法。" if self.batch or self.comparison_run else "未保存的棋譜將不會保留。", 238, 340)
+        self.text("確認後等待停止與保存完成。" if self.batch or self.comparison_run else "取消後可繼續，或先停止並保存棋譜。", 238, 373, muted=True)
         self.button("cancel", "取消", (238, 428, 196, 40), primary=True)
         self.button("confirm", "確認離開", (454, 428, 208, 40))
 

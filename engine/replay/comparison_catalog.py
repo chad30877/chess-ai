@@ -7,6 +7,7 @@ from math import isfinite
 from pathlib import Path
 
 from engine.replay.replay_catalog import _inside
+from engine.sessions.evaluation_comparison import comparison_progress
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,10 @@ class ComparisonSummary:
     draws: int
     losses: int
     unfinished: int
+    completed_pairs: int
+    incomplete_pairs: int
+    paired_score_rate: float | None
+    error: str
 
     @property
     def score_rate(self) -> float | None:
@@ -140,9 +145,12 @@ def load_comparison(manifest_path: Path) -> ComparisonSummary:
                 "score": expected["losses"] + 0.5 * expected["draws"]}
     if comparison["stats"]["baseline"] != baseline:
         raise ValueError("基準方統計與逐局結果不一致")
+    progress = comparison_progress(comparison["pairs"])
     return ComparisonSummary(manifest["batch_id"], str(manifest.get("name", "")),
                              manifest["status"], participants, budget, tuple(games),
-                             counts["win"], counts["draw"], counts["loss"], counts["unfinished"])
+                             counts["win"], counts["draw"], counts["loss"], counts["unfinished"],
+                             progress["completed_pairs"], progress["incomplete_pairs"], progress["paired_score_rate"],
+                             str(manifest.get("error", "")))
 
 
 class ComparisonCatalog:
