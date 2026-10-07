@@ -1,4 +1,4 @@
-"""固定深度比較的設定欄位與背景執行進度。"""
+"""批次設定中的評分比較欄位；啟動與進度交由共用批次入口。"""
 
 import json
 from pathlib import Path
@@ -7,11 +7,10 @@ import chess
 import pygame
 
 from engine.evaluation.config import EvaluationConfig
-from engine.sessions.comparison_run import ComparisonRun
 from engine.sessions.evaluation_comparison import ComparisonParticipant, ComparisonSearchConfig, _normalized_positions
 
 
-class ComparisonSetup:
+class EvaluationFields:
     def __init__(self, project):
         self.project = project
         self.files = sorted((project / "configs/evaluation").glob("*.json"))
@@ -69,20 +68,8 @@ class ComparisonSetup:
             self.focus = action.split(":")[1]
             self.draft = self.values[self.focus]
             pygame.key.start_text_input()
-        elif action == "comparison_start":
-            try:
-                options = self.options()
-                app.comparison_run = ComparisonRun(options, app.executor)
-                app.comparison_view.creating = False
-                self.message = ""
-            except (OSError, ValueError, TypeError, KeyError) as exc:
-                self.message = f"無法開始比較：{exc}"
-        elif action == "comparison_cancel_setup":
-            self.commit()
-            app.comparison_view.creating = False
 
     def render(self, app):
-        app.text("固定深度評分比較", 64, 125)
         app.text("點選設定檔切換；文字欄位 Ctrl+A 清空，Enter 確認。", 64, 158, muted=True)
         fields = [("baseline", "基準設定檔"), ("candidate", "候選設定檔"),
                   ("openings", "開局集路徑（留白為標準開局）"), ("depth", "一般搜尋深度（ply）"),
@@ -100,28 +87,4 @@ class ComparisonSetup:
                 action = f"comparison_field:{key}"
             app.button(action, value, (x, y + 25, 376, 39), primary=self.focus == key)
         app.text(self.message or "雙方使用相同搜尋設定，交換黑白；和棋政策為不自動申請。", 64, 611, muted=True, width=772)
-        app.button("comparison_cancel_setup", "返回清單", (64, 672, 220, 40))
-        app.button("comparison_start", "開始背景比較", (460, 672, 376, 40), primary=True)
-
-
-def render_comparison_progress(app):
-    state = app.comparison_run.snapshot()
-    labels = {"running": "比較進行中（暫時結果）", "stopping": "正在停止並保存", "completed": "比較完成",
-              "stopped": "已停止", "failed": "比較失敗"}
-    app.text("棋力比較", 64, 80, large=True)
-    app.text(labels[state["status"]], 64, 139, large=True)
-    app.text(state["batch_id"] or "準備建立批次…", 64, 187, muted=True)
-    app.text(f"目前第 {state['current_game']} / {state['requested_games']} 局　｜　已保存 {state['saved_games']} 局", 64, 241)
-    app.text(f"正常完成 {state['completed_games']} 局　｜　未完成 {state['unfinished']} 局", 64, 285)
-    app.text(f"完整配對 {state['completed_pairs']}　｜　不完整配對 {state['incomplete_pairs']}　｜　預定 {state['requested_pairs']} 對", 64, 329)
-    rate = "無資料" if state["paired_score_rate"] is None else f"{state['paired_score_rate']:.1%}"
-    app.text(f"候選累積得分率：{rate}（僅含兩局正常完成的配對）", 64, 381, width=772)
-    app.text("背景對戰不等待棋盤動畫。停止時保留已落子的棋局與結果。", 64, 432, muted=True, width=772)
-    app.text(state["error"], 64, 494, width=772)
-    app.button("comparison_watch", "回放最近保存棋局", (64, 562, 376, 44), enabled=bool(state["last_replay"]))
-    active = not app.comparison_run.future.done()
-    if active:
-        app.button("comparison_stop", "停止並保存", (460, 562, 376, 44), enabled=state["status"] == "running")
-    else:
-        app.button("comparison_finished", "查看本批次結果", (460, 562, 376, 44), enabled=bool(state["path"]), primary=True)
-        app.button("comparison_new", "設定下一批比較", (64, 672, 376, 40))
+        app.button("start", "開始生成", (460, 672, 376, 40), primary=True)

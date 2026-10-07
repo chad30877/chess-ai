@@ -14,7 +14,9 @@ import pygame
 from apps.play_ui import build_move_items, build_replay_info, create_session, get_replay_data
 from engine.game import create_board
 from engine.storage.data_ids import TAIPEI, allocate_id, date_key, now_iso
-from engine.sessions.batch_run import BatchRun, BatchSettings
+from engine.sessions.batch_run import BatchSettings
+from engine.sessions.batch_execution import start_batch
+from ui.batch_setup import EvaluationFields
 from engine.replay.replay_catalog import ReplayCatalog, result_badges
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.replay.replay_loader import load_replay_json
@@ -67,7 +69,8 @@ class ChessApplication:
         self.buttons: list[Button] = []
         self.browser: ReplayCatalog | None = None
         self.comparison_view: ComparisonView | None = None
-        self.comparison_run = None
+        self.batch_mode = "general"
+        self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
         self.confirm_action: str | None = None
         self.confirm_was_running = False
         self.message = ""
@@ -107,10 +110,6 @@ class ChessApplication:
                   round(width * self.scale) if width else None)
 
     def close(self):
-        if self.comparison_run:
-            self.comparison_run.stop()
-            if self._owns_executor:
-                self.comparison_run.future.result()
         if self.batch:
             self.batch.stop()
             # Never cancel a queued batch: its worker must publish the final manifest.
@@ -127,7 +126,8 @@ class ChessApplication:
         self.mode = mode
         self.live = self.replay = self.replay_data = None
         self.batch = None
-        self.comparison_run = None
+        self.batch_mode = "general"
+        self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
         self.saved_path = None
         self.numeric_focus = None
         self.browser = ReplayCatalog(PROJECT_ROOT / "data") if mode == "replay" else None
@@ -146,10 +146,14 @@ class ChessApplication:
             return
         if self.mode == "auto":
             if self.batch is None:
-                self.batch = BatchRun(BatchSettings(white=self.white, black=self.black,
-                                                   games=self.game_count, interval=self.batch_interval),
-                                      PROJECT_ROOT / "data/batches", self.executor)
-                self.message = ""
+                try:
+                    settings = (self.evaluation_fields.options() if self.batch_mode == "evaluation"
+                                else BatchSettings(white=self.white, black=self.black,
+                                                   games=self.game_count, interval=self.batch_interval))
+                    self.batch = start_batch(self.batch_mode, settings, PROJECT_ROOT / "data/batches", self.executor)
+                    self.message = ""
+                except (OSError, ValueError, TypeError, KeyError) as exc:
+                    self.message = f"無法開始批次：{exc}"
             return
         if self.mode not in ("auto", "human") or self.live is not None:
             return
@@ -207,9 +211,7 @@ class ChessApplication:
             return None
 
     def needs_confirmation(self) -> bool:
-        if self.comparison_run and not self.comparison_run.future.done():
-            return True
-        if self.batch and self.batch.snapshot()["status"] in ("running", "paused", "stopping"):
+        if self.batch and not self.batch.future.done():
             return True
         return self.live is not None and (self.live.active or (bool(self.live.move_items) and not self.saved))
 
@@ -219,18 +221,18 @@ class ChessApplication:
         if self.needs_confirmation():
             self.confirm_action = action
             self.confirm_was_running = False
-            if not self.comparison_run:
-                self.confirm_was_running = (self.batch.snapshot()["status"] if self.batch else self.live.status) == "running"
-                (self.batch or self.live).pause()
+            if self.batch:
+                self.confirm_was_running = self.batch.can_pause and self.batch.snapshot()["status"] == "running"
+                if self.confirm_was_running:
+                    self.batch.pause()
+            elif self.live:
+                self.confirm_was_running = self.live.status == "running"
+                self.live.pause()
             self.move_view.handle_mouse_up()
         else:
             self._leave(action)
 
     def _leave(self, action: str):
-        if self.comparison_run and not self.comparison_run.future.done():
-            self.comparison_run.stop()
-            self.pending_leave = action
-            return
         if self.batch and not self.batch.future.done():
             self.batch.stop()
             self.pending_leave = action
@@ -243,7 +245,10 @@ class ChessApplication:
             mode = self.mode if action == "restart" else "home"
             if mode == "replay":
                 mode = "home"
+            batch_mode = self.batch_mode
             self.new_setup(mode)
+            if action == "restart" and mode == "auto":
+                self.batch_mode = batch_mode
 
     def click_square(self, square: chess.Square | None):
         if self.live is None or not self.live.human_turn or self.promotions:
@@ -263,7 +268,7 @@ class ChessApplication:
         self.selected = square if self.live.legal_from(square) else None
 
     def tick(self):
-        worker = self.comparison_run or self.batch
+        worker = self.batch
         if self.pending_leave and worker and worker.future.done():
             action, self.pending_leave = self.pending_leave, None
             self._leave(action)
@@ -304,12 +309,37 @@ class ChessApplication:
         if self.browser:
             self._browser_action(action)
             return
+        if action == "batch_progress" and self.batch:
+            self.mode = "auto"
+            return
+        if action == "batch_watch" and self.batch:
+            path = self.batch.snapshot()["last_replay"]
+            if path:
+                self.open_replay(path)
+            return
+        if action == "batch_results" and self.batch and self.batch.future.done():
+            self.comparison_view = ComparisonView(PROJECT_ROOT / "data")
+            batch_id = self.batch.snapshot()["batch_id"]
+            self.comparison_view.selected = next((i for i, item in enumerate(self.comparison_view.catalog.entries)
+                                                  if item.batch_id == batch_id), None)
+            self.mode = "comparison"
+            return
         if action == "comparison_results" and self.comparison_view:
             self.mode = "comparison"
             return
         if self.mode == "comparison" and action.startswith("comparison_"):
             self.comparison_view.action(action, self)
             return
+        if self.mode == "auto" and self.batch is None:
+            if action.startswith("batch_mode:"):
+                if self._commit_number():
+                    self.evaluation_fields.commit()
+                    self.batch_mode = action.split(":")[1]
+                    self.message = ""
+                return
+            if self.batch_mode == "evaluation" and action.startswith("comparison_"):
+                self.evaluation_fields.action(action, self)
+                return
         if action == "view_batch" and self.batch:
             batch_id = self.batch.snapshot()["batch_id"]
             self.browser = ReplayCatalog(PROJECT_ROOT / "data")
@@ -443,7 +473,7 @@ class ChessApplication:
             elif event.key == pygame.K_RETURN:
                 self._browser_action("browser_open")
             return
-        setup = self.comparison_view.setup if self.mode == "comparison" and self.comparison_view and self.comparison_view.creating else None
+        setup = self.evaluation_fields if self.mode == "auto" and self.batch is None and self.batch_mode == "evaluation" else None
         if setup and setup.focus and not self.confirm_action and event.type in (pygame.TEXTINPUT, pygame.KEYDOWN):
             if event.type == pygame.TEXTINPUT:
                 setup.draft += event.text
@@ -459,14 +489,6 @@ class ChessApplication:
                 pygame.key.stop_text_input()
             return
         if self.mode == "comparison" and not self.confirm_action and event.type in (pygame.KEYDOWN, pygame.MOUSEWHEEL):
-            if self.comparison_run:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    self.request_leave("home")
-                return
-            if self.comparison_view.creating:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    self.dispatch("comparison_cancel_setup")
-                return
             if event.type == pygame.MOUSEWHEEL:
                 action = "comparison_prev" if event.y > 0 else "comparison_next"
                 if self.comparison_view.settings_side:
@@ -668,8 +690,10 @@ class ChessApplication:
         if self.replay_is_local_game:
             self.button("export", "匯出本局", (x + 121, 320, 111, 38))
         else:
-            if self.comparison_view and (self.comparison_view.summary or self.comparison_run):
+            if self.comparison_view and self.comparison_view.summary:
                 self.button("comparison_results", "返回比較", (x + 121, 320, 111, 38))
+            elif self.batch:
+                self.button("batch_progress", "返回批次", (x + 121, 320, 111, 38))
             else:
                 self.button("sample", "範例棋譜", (x + 121, 320, 111, 38))
 
@@ -688,8 +712,8 @@ class ChessApplication:
     def _render_confirmation(self):
         self._modal((210, 260, 480, 230))
         self.text("離開目前對局？", 238, 287, large=True)
-        self.text("停止後將保留已保存對局與本局走法。" if self.batch or self.comparison_run else "未保存的棋譜將不會保留。", 238, 340)
-        self.text("確認後等待停止與保存完成。" if self.batch or self.comparison_run else "取消後可繼續，或先停止並保存棋譜。", 238, 373, muted=True)
+        self.text("停止後將保留已保存對局與本局走法。" if self.batch else "未保存的棋譜將不會保留。", 238, 340)
+        self.text("確認後等待停止與保存完成。" if self.batch else "取消後可繼續，或先停止並保存棋譜。", 238, 373, muted=True)
         self.button("cancel", "取消", (238, 428, 196, 40), primary=True)
         self.button("confirm", "確認離開", (454, 428, 208, 40))
 
@@ -702,42 +726,59 @@ class ChessApplication:
         self.button("cancel_promotion", "取消", (238, 410, 424, 40))
 
     def _render_batch(self):
-        self.text("批次自動對戰", 100, 120, large=True)
+        self.text("批次自動對戰", 64, 80, large=True)
         if self.batch is None:
-            self.text("固定白黑方配置；間隔是兩場之間的等待秒數。", 100, 166, muted=True)
-            fields = [("white", "白方", self.white), ("black", "黑方", self.black),
-                      ("interval", "場間間隔（秒）", f"{self.batch_interval:g}"),
-                      ("count", "場次", str(self.game_count))]
-            for index, (action, label, value) in enumerate(fields):
-                y = 225 + index * 64
-                self.text(label, 100, y + 9)
-                if self.numeric_focus == action:
-                    value = self.numeric_text + " |"
-                self.button(action, value, (340, y, 360, 44), primary=self.numeric_focus == action)
-            self.text("數字欄位可輸入，Ctrl+A 全選，Enter 確認。", 100, 510, muted=True)
-            self.button("start", "開始生成", (100, 564, 600, 48), primary=True)
-        else:
-            state = self.batch.snapshot()
-            status = state["status"]
-            labels = {"running": "生成中", "paused": "已暫停", "stopping": "正在停止並保存",
-                      "completed": "批次完成", "stopped": "已停止", "failed": "生成失敗"}
-            self.text(labels.get(status, status), 100, 202, large=True)
-            self.text(f"目前第 {state['current_game']} / {state['requested_games']} 場", 100, 280)
-            self.draw_rect(BORDER, (100, 330, 700, 22), border_radius=8)
-            width = round(700 * state["saved_games"] / state["requested_games"])
-            if width:
-                self.draw_rect(ACCENT, (100, 330, width, 22), border_radius=8)
-            self.text(f"已保存 {state['saved_games']} / {state['requested_games']} 場", 100, 380, muted=True)
-            self.text(state["batch_id"], 100, 418, muted=True)
-            if status in ("running", "paused", "stopping"):
-                self.button("pause", "繼續" if status == "paused" else "暫停", (100, 500, 330, 44), enabled=status != "stopping")
-                self.button("stop", "停止並保存", (470, 500, 330, 44), enabled=status != "stopping")
+            for index, (mode, title) in enumerate((("general", "一般對戰"), ("evaluation", "評分比較"))):
+                self.button("batch_mode:" + mode, title, (64 + index * 396, 125, 376, 32),
+                            primary=self.batch_mode == mode)
+            if self.batch_mode == "evaluation":
+                self.evaluation_fields.render(self)
             else:
-                self.button("view_batch", "查看本批次", (100, 500, 330, 44), primary=True, enabled=state["saved_games"] > 0)
-                self.button("restart", "重新設定", (470, 500, 330, 44))
-            if state["error"]:
-                self.text(state["error"], 100, 565, width=700)
-        self.text(self.message, 100, 642, width=700, muted=True)
+                self.text("固定白黑方配置；間隔是兩場之間的等待秒數。", 100, 166, muted=True)
+                fields = [("white", "白方", self.white), ("black", "黑方", self.black),
+                          ("interval", "場間間隔（秒）", f"{self.batch_interval:g}"),
+                          ("count", "場次", str(self.game_count))]
+                for index, (action, label, value) in enumerate(fields):
+                    y = 225 + index * 64
+                    self.text(label, 100, y + 9)
+                    if self.numeric_focus == action:
+                        value = self.numeric_text + " |"
+                    self.button(action, value, (340, y, 360, 44), primary=self.numeric_focus == action)
+                self.text("數字欄位可輸入，Ctrl+A 清空，Enter 確認。", 100, 510, muted=True)
+                self.button("start", "開始生成", (100, 564, 600, 48), primary=True)
+            self.text(self.message, 64, 642, width=772, muted=True)
+            return
+        state = self.batch.snapshot()
+        status = state["status"]
+        labels = {"running": "生成中（暫時結果）", "paused": "已暫停", "stopping": "正在停止並保存",
+                  "completed": "批次完成", "stopped": "已停止", "failed": "生成失敗"}
+        comparison = self.batch.mode == "evaluation"
+        self.text(("評分比較　｜　" if comparison else "一般對戰　｜　") + labels[status], 64, 139, large=True)
+        self.text(state["batch_id"] or "準備建立批次…", 64, 187, muted=True)
+        self.text(f"目前第 {state['current_game']} / {state['requested_games']} 局　｜　已保存 {state['saved_games']} 局", 64, 241)
+        self.draw_rect(BORDER, (64, 282, 772, 16), border_radius=6)
+        width = round(772 * state["saved_games"] / state["requested_games"])
+        if width:
+            self.draw_rect(ACCENT, (64, 282, width, 16), border_radius=6)
+        self.text(f"正常完成 {state['completed_games']} 局　｜　未完成 {state['unfinished']} 局", 64, 320)
+        if comparison:
+            self.text(f"完整配對 {state['completed_pairs']}　｜　不完整配對 {state['incomplete_pairs']}　｜　預定 {state['requested_pairs']} 對", 64, 362)
+            rate = "無資料" if state["paired_score_rate"] is None else f"{state['paired_score_rate']:.1%}"
+            self.text(f"候選累積得分率：{rate}（僅含兩局正常完成的配對）", 64, 404, width=772)
+        self.text("評分比較支援停止，不提供暫停；停止保留當盤已落子的走法。" if comparison else
+                  "一般對戰可在落子邊界暫停；停止保留當盤已落子的走法。", 64, 456, muted=True, width=772)
+        self.text(state["error"], 64, 505, width=772)
+        active = not self.batch.future.done()
+        if active:
+            if self.batch.can_pause:
+                self.button("pause", "繼續" if status == "paused" else "暫停", (64, 562, 240, 44), enabled=status != "stopping")
+            self.button("stop", "停止並保存", (596, 562, 240, 44), enabled=status in ("running", "paused"))
+        else:
+            self.button("batch_results" if comparison else "view_batch", "查看本批次結果" if comparison else "查看本批次棋譜",
+                        (460, 562, 376, 44), enabled=bool(state["path"]) if comparison else state["saved_games"] > 0, primary=True)
+            self.button("restart", "設定下一批", (64, 672, 376, 40))
+        self.button("batch_watch", "回放最近保存棋局", (64 if not active else 320, 562, 376 if not active else 260, 44),
+                    enabled=bool(state["last_replay"]))
 
     def _render_browser(self):
         browser = self.browser

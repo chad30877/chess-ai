@@ -399,17 +399,17 @@ class ChessApplicationTest(unittest.TestCase):
         self.enter_comparison_field("seed", "42")
         self.enter_comparison_field("name", "UI 比較")
         self.enter_comparison_field("tags", "smoke,phase")
-        self.click("comparison_start")
-        run = self.app.comparison_run
+        self.click("start")
+        run = self.app.batch
         self.assertFalse(run.future.done())
         self.app.render()
-        self.assertNotIn("comparison_start", {b.action for b in self.app.buttons})
-        self.assertIn("comparison_stop", {b.action for b in self.app.buttons})
+        self.assertNotIn("start", {b.action for b in self.app.buttons})
+        self.assertIn("stop", {b.action for b in self.app.buttons})
         # 啟動後修改來源檔，不應改變已解析的實際玩家設定。
         (self.project / "configs/evaluation/example_tapered.json").write_text("{}", encoding="utf-8")
         self.executor.finish()
         self.assertEqual(run.snapshot()["completed_pairs"], 2)
-        self.click("comparison_finished")
+        self.click("batch_results")
         summary = self.app.comparison_view.summary
         self.assertEqual(summary.name, "UI 比較")
         self.assertEqual(summary.budget["depth_plies"], 3)
@@ -418,6 +418,58 @@ class ChessApplicationTest(unittest.TestCase):
         self.assertEqual(manifest["settings"]["comparison"]["base_seed"], 42)
         self.assertIn("phase", manifest["tags"])
 
+    def test_shared_batch_entry_switches_fields_and_shortcut_preselects_mode(self):
+        self.prepare_comparison_configs()
+        self.click("mode:auto")
+        self.click("white")
+        self.app.game_count = 7
+        self.app.batch_interval = 0.25
+        self.click("batch_mode:evaluation")
+        self.assertEqual(self.app.mode, "auto")
+        self.enter_comparison_field("depth", "3")
+        self.app.render()
+        actions = {b.action for b in self.app.buttons}
+        self.assertNotIn("white", actions)
+        self.assertNotIn("count", actions)
+        self.assertNotIn("comparison_start", actions)
+        self.click("batch_mode:general")
+        self.assertEqual((self.app.white, self.app.game_count, self.app.batch_interval), ("Greedy", 7, 0.25))
+        self.click("batch_mode:evaluation")
+        self.assertEqual(self.app.evaluation_fields.options()["baseline"].search_config.depth_plies, 3)
+        self.click("home")
+        self.click("mode:comparison")
+        self.assertFalse(hasattr(self.app.comparison_view, "setup"))
+        self.click("comparison_new")
+        self.assertEqual((self.app.mode, self.app.batch_mode), ("auto", "evaluation"))
+        self.assertIsNone(self.app.comparison_view)
+        self.enter_comparison_field("max_plies", "0")
+        self.click("start")
+        self.app.render()
+        self.assertNotIn("pause", {b.action for b in self.app.buttons})
+        self.assertNotIn("batch_mode:general", {b.action for b in self.app.buttons})
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE))
+        self.assertEqual(self.app.batch.snapshot()["status"], "running")
+        self.executor.finish()
+        self.click("restart")
+        self.assertEqual((self.app.mode, self.app.batch_mode), ("auto", "evaluation"))
+
+    def test_settings_diff_uses_saved_settings_after_source_changes(self):
+        self.comparison_batch()
+        self.click("mode:comparison")
+        self.click("comparison_batch:0")
+        self.prepare_comparison_configs()
+        (self.project / "configs/evaluation/example_tapered.json").write_text("{}", encoding="utf-8")
+        self.click("comparison_settings:diff")
+        with patch.object(self.app, "draw_label", wraps=self.app.draw_label) as labels:
+            self.app.render()
+        text = "\n".join(str(call.args[1]) for call in labels.call_args_list)
+        self.assertIn('"phase"', text)
+        self.assertIn('"基準": false', text)
+        self.assertIn('"候選": true', text)
+        self.assertNotIn('"label"', text)
+        self.click("comparison_back")
+        self.assertIsNone(self.app.comparison_view.settings_side)
+
     def test_comparison_setup_invalid_inputs_create_no_batch(self):
         self.prepare_comparison_configs()
         self.click("mode:comparison")
@@ -425,16 +477,16 @@ class ChessApplicationTest(unittest.TestCase):
         for field, value in (("depth", "0"), ("seed", "-1"), ("repetitions", "0"),
                              ("openings", "missing.txt"), ("max_plies", "-1")):
             with self.subTest(field=field):
-                setup = self.app.comparison_view.setup
+                setup = self.app.evaluation_fields
                 original = setup.values[field]
                 self.enter_comparison_field(field, value)
-                self.click("comparison_start")
-                self.assertIsNone(self.app.comparison_run)
-                self.assertIn("無法開始", setup.message)
+                self.click("start")
+                self.assertIsNone(self.app.batch)
+                self.assertIn("無法開始", self.app.message)
                 self.assertFalse((self.project / "data/batches").exists())
                 setup.values[field] = original
         self.click("comparison_file:baseline")
-        self.assertEqual(self.app.comparison_view.setup.baseline.name, "example_tapered.json")
+        self.assertEqual(self.app.evaluation_fields.baseline.name, "example_tapered.json")
         for size in ((900, 768), APP_SIZE, (1800, 1536)):
             self.app.resize(pygame.Surface(size))
             self.app.render()
@@ -444,8 +496,8 @@ class ChessApplicationTest(unittest.TestCase):
         self.prepare_comparison_configs()
         self.click("mode:comparison")
         self.click("comparison_new")
-        self.click("comparison_start")
-        run = self.app.comparison_run
+        self.click("start")
+        run = self.app.batch
         self.click("home")
         self.assertEqual(run.snapshot()["status"], "running")
         self.click("cancel")
@@ -466,7 +518,7 @@ class ChessApplicationTest(unittest.TestCase):
         self.click("mode:comparison")
         self.click("comparison_new")
         self.enter_comparison_field("openings", "openings.txt")
-        self.click("comparison_start")
+        self.click("start")
         progress = ComparisonRun._progress
         watched = False
         def watch(run, state):
@@ -474,16 +526,16 @@ class ChessApplicationTest(unittest.TestCase):
             progress(run, state)
             if state["saved_games"] == 1 and not watched:
                 watched = True
-                self.click("comparison_watch")
+                self.click("batch_watch")
                 self.assertEqual(self.app.mode, "replay")
-                self.click("comparison_results")
-                self.click("comparison_stop")
+                self.click("batch_progress")
+                self.click("stop")
         with patch.object(ComparisonRun, "_progress", watch):
             self.executor.finish()
         self.assertTrue(watched)
-        run = self.app.comparison_run
+        run = self.app.batch
         self.assertEqual(run.snapshot()["status"], "stopped")
-        self.click("comparison_finished")
+        self.click("batch_results")
         self.assertEqual(self.app.comparison_view.summary.incomplete_pairs, 1)
         self.assertIsNone(self.app.comparison_view.summary.paired_score_rate)
 
@@ -491,12 +543,12 @@ class ChessApplicationTest(unittest.TestCase):
         self.prepare_comparison_configs()
         self.click("mode:comparison")
         self.click("comparison_new")
-        self.click("comparison_start")
+        self.click("start")
         with patch("engine.sessions.evaluation_comparison.play_game", side_effect=RuntimeError("測試搜尋錯誤")):
             self.executor.finish()
-        self.assertEqual(self.app.comparison_run.snapshot()["status"], "failed")
-        self.assertIn("測試搜尋錯誤", self.app.comparison_run.snapshot()["error"])
-        self.click("comparison_finished")
+        self.assertEqual(self.app.batch.snapshot()["status"], "failed")
+        self.assertIn("測試搜尋錯誤", self.app.batch.snapshot()["error"])
+        self.click("batch_results")
         summary = self.app.comparison_view.summary
         self.assertEqual(summary.status, "failed")
         self.assertIn("測試搜尋錯誤", summary.error)

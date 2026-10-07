@@ -1,10 +1,9 @@
-"""比較設定、背景進度與結果頁，沿用主程式的縮放控制項。"""
+"""既有比較批次的設定與結果檢視，生成捷徑導向批次設定。"""
 
 import json
 
 from engine.replay.comparison_catalog import ComparisonCatalog
 from ui.controls import MUTED, TEXT
-from ui.comparison_setup import ComparisonSetup, render_comparison_progress
 
 
 OUTCOMES = {"win": "勝", "draw": "和", "loss": "敗", "unfinished": "未完成"}
@@ -22,8 +21,6 @@ class ComparisonView:
         self.settings_side = None
         self.settings_offset = 0
         self.message = ""
-        self.creating = False
-        self.setup = ComparisonSetup(root.parent)
 
     @property
     def summary(self):
@@ -35,29 +32,8 @@ class ComparisonView:
 
     def action(self, action, app):
         if action == "comparison_new":
-            if app.comparison_run and not app.comparison_run.future.done():
-                return
-            app.comparison_run = None
-            self.creating = True
-            self.setup = ComparisonSetup(self.catalog.root.parent)
-            return
-        if self.creating:
-            self.setup.action(action, app)
-            return
-        if action == "comparison_stop" and app.comparison_run:
-            app.comparison_run.stop()
-            return
-        if action == "comparison_watch" and app.comparison_run:
-            path = app.comparison_run.snapshot()["last_replay"]
-            if path:
-                app.open_replay(path)
-            return
-        if action == "comparison_finished" and app.comparison_run and app.comparison_run.future.done():
-            batch_id = app.comparison_run.snapshot()["batch_id"]
-            self.catalog.refresh()
-            self.selected = next((i for i, item in enumerate(self.catalog.entries) if item.batch_id == batch_id), None)
-            self.offset = 0
-            app.comparison_run = None
+            app.new_setup("auto")
+            app.batch_mode = "evaluation"
             return
         if action == "comparison_refresh":
             self.catalog.refresh()
@@ -92,13 +68,6 @@ class ComparisonView:
                 self.message = app.message
 
     def render(self, app):
-        if self.creating:
-            app.text("棋力比較", 64, 80, large=True)
-            self.setup.render(app)
-            return
-        if app.comparison_run:
-            render_comparison_progress(app)
-            return
         app.text("棋力比較", 64, 80, large=True)
         if self.settings_side:
             self._settings(app)
@@ -139,6 +108,7 @@ class ComparisonView:
                     x += width
             app.button("comparison_settings:baseline", "基準完整設定", (64, 289, 220, 36))
             app.button("comparison_settings:candidate", "候選完整設定", (300, 289, 220, 36))
+            app.button("comparison_settings:diff", "設定差異", (536, 289, 220, 36))
             for row, index in enumerate(range(self.offset, min(len(summary.games), self.offset + self.PAGE_SIZE))):
                 game = summary.games[index]
                 y = 342 + row * 49
@@ -156,10 +126,28 @@ class ComparisonView:
 
     def _settings(self, app):
         side = self.settings_side
-        app.text("候選完整設定" if side == "candidate" else "基準完整設定", 64, 125)
+        app.text({"candidate": "候選完整設定", "baseline": "基準完整設定", "diff": "基準與候選設定差異"}[side], 64, 125)
+        if side == "diff":
+            def differences(left, right):
+                result = {}
+                for key in sorted(left.keys() | right.keys()):
+                    if key == "label":
+                        continue
+                    a, b = left.get(key), right.get(key)
+                    if isinstance(a, dict) and isinstance(b, dict):
+                        children = differences(a, b)
+                        if children:
+                            result[key] = children
+                    elif a != b:
+                        result[key] = {"基準": a, "候選": b}
+                return result
+            payload = differences(self.summary.participants["baseline"], self.summary.participants["candidate"])
+            payload = payload or {"說明": "雙方保存的設定相同（不比較名稱）"}
+        else:
+            payload = self.summary.participants[side]
         # 依實際文字寬度換行，確保長字串也能完整讀取。
         lines = []
-        for line in json.dumps(self.summary.participants[side], ensure_ascii=False, indent=2).splitlines():
+        for line in json.dumps(payload, ensure_ascii=False, indent=2).splitlines():
             current = ""
             for char in line:
                 if app.small_font.size(current + char)[0] > round(772 * app.scale):

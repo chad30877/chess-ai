@@ -1,10 +1,9 @@
-"""Background batch execution with cooperative pause and durable per-game saves."""
+"""一般批次的固定顏色政策與逐局保存，背景控制使用共用執行機制。"""
 
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from threading import Condition
-from time import monotonic
+from engine.sessions.batch_execution import BatchExecution
 
 import chess
 
@@ -42,60 +41,16 @@ class BatchSettings:
             raise ValueError("black_evaluation is only valid for Greedy")
 
 
-class BatchRun:
+class BatchRun(BatchExecution):
     def __init__(self, settings: BatchSettings, root: Path, executor):
         self.settings = settings
         self.root = root
-        self._condition = Condition()
-        self._paused = self._stopped = False
-        self._state = dict(status="running", current_game=0, saved_games=0,
-                           requested_games=settings.games, batch_id="", error="")
-        self.future = executor.submit(self._run)
-
-    def snapshot(self):
-        with self._condition:
-            return dict(self._state)
-
-    def pause(self):
-        with self._condition:
-            if self._state["status"] == "running":
-                self._paused = True
-                self._state["status"] = "paused"
-                self._condition.notify_all()
-
-    def resume(self):
-        with self._condition:
-            if self._paused and not self._stopped:
-                self._paused = False
-                self._state["status"] = "running"
-                self._condition.notify_all()
-
-    def stop(self):
-        with self._condition:
-            if self._state["status"] in ("running", "paused"):
-                self._stopped = True
-                self._state["status"] = "stopping"
-                self._condition.notify_all()
-
-    def _control(self):
-        with self._condition:
-            while self._paused and not self._stopped:
-                self._condition.wait()
-            return not self._stopped
+        super().__init__(executor, requested_games=settings.games)
 
     def _interval(self):
-        remaining = self.settings.interval
-        with self._condition:
-            while remaining > 0 and not self._stopped:
-                if self._paused:
-                    self._condition.wait()
-                    continue
-                start = monotonic()
-                self._condition.wait(timeout=remaining)
-                remaining -= monotonic() - start
-        return self._control()
+        return self._wait_interval(self.settings.interval)
 
-    def _run(self):
+    def _execute(self):
         s = self.settings
         templates = {
             "white": self._create_player(
@@ -111,36 +66,33 @@ class BatchRun:
                         color_assignment="fixed", interval_seconds=s.interval, workers=1)
         if s.max_plies is not None:
             settings["max_plies"] = s.max_plies
-        try:
-            with BatchWriter(self.root, name=None, tags=[], settings={"num_games": s.games, **settings}) as writer:
-                with self._condition:
-                    self._state["batch_id"] = writer.batch_id
-                for number in range(1, s.games + 1):
-                    if not self._control():
-                        break
-                    with self._condition:
-                        self._state["current_game"] = number
-                    seed = random.SystemRandom().randrange(2**63)
-                    rng = random.Random(seed)
-                    game = play_game(
-                        number,
-                        self._create_player(s.white, rng, s.white_evaluation, s.claim_draw),
-                        self._create_player(s.black, rng, s.black_evaluation, s.claim_draw),
-                        s.white, s.black, initial_fen=s.initial_fen,
-                        claim_draw=s.claim_draw, max_plies=s.max_plies, control=self._control,
-                    )
-                    writer.add_game(game, seed=seed)
-                    with self._condition:
-                        self._state["saved_games"] = number
-                    if number < s.games and not self._interval():
-                        break
-                if self._stopped:
-                    writer.manifest["status"] = "stopped"
-            with self._condition:
-                self._state["status"] = writer.manifest["status"]
-        except Exception as exc:
-            with self._condition:
-                self._state.update(status="failed", error=f"{type(exc).__name__}: {exc}")
+        with BatchWriter(self.root, name=None, tags=[], settings={"num_games": s.games, **settings}) as writer:
+            self._progress(dict(batch_id=writer.batch_id, path=str(writer.path)))
+            for number in range(1, s.games + 1):
+                if not self._control():
+                    break
+                self._progress(dict(current_game=number))
+                seed = random.SystemRandom().randrange(2**63)
+                rng = random.Random(seed)
+                game = play_game(
+                    number,
+                    self._create_player(s.white, rng, s.white_evaluation, s.claim_draw),
+                    self._create_player(s.black, rng, s.black_evaluation, s.claim_draw),
+                    s.white, s.black, initial_fen=s.initial_fen,
+                    claim_draw=s.claim_draw, max_plies=s.max_plies, control=self._control,
+                )
+                game_id = writer.add_game(game, seed=seed)
+                counts = writer.manifest["counts"]
+                self._progress(dict(saved_games=counts["saved_games"],
+                                    completed_games=counts["completed_games"],
+                                    unfinished=counts["saved_games"] - counts["completed_games"],
+                                    last_replay=str(writer.path / "replays" / f"{game_id}.json")))
+                if number < s.games and not self._interval():
+                    break
+            if self._stopped:
+                writer.manifest["status"] = "stopped"
+        self._progress(dict(status=writer.manifest["status"]))
+        return writer.path
 
     @staticmethod
     def _create_player(
