@@ -133,6 +133,7 @@ class ComparisonResult:
     path: Path
     candidate_stats: ComparisonStats
     baseline_stats: ComparisonStats
+    candidate_results: tuple[ComparisonStats, ...] = ()
 
 
 def _normalized_positions(initial_fens: list[str] | tuple[str, ...]) -> list[str]:
@@ -210,7 +211,8 @@ class _ControlledPlayer:
 def run_evaluation_comparison(
     *,
     baseline: ComparisonParticipant,
-    candidate: ComparisonParticipant,
+    candidate: ComparisonParticipant | None = None,
+    candidates: list[ComparisonParticipant] | tuple[ComparisonParticipant, ...] | None = None,
     initial_fens: list[str] | tuple[str, ...] = (chess.STARTING_FEN,),
     repetitions: int = 1,
     base_seed: int = 10_000,
@@ -226,11 +228,17 @@ def run_evaluation_comparison(
 ) -> ComparisonResult:
     """交換黑白比較，支援進度通知、合作式停止與逐局保存。"""
 
-    if not isinstance(baseline, ComparisonParticipant) or not isinstance(
-        candidate, ComparisonParticipant,
-    ):
-        raise ValueError("baseline and candidate must be ComparisonParticipant values")
-    if baseline.label == candidate.label:
+    if not isinstance(baseline, ComparisonParticipant):
+        raise ValueError("baseline must be a ComparisonParticipant")
+    if candidates is None:
+        candidates = (candidate,) if candidate is not None else ()
+    elif candidate is not None:
+        raise ValueError("Use candidate or candidates, not both")
+    candidates = tuple(candidates)
+    if not candidates or any(not isinstance(side, ComparisonParticipant) for side in candidates):
+        raise ValueError("At least one candidate ComparisonParticipant is required")
+    labels = [baseline.label, *(side.label for side in candidates)]
+    if len(set(labels)) != len(labels):
         raise ValueError("Baseline and candidate labels must be different")
     if isinstance(repetitions, bool) or not isinstance(repetitions, int) or repetitions <= 0:
         raise ValueError("repetitions must be greater than 0")
@@ -248,21 +256,21 @@ def run_evaluation_comparison(
     from engine.sessions.batch_workers import participant_payload
 
     positions = _normalized_positions(initial_fens)
-    evaluated = [side for side in (baseline, candidate) if side.strategy != "random"]
-    if len(evaluated) == 2 and (
-        evaluated[0].strategy != evaluated[1].strategy
-        or evaluated[0].search_config != evaluated[1].search_config
-    ):
+    evaluated = [side for side in (baseline, *candidates) if side.strategy != "random"]
+    if evaluated and any(side.strategy != evaluated[0].strategy or side.search_config != evaluated[0].search_config
+           for side in evaluated[1:]):
         raise ValueError("Evaluation comparisons require identical strategies and search settings")
     budget = dict(FIXED_DEPTH_BUDGET)
     pair_count = len(positions) * repetitions
+    work_count = pair_count * len(candidates)
     requested_workers = workers
-    workers = actual_workers(workers, pair_count)
-    participant_settings = {
-        "baseline": baseline.settings_snapshot(claim_draw=claim_draw),
-        "candidate": candidate.settings_snapshot(claim_draw=claim_draw),
-    }
-    actual_searches = [settings["search"] for settings in participant_settings.values()
+    workers = actual_workers(workers, work_count)
+    candidate_settings = [side.settings_snapshot(claim_draw=claim_draw) for side in candidates]
+    participant_settings = {"baseline": baseline.settings_snapshot(claim_draw=claim_draw),
+                            "candidate": candidate_settings[0]}
+    for index, candidate_setting in enumerate(candidate_settings):
+        participant_settings[f"candidate_{index + 1}"] = candidate_setting
+    actual_searches = [settings["search"] for settings in [participant_settings["baseline"], *candidate_settings]
                        if settings["strategy"] == "AlphaBeta"]
     if actual_searches:
         if any(search != actual_searches[0] for search in actual_searches):
@@ -270,19 +278,26 @@ def run_evaluation_comparison(
         if actual_searches[0]["claim_draw"] != claim_draw:
             raise ValueError("Actual AlphaBeta draw policy must match game rules")
         budget["depth_plies"] = actual_searches[0]["max_depth"]
-    settings = {
-        "num_games": pair_count * 2,
-        "comparison": {
-            "schema_version": COMPARISON_SCHEMA_VERSION,
+    multi_candidate = len(candidates) > 1
+    stored_participants = ({"baseline": participant_settings["baseline"], "candidates": candidate_settings}
+                           if multi_candidate else
+                           {"baseline": participant_settings["baseline"], "candidate": candidate_settings[0]})
+    comparison_settings = {
+            "schema_version": 3 if multi_candidate else COMPARISON_SCHEMA_VERSION,
             "kind": "evaluation",
             "pairing": "same_position_color_swap",
-            "participants": participant_settings,
+            "participants": stored_participants,
             "budget": budget,
             "base_seed": base_seed,
-            "seed_derivation": "base_seed + pair_number - 1; reset for each color-swapped game",
+            "seed_derivation": ("base_seed + pair_number - 1; reset for each color-swapped game and candidate"
+                                if multi_candidate else
+                                "base_seed + pair_number - 1; reset for each color-swapped game"),
             "initial_fens": positions,
             "repetitions": repetitions,
-        },
+        }
+    settings = {
+        "num_games": work_count * 2,
+        "comparison": comparison_settings,
         "rules": {"claim_draw": claim_draw},
         "color_assignment": "paired_swap",
         "workers": workers, "requested_workers": requested_workers, "publication_order": "arrival",
@@ -295,19 +310,30 @@ def run_evaluation_comparison(
     stopped = False
     current_game = 0
     last_replay = None
-    work_progress = dict(waiting_work=pair_count, running_work=0, finished_work=0, finished_games=0,
+    work_progress = dict(waiting_work=work_count, running_work=0, finished_work=0, finished_games=0,
                          requested_workers=requested_workers, actual_workers=workers)
     writer = BatchWriter(Path(batch_root), name=name, tags=tagged, settings=settings)
 
+    def stats_for(index):
+        outcomes = [game["candidate_outcome"] for pair in pair_records
+                    if pair.get("candidate_index", 0) == index for game in pair["games"]]
+        return _stats(outcomes)
+
     def publish():
-        outcomes = [game["candidate_outcome"] for pair in pair_records for game in pair["games"]]
-        candidate_stats = _stats(outcomes)
+        candidate_stats = stats_for(0)
+        all_stats = [stats_for(index) for index in range(len(candidates))]
         payload = {
-            "schema_version": COMPARISON_SCHEMA_VERSION, "batch_id": writer.batch_id,
-            "kind": "evaluation", "budget": budget, "participants": participant_settings,
+            "schema_version": 3 if multi_candidate else COMPARISON_SCHEMA_VERSION, "batch_id": writer.batch_id,
+            "kind": "evaluation", "budget": budget,
+            "participants": stored_participants,
             "pairs": pair_records,
-            "stats": {"candidate": candidate_stats.to_dict(), "baseline": _baseline_stats(candidate_stats).to_dict()},
-            "progress": comparison_progress(pair_records),
+            "stats": ({"candidates": [stat.to_dict() for stat in all_stats],
+                       "baseline": _baseline_stats(_stats([g["candidate_outcome"] for p in pair_records
+                           for g in p["games"]])).to_dict()} if multi_candidate else
+                      {"candidate": candidate_stats.to_dict(), "baseline": _baseline_stats(candidate_stats).to_dict()}),
+            "progress": ({"candidates": [comparison_progress([p for p in pair_records
+                          if p.get("candidate_index", 0) == index]) for index in range(len(candidates))]}
+                          if multi_candidate else comparison_progress(pair_records)),
             "note": "小樣本只驗證比較流程，不能證明棋力提升。",
         }
         if "comparison" not in writer.manifest["files"]:
@@ -319,26 +345,30 @@ def run_evaluation_comparison(
     def notify(status="running"):
         if progress:
             progress(dict(batch_id=writer.batch_id, path=str(writer.path), status=status,
-                          requested_games=pair_count * 2, requested_pairs=pair_count,
+                          requested_games=work_count * 2, requested_pairs=work_count,
                           current_game=current_game, last_replay=last_replay,
                           **comparison_progress(pair_records), **work_progress))
 
-    def save(number, game, seed, elapsed_seconds):
+    def save(number, candidate_index, game, seed, elapsed_seconds):
         nonlocal last_replay
         logical_number = game.game_id
         candidate_is_white = logical_number % 2 == 0
-        position_index = (number - 1) // repetitions
-        pair = next((p for p in pair_records if p["pair_number"] == number), None)
+        pair_number = (number - 1) % pair_count + 1
+        position_index = (pair_number - 1) // repetitions
+        pair = next((p for p in pair_records if p["pair_number"] == pair_number
+                     and p.get("candidate_index", 0) == candidate_index), None)
         if pair is None:
-            pair = dict(pair_number=number, position_index=position_index + 1,
-                        repetition=(number - 1) % repetitions + 1, initial_fen=positions[position_index],
+            pair = dict(pair_number=pair_number, position_index=position_index + 1,
+                        repetition=(pair_number - 1) % repetitions + 1, initial_fen=positions[position_index],
                         seed=seed, games=[])
+            if multi_candidate:
+                pair.update(candidate_index=candidate_index, candidate_label=candidates[candidate_index].label)
         game = replace(game, game_id=writer.manifest["counts"]["saved_games"] + 1)
         stored_game_id = writer.add_game(game, seed=seed,
                                         execution=dict(work_number=number, game_number=logical_number))
         if pair not in pair_records:
             pair_records.append(pair)
-            pair_records.sort(key=lambda p: p["pair_number"])
+        pair_records.sort(key=lambda p: (p.get("candidate_index", 0), p["pair_number"]))
         outcome = _game_outcome_for_candidate(game, candidate_is_white)
         pair["games"].append(dict(
             game_number=game.game_id, task_game_number=logical_number, game_id=stored_game_id,
@@ -358,61 +388,72 @@ def run_evaluation_comparison(
         notify()
 
     def make_work(number):
-        return dict(number=number, kind="evaluation", seed=base_seed + number - 1,
-                    initial_fen=positions[(number - 1) // repetitions], claim_draw=claim_draw, max_plies=max_plies,
-                    baseline=participant_payload(baseline), candidate=participant_payload(candidate),
-                    participant_settings=participant_settings)
+        candidate_index = (number - 1) // pair_count
+        pair_number = (number - 1) % pair_count + 1
+        return dict(number=number, kind="evaluation", seed=base_seed + pair_number - 1,
+                    initial_fen=positions[(pair_number - 1) // repetitions], claim_draw=claim_draw, max_plies=max_plies,
+                    baseline=participant_payload(baseline), candidate=participant_payload(candidates[candidate_index]),
+                    candidate_index=candidate_index,
+                    participant_settings={"baseline": participant_settings["baseline"],
+                                          "candidate": candidate_settings[candidate_index]})
 
     with writer:
         try:
             publish()
             notify()
             if workers > 1:
-                stopped = run_parallel(work_count=pair_count, workers=workers, make_work=make_work,
-                                       on_game=save, progress=parallel_progress, control=control,
+                stopped = run_parallel(work_count=work_count, workers=workers, make_work=make_work,
+                                       on_game=lambda number, game, seed, elapsed: save(
+                                           number, (number - 1) // pair_count, game, seed, elapsed),
+                                       progress=parallel_progress, control=control,
                                        bind_control=_bind_process_control)
             else:
-                pair_number = 0
-                for position_index, initial_fen in enumerate(positions, 1):
-                    for repetition in range(1, repetitions + 1):
-                        if control is not None and not control():
-                            stopped = True
-                            break
-                        pair_number += 1
-                        pair_seed = base_seed + pair_number - 1
-                        work_progress.update(waiting_work=pair_count - pair_number, running_work=1)
-                        arrangements = ((baseline, candidate, False), (candidate, baseline, True))
-                        for white, black, candidate_is_white in arrangements:
+                for candidate_index, candidate_participant in enumerate(candidates):
+                    pair_number = 0
+                    for position_index, initial_fen in enumerate(positions, 1):
+                        for repetition in range(1, repetitions + 1):
                             if control is not None and not control():
                                 stopped = True
                                 break
-                            current_game += 1
+                            pair_number += 1
+                            pair_seed = base_seed + pair_number - 1
+                            task_number = candidate_index * pair_count + pair_number
+                            work_progress.update(waiting_work=work_count - task_number, running_work=1)
+                            arrangements = ((baseline, candidate_participant, False),
+                                            (candidate_participant, baseline, True))
+                            for white, black, candidate_is_white in arrangements:
+                                if control is not None and not control():
+                                    stopped = True
+                                    break
+                                current_game += 1
+                                notify()
+                                rng = random.Random(pair_seed)
+                                white_player = white.create_player(rng, claim_draw=claim_draw)
+                                black_player = black.create_player(rng, claim_draw=claim_draw)
+                                for participant, player in ((white, white_player), (black, black_player)):
+                                    key = "candidate" if participant is candidate_participant else "baseline"
+                                    if participant.settings_snapshot(player=player) != participant_settings[key]:
+                                        raise ValueError("Actual player settings changed during comparison")
+                                if control is not None:
+                                    white_player = _ControlledPlayer(white_player, control)
+                                    black_player = _ControlledPlayer(black_player, control)
+                                started = perf_counter()
+                                game_options = dict(initial_fen=initial_fen, claim_draw=claim_draw, max_plies=max_plies)
+                                if control is not None:
+                                    game_options["control"] = control
+                                game = play_game(current_game, white_player, black_player, white.label, black.label,
+                                                 **game_options)
+                                elapsed_seconds = perf_counter() - started
+                                save(task_number, candidate_index, game, pair_seed, elapsed_seconds)
+                                work_progress.update(finished_games=len([g for p in pair_records for g in p["games"]]))
+                                notify()
+                                if game.termination == "user_stop":
+                                    stopped = True
+                                    break
+                            work_progress.update(running_work=0, finished_work=task_number)
                             notify()
-                            rng = random.Random(pair_seed)
-                            white_player = white.create_player(rng, claim_draw=claim_draw)
-                            black_player = black.create_player(rng, claim_draw=claim_draw)
-                            for participant, player in ((white, white_player), (black, black_player)):
-                                key = "candidate" if participant is candidate else "baseline"
-                                if participant.settings_snapshot(player=player) != participant_settings[key]:
-                                    raise ValueError("Actual player settings changed during comparison")
-                            if control is not None:
-                                white_player = _ControlledPlayer(white_player, control)
-                                black_player = _ControlledPlayer(black_player, control)
-                            started = perf_counter()
-                            game_options = dict(initial_fen=initial_fen, claim_draw=claim_draw, max_plies=max_plies)
-                            if control is not None:
-                                game_options["control"] = control
-                            game = play_game(current_game, white_player, black_player, white.label, black.label,
-                                             **game_options)
-                            elapsed_seconds = perf_counter() - started
-                            save(pair_number, game, pair_seed, elapsed_seconds)
-                            work_progress.update(finished_games=len([g for p in pair_records for g in p["games"]]))
-                            notify()
-                            if game.termination == "user_stop":
-                                stopped = True
+                            if stopped:
                                 break
-                        work_progress.update(running_work=0, finished_work=pair_number)
-                        notify()
                         if stopped:
                             break
                     if stopped:
@@ -423,4 +464,6 @@ def run_evaluation_comparison(
             # 即使當盤失敗，也發布先前成功保存的配對與棋局。
             candidate_stats = publish()
     notify(writer.manifest["status"])
-    return ComparisonResult(writer.path, candidate_stats, _baseline_stats(candidate_stats))
+    candidate_results = tuple(stats_for(index) for index in range(len(candidates)))
+    combined = _stats([g["candidate_outcome"] for pair in pair_records for g in pair["games"]])
+    return ComparisonResult(writer.path, candidate_stats, _baseline_stats(combined), candidate_results)
