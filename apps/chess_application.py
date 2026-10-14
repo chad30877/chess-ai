@@ -13,6 +13,7 @@ import chess
 import pygame
 
 from apps.play_ui import build_move_items, create_session, get_replay_data
+from engine.evaluation.config import EvaluationConfig
 from engine.game import create_board
 from engine.evaluation.config import EvaluationConfig
 from engine.evaluation.evaluator import HandcraftedEvaluator, MaterialEvaluator
@@ -57,6 +58,12 @@ class ChessApplication:
         self.replay_is_local_game = False
         self.white, self.black = "Random", "Greedy"
         self.human_color, self.opponent = chess.WHITE, "Greedy"
+        self.live_evaluation_files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
+        self.live_evaluation_file = next(
+            (path for path in self.live_evaluation_files if path.name == "stable.json"),
+            self.live_evaluation_files[0] if self.live_evaluation_files else None,
+        )
+        self.live_search_depth = 2
         self.interval = 1.0
         self.batch_interval = 0.0
         self.batch_workers = 4
@@ -186,8 +193,28 @@ class ChessApplication:
         white, black = self.white, self.black
         if self.mode == "human":
             white, black = ("Human", self.opponent) if self.human_color else (self.opponent, "Human")
-        self.live = LiveSession(LiveSettings(white=white, black=black,
-                                            seed=random.SystemRandom().randrange(2**63), interval=self.interval))
+        evaluation = None
+        if self.mode == "human" and self.opponent in ("Greedy", "AlphaBeta"):
+            try:
+                if self.live_evaluation_file is None:
+                    raise ValueError("找不到 configs/evaluation 評分設定檔")
+                evaluation = EvaluationConfig.from_dict(
+                    json.loads(self.live_evaluation_file.read_text(encoding="utf-8")),
+                )
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                self.message = f"無法載入評分設定檔：{exc}"
+                return
+        white_evaluation = evaluation if white in ("Greedy", "AlphaBeta") else None
+        black_evaluation = evaluation if black in ("Greedy", "AlphaBeta") else None
+        self.live = LiveSession(LiveSettings(
+            white=white,
+            black=black,
+            seed=random.SystemRandom().randrange(2**63),
+            interval=self.interval,
+            white_evaluation=white_evaluation,
+            black_evaluation=black_evaluation,
+            search_depth=self.live_search_depth,
+        ))
         self.live.start(self.now())
         self.saved = False
         self.message = ""
@@ -486,7 +513,17 @@ class ChessApplication:
         elif action == "flip":
             self.flipped = not self.flipped
         elif action in ("white", "black", "opponent") and self.live is None:
-            setattr(self, action, "Greedy" if getattr(self, action) == "Random" else "Random")
+            if action == "opponent":
+                options = ("Random", "Greedy", "AlphaBeta")
+                self.opponent = options[(options.index(self.opponent) + 1) % len(options)]
+            else:
+                setattr(self, action, "Greedy" if getattr(self, action) == "Random" else "Random")
+        elif action == "live_evaluation" and self.live is None and self.live_evaluation_files:
+            current = self.live_evaluation_files.index(self.live_evaluation_file)
+            self.live_evaluation_file = self.live_evaluation_files[(current + 1) % len(self.live_evaluation_files)]
+        elif action == "live_depth" and self.live is None:
+            depths = (1, 2, 3, 4, 5)
+            self.live_search_depth = depths[(depths.index(self.live_search_depth) + 1) % len(depths)]
         elif action == "color" and self.live is None:
             self.human_color = not self.human_color
             self.flipped = not self.human_color
@@ -772,20 +809,29 @@ class ChessApplication:
         if self.mode == "auto":
             fields = [("white", "白方", self.white), ("black", "黑方", self.black)]
         else:
+            opponent_name = "Alpha-Beta" if self.opponent == "AlphaBeta" else self.opponent
             fields = [("color", "我執", "白方" if self.human_color else "黑方"),
-                      ("opponent", "對手", self.opponent)]
-        fields.append(("interval", "間隔", f"{self.interval:g} 秒"))
+                      ("opponent", "對手", opponent_name),
+                      ("live_evaluation", "評分設定", self.live_evaluation_file.name
+                       if self.live_evaluation_file else "沒有設定檔")]
+            if self.opponent == "AlphaBeta":
+                fields.append(("live_depth", "搜尋深度", str(self.live_search_depth)))
+            fields.append(("interval", "間隔", f"{self.interval:g} 秒"))
         for i, (action, label, value) in enumerate(fields):
-            y = 119 + i * 46
+            y = 112 + i * 42 if self.mode == "human" else 119 + i * 46
             self.text(label, x, y + 7)
-            self.button(action, value, (x + 56, y, 176, 36))
-        self.button("start", "開始對戰", (x, 270, 232, 42), primary=True)
-        self.text("點選設定可切換選項", x, 324, muted=True)
-        self.draw_label(self.small_font, "和棋政策：不自動申請", (x, 352), MUTED)
+            self.button(action, value, (x + 70, y, 162, 36) if self.mode == "human" else (x + 56, y, 176, 36))
+        start_y = 322 if self.mode == "human" else 270
+        self.button("start", "開始對戰", (x, start_y, 232, 42), primary=True)
+        if self.mode == "human":
+            self.draw_label(self.small_font, "點選設定切換；深度選項為 1–5", (x, 373), MUTED, 232)
+        else:
+            self.text("點選設定可切換選項", x, start_y + 51, muted=True)
+            self.draw_label(self.small_font, "和棋政策：不自動申請", (x, start_y + 79), MUTED)
 
     def _render_live_panel(self, x):
         session = self.live
-        player_name = lambda name: "真人" if name == "Human" else name
+        player_name = lambda name: {"Human": "真人", "AlphaBeta": "Alpha-Beta"}.get(name, name)
         self.text("白方：" + player_name(session.settings.white), x, 114)
         self.text("黑方：" + player_name(session.settings.black), x, 144)
         self.text(self._status_text(), x, 178, width=232)

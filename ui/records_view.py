@@ -166,15 +166,22 @@ class RecordsView:
         summary, comparison = self.summary, self.summary.comparison
         app.text(f"{KINDS[summary.kind]}　{summary.batch_id}　{summary.name}", 64, 124, width=772)
         if comparison:
-            candidate, baseline = comparison.participants["candidate"], comparison.participants["baseline"]
-            app.text(f"候選：{candidate['label']} ({candidate['strategy']})　vs　基準：{baseline['label']} ({baseline['strategy']})", 64, 157, width=772)
-            app.text(f"固定一般深度：{comparison.budget['depth_plies']} ply　｜　狀態：{present(STATES.get(summary.status, summary.status))}　｜　對局總耗時：{elapsed(summary.elapsed_seconds)}", 64, 190, width=772)
-            rate = "無資料" if comparison.paired_score_rate is None else f"{comparison.paired_score_rate:.1%}"
+            baseline = comparison.participants["baseline"]
+            app.text(f"基準：{baseline['label']} ({baseline['strategy']})　｜　固定一般深度：{comparison.budget['depth_plies']} ply", 64, 157, width=772)
+            app.text(f"狀態：{present(STATES.get(summary.status, summary.status))}　｜　對局總耗時：{elapsed(comparison.elapsed_seconds)}", 64, 190, width=772)
             counts = dict(win=comparison.wins, draw=comparison.draws, loss=comparison.losses, unfinished=comparison.unfinished)
-            app.text(f"候選方：{counts['win']} 勝　{counts['draw']} 和　{counts['loss']} 敗　{counts['unfinished']} 未完成　｜　完整配對得分率：{rate}", 64, 225, width=772)
-            for x, side, label in ((64, "baseline", "基準完整設定"), (258, "candidate", "候選完整設定"), (452, "diff", "設定差異"), (646, "all", "批次保存設定")):
-                app.button("records_settings:" + side, label, (x, 289, 180, 36))
-            footer = f"完整配對：{comparison.completed_pairs}　｜　不完整配對：{comparison.incomplete_pairs}"
+            for index, candidate in enumerate(comparison.candidate_summaries[:7]):
+                x = 64 + (index % 2) * 390
+                y = 222 + (index // 2) * 27
+                rate = "無資料" if candidate["paired_score_rate"] is None else f"{candidate['paired_score_rate']:.1%}"
+                app.draw_label(app.small_font,
+                               f"{candidate['label']}　{candidate['wins']}/{candidate['draws']}/{candidate['losses']}　得分率 {rate}　不完整 {candidate['incomplete_pairs']}",
+                               (x, y), TEXT, 380)
+            if len(comparison.candidate_summaries) > 7:
+                app.draw_label(app.small_font, f"另有 {len(comparison.candidate_summaries) - 7} 份候選，完整快照見批次保存設定。", (64, 303), MUTED, 772)
+            for x, side, label in ((64, "baseline", "基準完整設定"), (258, "candidate", "首份候選設定"), (452, "diff", "設定差異"), (646, "all", "批次保存設定")):
+                app.button("records_settings:" + side, label, (x, 322, 180, 36))
+            footer = "候選各自計算；得分率不含未完成配對。"
         else:
             def players(side):
                 values = list(dict.fromkeys(game.white if side == "white" else game.black for game in summary.games))
@@ -189,23 +196,24 @@ class RecordsView:
             app.text(f"白勝 {counts['win']}　｜　和 {counts['draw']}　｜　黑勝 {counts['loss']}　｜　未完成 {counts['unfinished']}　｜　結果未記錄或損壞 {counts['unknown']}", 64, 225, width=772)
             app.button("records_settings:all", "保存設定", (64, 289, 220, 36))
             footer = f"已保存棋局：{len(summary.games)}"
-        completed = sum(counts[k] for k in ("win", "draw", "loss"))
-        x = 64
-        for kind in ("win", "draw", "loss"):
-            width = 772 * counts[kind] / completed if completed else 0
-            if width:
-                app.draw_rect(COLORS[kind], (x, 260, width, 14))
-                x += width
+        if not comparison:
+            completed = sum(counts[k] for k in ("win", "draw", "loss"))
+            x = 64
+            for kind in ("win", "draw", "loss"):
+                width = 772 * counts[kind] / completed if completed else 0
+                if width:
+                    app.draw_rect(COLORS[kind], (x, 260, width, 14))
+                    x += width
         games = self.options
         for row, index in enumerate(range(self.offset, min(len(games), self.offset + self.PAGE_SIZE))):
-            self._game_row(app, games[index], index, 342 + row * 49, comparison)
+            self._game_row(app, games[index], index, (370 if comparison else 342) + row * 43, comparison)
         app.draw_label(app.small_font, footer + f"　｜　日期：{self.date or '全部'}　｜　本頁 {self.offset + 1 if games else 0}–{min(len(games), self.offset + self.PAGE_SIZE)} / {len(games)} 局", (64, 596), MUTED, 772)
-        hint = "得分率僅計完整配對；小樣本不代表棋力提升。點選棋局回放。" if comparison else "點選棋局回放；設定與統計均來自保存資料。"
+        hint = "得分率僅計各候選的完整配對；結果不作最佳設定排名。點選棋局回放。" if comparison else "點選棋局回放；設定與統計均來自保存資料。"
         app.draw_label(app.small_font, self.message or summary.error or hint, (64, 625), MUTED, 772)
         app.button("records_back", "返回紀錄清單", (64, 672, 200, 40))
 
     def _game_row(self, app, game, index, y, comparison):
-        detail = (f"候選執{'白' if game.candidate_color == 'white' else '黑'}　{OUTCOMES[game.outcome]}" if comparison
+        detail = (f"{game.candidate_label}執{'白' if game.candidate_color == 'white' else '黑'}　{OUTCOMES[game.outcome]}" if comparison
                   else f"{time_label(game.started_at)}　{present(game.white)}／{present(game.black)}　{RESULTS[game.result_kind]}")
         app.button(f"records_game:{index}", "", (64, y, 772, 43), enabled=game.path is not None,
                    primary=game.game_id == self.selected_game)
