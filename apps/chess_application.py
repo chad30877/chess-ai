@@ -2,6 +2,7 @@
 
 import json
 import random
+import re
 import sqlite3
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -25,6 +26,7 @@ from ui.board_view import BOARD_PIXELS, WINDOW_HEIGHT, BoardView
 from ui.controls import ACCENT, BACKGROUND, BORDER, MUTED, PANEL, TEXT, Button, draw_text, ui_font
 from ui.move_list_view import MOVE_LIST_WIDTH, MoveListView
 from ui.records_view import RecordsView
+from ui.replay_evaluation_editor import GROUPS, ReplayEvaluationEditor, TERM_LABELS
 
 HEADER_HEIGHT = 56
 LOGICAL_SIZE = (900, 768)
@@ -73,8 +75,10 @@ class ChessApplication:
         self.replay_return = None
         self.replay_record = None
         self.replay_evaluator = None
+        self.replay_evaluator_saved = False
         self._replay_breakdown = None
         self._replay_breakdown_ply = -1
+        self.replay_editor: ReplayEvaluationEditor | None = None
         self.records_return_mode = None
         self.batch_mode = "general"
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
@@ -193,7 +197,8 @@ class ChessApplication:
         items = build_move_items(data["initial_fen"], data["moves_uci"])
         session, _ = create_session(data)
         self.replay, self.replay_data, self.replay_items = session, data, items
-        self.replay_evaluator = self._replay_static_evaluator(data)
+        self.replay_evaluator, self.replay_evaluator_saved = self._replay_static_evaluator(data)
+        self.replay_editor = None
         self._replay_breakdown = None
         self._replay_breakdown_ply = -1
         self.replay_source, self.replay_is_local_game = source, local_game
@@ -207,8 +212,40 @@ class ChessApplication:
 
     @staticmethod
     def _replay_static_evaluator(data):
-        strategies = data.get("metadata", {}).get("strategies", {})
-        for color in ("white", "black"):
+        metadata = data.get("metadata", {})
+        strategies = metadata.get("strategies", {}) if isinstance(metadata, dict) else {}
+        if not isinstance(strategies, dict) or not strategies:
+            batch_id = metadata.get("batch_id") if isinstance(metadata, dict) else None
+            if isinstance(batch_id, str) and batch_id and Path(batch_id).name == batch_id:
+                batches = (PROJECT_ROOT / "data/batches").resolve()
+                manifest_path = (batches / batch_id / "manifest.json").resolve()
+                if manifest_path.is_relative_to(batches) and manifest_path.is_file():
+                    try:
+                        settings = json.loads(manifest_path.read_text(encoding="utf-8")).get("settings", {})
+                        strategies = settings.get("strategies", {})
+                        comparison = settings.get("comparison", {})
+                        participants = comparison.get("participants", {})
+                        if isinstance(participants, dict) and participants:
+                            white_player = metadata.get("white_player")
+                            black_player = metadata.get("black_player")
+                            strategies = {
+                                "white": next((p for p in participants.values()
+                                               if p.get("label") == white_player), {}),
+                                "black": next((p for p in participants.values()
+                                               if p.get("label") == black_player), {}),
+                            }
+                    except (OSError, ValueError, TypeError, AttributeError):
+                        strategies = {}
+        colors = ("white", "black")
+        if isinstance(metadata, dict) and metadata.get("white_player"):
+            white_name = metadata["white_player"]
+            white_strategy = strategies.get("white", {}) if isinstance(strategies, dict) else {}
+            black_strategy = strategies.get("black", {}) if isinstance(strategies, dict) else {}
+            white_strategy = white_strategy if isinstance(white_strategy, dict) else {}
+            black_strategy = black_strategy if isinstance(black_strategy, dict) else {}
+            if white_strategy.get("strategy") in (None, "Random") and black_strategy.get("evaluator"):
+                colors = ("black", "white")
+        for color in colors:
             strategy = strategies.get(color, {}) if isinstance(strategies, dict) else {}
             settings = strategy.get("evaluator") if isinstance(strategy, dict) else None
             if not isinstance(settings, dict):
@@ -218,18 +255,20 @@ class ChessApplication:
             try:
                 config = EvaluationConfig.from_dict(config_data)
                 if evaluator_type == "material":
-                    return MaterialEvaluator(config.piece_values)
+                    return MaterialEvaluator(config.piece_values), True
                 if evaluator_type == "handcrafted":
-                    return HandcraftedEvaluator(config=config)
+                    return HandcraftedEvaluator(config=config), True
             except (TypeError, ValueError):
                 continue
-        return HandcraftedEvaluator()
+        return HandcraftedEvaluator(), False
 
     def _current_replay_breakdown(self):
-        if self.replay is None or self.replay_evaluator is None:
+        evaluator = (HandcraftedEvaluator(config=self.replay_editor.config)
+                     if self.replay_editor is not None else self.replay_evaluator)
+        if self.replay is None or evaluator is None:
             return None
         if self._replay_breakdown_ply != self.replay.current_ply:
-            self._replay_breakdown = self.replay_evaluator.evaluate_breakdown(
+            self._replay_breakdown = evaluator.evaluate_breakdown(
                 self.replay.current_board(),
             )
             self._replay_breakdown_ply = self.replay.current_ply
@@ -346,6 +385,35 @@ class ChessApplication:
         return [], 0
 
     def dispatch(self, action: str):
+        if self.replay_editor is not None and action.startswith("editor_"):
+            editor = self.replay_editor
+            if editor.focus is not None and action not in ("editor_discard",):
+                if not editor.commit_edit():
+                    return
+                self._replay_breakdown_ply = -1
+                pygame.key.stop_text_input()
+            if action == "editor_discard":
+                editor.cancel_edit()
+                self.replay_editor = None
+                self._replay_breakdown_ply = -1
+                pygame.key.stop_text_input()
+            elif action == "editor_save":
+                self._save_replay_evaluation()
+            elif action.startswith("editor_group:"):
+                group = action.split(":", 1)[1]
+                editor.expanded[group] = not editor.expanded[group]
+            elif action.startswith("editor_toggle:"):
+                editor.toggle(action.split(":", 1)[1])
+                self._replay_breakdown_ply = -1
+            elif action.startswith("editor_field:"):
+                editor.begin_edit(action.split(":", 1)[1])
+                pygame.key.start_text_input()
+            return
+        if self.replay_editor is not None and action == "replay_edit":
+            if self.replay_evaluator is not None and self.replay_evaluator_saved:
+                self.replay_editor = ReplayEvaluationEditor(self.replay_evaluator.config)
+                self._replay_breakdown_ply = -1
+            return
         if self.confirm_action:
             if action == "confirm":
                 pending = self.confirm_action
@@ -495,6 +563,33 @@ class ChessApplication:
         if event.type == pygame.VIDEORESIZE:
             self.resize(pygame.display.set_mode((max(900, event.w), max(768, event.h)), pygame.RESIZABLE))
             return
+        if self.replay_editor is not None:
+            editor = self.replay_editor
+            if editor.focus is not None and event.type == pygame.TEXTINPUT:
+                editor.input_draft += event.text
+                return
+            if editor.focus is not None and event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    editor.input_draft = editor.input_draft[:-1]
+                elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
+                    editor.input_draft = ""
+                elif event.key == pygame.K_RETURN:
+                    if editor.commit_edit():
+                        pygame.key.stop_text_input()
+                        self._replay_breakdown_ply = -1
+                elif event.key == pygame.K_ESCAPE:
+                    editor.cancel_edit()
+                    pygame.key.stop_text_input()
+                return
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                self.dispatch("editor_discard")
+                return
+            if event.type == pygame.MOUSEWHEEL:
+                editor.scroll = max(0, min(editor.scroll + (3 if event.y < 0 else -3),
+                                           max(0, len(self._replay_editor_rows()) - 14)))
+                return
+            if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
+                return
         if self.numeric_focus and event.type in (pygame.TEXTINPUT, pygame.KEYDOWN):
             if event.type == pygame.TEXTINPUT:
                 self.numeric_text += event.text
@@ -563,6 +658,8 @@ class ChessApplication:
                 if button.enabled and button.rect.collidepoint(event.pos):
                     self.dispatch(button.action)
                     return
+            if self.replay_editor is not None:
+                return
             if self.confirm_action or self.promotions:
                 return
             if self.mode == "records":
@@ -657,6 +754,8 @@ class ChessApplication:
         hint = "← → 前後一步　Home / End 起終點　F 翻轉" if self.mode == "replay" else (
             "點選棋子與目的格；Esc 回首頁，F 翻轉" if self.mode == "human" else "Space 暫停／繼續　F 翻轉　Esc 回首頁")
         self.draw_label(self.small_font, self.message or hint, (14, 737), MUTED, 610)
+        if self.mode == "replay" and self.replay_editor is not None:
+            self._render_replay_editor()
 
     def _status_text(self):
         if self.mode == "replay":
@@ -710,6 +809,8 @@ class ChessApplication:
         label = datetime.fromisoformat(timestamp).astimezone(TAIPEI).strftime("%Y-%m-%d %H:%M:%S") if date_key(timestamp) != "日期不詳" else "日期時間不詳"
         self.draw_label(self.small_font, label if self.replay_data else "尚未選擇對局", (x, 113), MUTED, 230)
         if self.replay_data:
+            self.button("replay_edit", "調整評分", (x + 118, 68, 114, 32),
+                        enabled=self.replay_evaluator_saved)
             metadata = self.replay_data.get("metadata", {})
             info = {key: metadata.get(key) or "未記錄" for key in ("white_player", "black_player", "game_id")}
             result = self.replay_record.result if self.replay_record is not None else self.replay_data.get("result")
@@ -733,6 +834,106 @@ class ChessApplication:
                 self.button("batch_progress", "返回批次", (x + 121, 526, 111, 34))
             else:
                 self.button("sample", "範例棋譜", (x + 121, 526, 111, 34))
+
+    def _replay_editor_rows(self):
+        editor = self.replay_editor
+        if editor is None:
+            return []
+        rows = []
+        fields = editor.fields()
+        for key, label, terms in GROUPS:
+            rows.append(("group", key, label, None, None))
+            if editor.expanded[key]:
+                rows.extend(("field", field[2], field[1], field[3], field[4])
+                            for field in fields if field[0] == key)
+        return rows
+
+    def _save_replay_evaluation(self):
+        editor = self.replay_editor
+        if editor is None:
+            return
+        if not editor.commit_edit():
+            return
+        name = editor.name.strip()
+        if name.lower().endswith(".json"):
+            name = name[:-5]
+        if not name or not re.fullmatch(r"[\w.-]+", name, flags=re.UNICODE) or name in (".", ".."):
+            editor.message = "請輸入不含路徑的設定檔名稱。"
+            return
+        path = PROJECT_ROOT / "configs/evaluation" / f"{name}.json"
+        try:
+            with path.open("x", encoding="utf-8") as stream:
+                json.dump(editor.config.to_dict(), stream, ensure_ascii=False, indent=2)
+                stream.write("\n")
+        except FileExistsError:
+            editor.message = "同名設定檔已存在，請更換名稱。"
+            return
+        except OSError as exc:
+            editor.message = f"無法保存設定檔：{exc}"
+            return
+        self.replay_editor = None
+        self.replay_evaluator = HandcraftedEvaluator(config=editor.config)
+        self.evaluation_fields.files = sorted(set([*self.evaluation_fields.files, path]))
+        self._replay_breakdown_ply = -1
+        self.message = f"已另存評分設定：{name}.json"
+
+    def _render_replay_editor(self):
+        editor = self.replay_editor
+        if editor is None:
+            return
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 175))
+        self.screen.blit(overlay, (0, 0))
+        self.draw_rect(PANEL, (24, 64, 852, 640), border_radius=10)
+        self.draw_rect(BORDER, (24, 64, 852, 640), 1, border_radius=10)
+        self.buttons = []
+        self.text("調整回放評分", 48, 79, large=True)
+        self.draw_label(self.small_font, "設定名稱", (48, 125), MUTED)
+        name_value = (editor.input_draft + " |" if editor.focus == "name" else editor.name or "點此輸入新設定檔名稱")
+        self.button("editor_field:name", name_value, (48, 148, 360, 38), primary=editor.focus == "name")
+        self.draw_label(self.small_font, "即時局面靜態評分（白方／兵）", (48, 202), MUTED, 370)
+        breakdown = self._current_replay_breakdown()
+        if breakdown is not None:
+            self.draw_label(self.title_font, f"總分：{breakdown.total_score!r}", (48, 230), TEXT, 360)
+            terms = [(key, term) for key, term in breakdown.terms.items() if term.enabled]
+            maximum = max((abs(term.contribution) for _, term in terms), default=1.0) or 1.0
+            center_x = self.point(246, 0)[0]
+            half = round(54 * self.scale)
+            for index, (key, term) in enumerate(terms):
+                y = 278 + index * 21
+                self.draw_label(self.evaluation_font, TERM_LABELS.get(key, key), (48, y), TEXT, 82)
+                row_y = self.point(246, y + 7)[1]
+                pygame.draw.line(self.screen, BORDER, (center_x, row_y - 5), (center_x, row_y + 5), 1)
+                width = round(half * min(1.0, abs(term.contribution) / maximum))
+                if width:
+                    color = (110, 203, 146) if term.contribution > 0 else (231, 119, 119)
+                    left = center_x if term.contribution > 0 else center_x - width
+                    pygame.draw.rect(self.screen, color, pygame.Rect(left, row_y - 2, width, 5))
+                self.draw_label(self.evaluation_font, f"{term.contribution:+}" if term.contribution else "0.0",
+                                (310, y), TEXT, 88)
+
+        self.draw_label(self.small_font, "現有評分項；點選數值修改，滾輪瀏覽。", (455, 122), MUTED, 398)
+        rows = self._replay_editor_rows()
+        start, visible = 158, 15
+        for row_index, row in enumerate(rows[editor.scroll:editor.scroll + visible]):
+            kind, key, label, value, field_kind = row
+            y = start + row_index * 30
+            if kind == "group":
+                marker = "▼" if editor.expanded[key] else "▶"
+                self.button(f"editor_group:{key}", f"{marker} {label}", (455, y, 398, 27))
+            else:
+                self.draw_label(self.small_font, label, (468, y + 5), TEXT, 182)
+                if field_kind == "toggle":
+                    display = "開啟" if value else "關閉"
+                    action = f"editor_toggle:{key}"
+                else:
+                    display = editor.input_draft + " |" if editor.focus == key else repr(value)
+                    action = f"editor_field:{key}"
+                self.button(action, display, (654, y, 199, 27), primary=editor.focus == key)
+        if editor.message:
+            self.draw_label(self.small_font, editor.message, (48, 650), (239, 184, 89), 390)
+        self.button("editor_discard", "放棄草稿", (568, 650, 136, 36))
+        self.button("editor_save", "另存設定檔", (716, 650, 137, 36), primary=True)
 
     def _render_replay_evaluation(self, x):
         breakdown = self._current_replay_breakdown()
