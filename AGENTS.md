@@ -7,3 +7,13 @@
 - tests/TESTING.md 以盡量簡單的方式講述檔案在做什麼測試
 - README、docs、註解及 Git commit message 使用繁體中文。
 - 每次改動完成後建立 Git commit，並簡單說明人工測試方式。
+`r`n## Agent skills
+
+### Issue tracker
+
+Issues 和規格使用 GitHub Issues 管理，操作方式見 `docs/agents/issue-tracker.md`。
+
+### Domain docs
+
+採用 single-context 根目錄文件配置，消費規則見 `docs/agents/domain.md`。
+
