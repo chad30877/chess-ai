@@ -7,10 +7,12 @@ from dataclasses import dataclass
 import chess
 
 from engine.evaluation.config import EvaluationConfig
+from engine.evaluation.evaluator import HandcraftedEvaluator
 from engine.game import create_board, get_legal_moves, get_outcome, make_move
 from engine.storage.data_ids import now_iso
 from engine.strategy_config import strategy_config
-from engine.players import GreedyPlayer, RandomPlayer
+from engine.players import AlphaBetaPlayer, GreedyPlayer, RandomPlayer
+from engine.search import SearchLimits
 
 
 @dataclass(frozen=True)
@@ -24,20 +26,25 @@ class LiveSettings:
     max_plies: int | None = None
     white_evaluation: EvaluationConfig | None = None
     black_evaluation: EvaluationConfig | None = None
+    search_depth: int = 2
 
     def __post_init__(self):
-        if self.white not in ("Random", "Greedy", "Human") or self.black not in ("Random", "Greedy", "Human"):
+        players = ("Random", "Greedy", "AlphaBeta", "Human")
+        if self.white not in players or self.black not in players:
             raise ValueError("Unsupported player")
         if self.interval < 0 or (self.max_plies is not None and self.max_plies < 0):
             raise ValueError("Execution limits must be non-negative")
+        if isinstance(self.search_depth, bool) or not isinstance(self.search_depth, int) or self.search_depth < 1:
+            raise ValueError("search_depth must be a positive integer")
         if self.white_evaluation is not None and not isinstance(self.white_evaluation, EvaluationConfig):
             raise ValueError("white_evaluation must be an EvaluationConfig")
         if self.black_evaluation is not None and not isinstance(self.black_evaluation, EvaluationConfig):
             raise ValueError("black_evaluation must be an EvaluationConfig")
-        if self.white != "Greedy" and self.white_evaluation is not None:
-            raise ValueError("white_evaluation is only valid for Greedy")
-        if self.black != "Greedy" and self.black_evaluation is not None:
-            raise ValueError("black_evaluation is only valid for Greedy")
+        evaluated_players = ("Greedy", "AlphaBeta")
+        if self.white not in evaluated_players and self.white_evaluation is not None:
+            raise ValueError("white_evaluation is only valid for an evaluated player")
+        if self.black not in evaluated_players and self.black_evaluation is not None:
+            raise ValueError("black_evaluation is only valid for an evaluated player")
 
 
 class LiveSession:
@@ -61,7 +68,7 @@ class LiveSession:
         }
         self.players = {
             color: self._create_player(
-                name, rng, evaluations[color], settings.claim_draw,
+                name, rng, evaluations[color], settings.claim_draw, settings.search_depth,
             ) if name != "Human" else None
             for color, name in ((chess.WHITE, settings.white), (chess.BLACK, settings.black))
         }
@@ -76,11 +83,19 @@ class LiveSession:
         rng: random.Random,
         evaluation: EvaluationConfig | None,
         claim_draw: bool,
-    ) -> RandomPlayer | GreedyPlayer:
+        search_depth: int,
+    ) -> RandomPlayer | GreedyPlayer | AlphaBetaPlayer:
         if name == "Random":
             return RandomPlayer(rng=rng)
         if name == "Greedy":
             return GreedyPlayer(config=evaluation, rng=rng, claim_draw=claim_draw)
+        if name == "AlphaBeta":
+            config = evaluation if evaluation is not None else EvaluationConfig()
+            return AlphaBetaPlayer.from_evaluator(
+                HandcraftedEvaluator(config=config),
+                limits=SearchLimits(max_depth=search_depth),
+                claim_draw=claim_draw,
+            )
         raise ValueError(f"Unsupported AI player: {name}")
 
     @property
