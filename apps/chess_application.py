@@ -14,6 +14,8 @@ import pygame
 from apps.play_ui import build_move_items, create_session, get_replay_data
 from engine.evaluation.config import EvaluationConfig
 from engine.game import create_board
+from engine.evaluation.config import EvaluationConfig
+from engine.evaluation.evaluator import HandcraftedEvaluator, MaterialEvaluator
 from engine.storage.data_ids import TAIPEI, allocate_id, date_key, now_iso
 from engine.sessions.batch_run import BatchSettings
 from engine.sessions.batch_execution import start_batch
@@ -77,6 +79,9 @@ class ChessApplication:
         self.records_view: RecordsView | None = None
         self.replay_return = None
         self.replay_record = None
+        self.replay_evaluator = None
+        self._replay_breakdown = None
+        self._replay_breakdown_ply = -1
         self.records_return_mode = None
         self.batch_mode = "general"
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
@@ -100,7 +105,9 @@ class ChessApplication:
                                     origin_x=self.origin[0], square_size=round(80 * self.scale))
         self.move_view = MoveListView(screen, *self.point(640, 392), round(376 * self.scale), self.scale)
         self.move_view.scroll_offset = old_scroll
-        self.font, self.small_font, self.title_font = [ui_font(round(n * self.scale)) for n in (18, 15, 28)]
+        self.font, self.small_font, self.title_font, self.evaluation_font = [
+            ui_font(round(n * self.scale)) for n in (18, 15, 28, 12)
+        ]
 
     def point(self, x, y):
         return self.origin[0] + round(x * self.scale), self.origin[1] + round(y * self.scale)
@@ -151,6 +158,15 @@ class ChessApplication:
         self.flipped = mode == "human" and self.human_color == chess.BLACK
         self.move_view.scroll_offset = 0
         self._last_ply = -1
+
+    def _set_move_view_layout(self):
+        origin_y = 566 if self.mode == "replay" else 392
+        self.move_view.origin_y = self.point(640, origin_y)[1]
+        self.move_view.height = round((768 - origin_y) * self.scale)
+        self.move_view.panel_rect = pygame.Rect(
+            self.move_view.origin_x, self.move_view.origin_y,
+            round(MOVE_LIST_WIDTH * self.scale), self.move_view.height,
+        )
 
     def start_game(self):
         if not self._commit_number():
@@ -204,6 +220,9 @@ class ChessApplication:
         items = build_move_items(data["initial_fen"], data["moves_uci"])
         session, _ = create_session(data)
         self.replay, self.replay_data, self.replay_items = session, data, items
+        self.replay_evaluator = self._replay_static_evaluator(data)
+        self._replay_breakdown = None
+        self._replay_breakdown_ply = -1
         self.replay_source, self.replay_is_local_game = source, local_game
         self.replay_record = None
         self.replay_return = None
@@ -212,6 +231,36 @@ class ChessApplication:
         self.move_view.scroll_offset = 0
         self.message = ""
         self._last_ply = -1
+
+    @staticmethod
+    def _replay_static_evaluator(data):
+        strategies = data.get("metadata", {}).get("strategies", {})
+        for color in ("white", "black"):
+            strategy = strategies.get(color, {}) if isinstance(strategies, dict) else {}
+            settings = strategy.get("evaluator") if isinstance(strategy, dict) else None
+            if not isinstance(settings, dict):
+                continue
+            evaluator_type = settings.get("type")
+            config_data = {key: value for key, value in settings.items() if key != "type"}
+            try:
+                config = EvaluationConfig.from_dict(config_data)
+                if evaluator_type == "material":
+                    return MaterialEvaluator(config.piece_values)
+                if evaluator_type == "handcrafted":
+                    return HandcraftedEvaluator(config=config)
+            except (TypeError, ValueError):
+                continue
+        return HandcraftedEvaluator()
+
+    def _current_replay_breakdown(self):
+        if self.replay is None or self.replay_evaluator is None:
+            return None
+        if self._replay_breakdown_ply != self.replay.current_ply:
+            self._replay_breakdown = self.replay_evaluator.evaluate_breakdown(
+                self.replay.current_board(),
+            )
+            self._replay_breakdown_ply = self.replay.current_ply
+        return self._replay_breakdown
 
     def open_replay(self, path: str | Path, *, return_to=None, record=None) -> bool:
         try:
@@ -618,13 +667,15 @@ class ChessApplication:
             self._render_promotion()
 
     def _render_game(self):
+        self._set_move_view_layout()
         items, ply = self.current_moves()
         board = self.replay.current_board() if self.mode == "replay" and self.replay else (
             self.live.board if self.live and self.mode != "replay" else create_board())
         destinations = {m.to_square for m in self.live.legal_from(self.selected)} if self.live and self.selected is not None else set()
         self.board_view.render(board, ply, len(items), self.flipped,
                                selected=self.selected, destinations=destinations)
-        self.draw_rect(PANEL, (BOARD_PIXELS, HEADER_HEIGHT, MOVE_LIST_WIDTH, 336))
+        panel_height = 510 if self.mode == "replay" else 336
+        self.draw_rect(PANEL, (BOARD_PIXELS, HEADER_HEIGHT, MOVE_LIST_WIDTH, panel_height))
         x = BOARD_PIXELS + 14
         title = {"auto": "自動對戰", "human": "真人對 AI", "replay": "棋譜回放"}[self.mode]
         self.text(title, x, 70, large=True)
@@ -711,22 +762,65 @@ class ChessApplication:
             info["result"] = result or "未記錄"
             for i, (label, key) in enumerate([("白方", "white_player"), ("黑方", "black_player"),
                                               ("結果", "result"), ("編號", "game_id")]):
-                self.draw_label(self.small_font, f"{label}：{info[key]}", (x, 141 + i * 24), TEXT, 230)
+                self.draw_label(self.small_font, f"{label}：{info[key]}", (x, 137 + i * 19), TEXT, 230)
             reason = self.replay_data.get("metadata", {}).get("termination", "")
-            self.draw_label(self.small_font, REASONS.get(reason, reason), (x, 238), MUTED, 230)
+            self.draw_label(self.small_font, REASONS.get(reason, reason), (x, 215), MUTED, 230)
+            self._render_replay_evaluation(x)
         for i, (action, label) in enumerate([("first", "起點"), ("prev", "上步"), ("next", "下步"), ("last", "終點")]):
             enabled = self.replay is not None and (self.replay.current_ply > 0 if i < 2 else self.replay.current_ply < self.replay.total_ply())
-            self.button(action, label, (x + i * 59, 270, 55, 36), enabled=enabled)
-        self.button("open", "選擇對局", (x, 320, 111, 38), primary=self.replay is None)
+            self.button(action, label, (x + i * 59, 480, 55, 34), enabled=enabled)
+        self.button("open", "選擇對局", (x, 526, 111, 34), primary=self.replay is None)
         if self.replay_is_local_game:
-            self.button("export", "匯出本局", (x + 121, 320, 111, 38))
+            self.button("export", "匯出本局", (x + 121, 526, 111, 34))
         else:
             if self.replay_return == "records" and self.records_view:
-                self.button("records_results", "返回紀錄", (x + 121, 320, 111, 38))
+                self.button("records_results", "返回紀錄", (x + 121, 526, 111, 34))
             elif self.replay_return == "batch" and self.batch:
-                self.button("batch_progress", "返回批次", (x + 121, 320, 111, 38))
+                self.button("batch_progress", "返回批次", (x + 121, 526, 111, 34))
             else:
-                self.button("sample", "範例棋譜", (x + 121, 320, 111, 38))
+                self.button("sample", "範例棋譜", (x + 121, 526, 111, 34))
+
+    def _render_replay_evaluation(self, x):
+        breakdown = self._current_replay_breakdown()
+        self.draw_label(self.small_font, "局面靜態評分（白方／兵）", (x, 237), MUTED, 232)
+        if breakdown is None:
+            self.draw_label(self.small_font, "無法計算評分拆解", (x, 255), MUTED, 232)
+            return
+
+        total_text = f"總分：{breakdown.total_score!r}"
+        self.draw_label(self.font, total_text, (x, 256), TEXT, 232)
+        self.draw_label(self.small_font, "已啟用評分項　｜　貢獻值", (x, 279), MUTED, 232)
+        labels = {
+            "material": "子力", "piece_square": "位置",
+            "isolated_pawns": "孤兵", "doubled_pawns": "疊兵", "passed_pawns": "通路兵",
+            "pawn_mobility": "兵活動", "knight_mobility": "馬活動", "bishop_mobility": "象活動",
+            "rook_mobility": "車活動", "queen_mobility": "后活動", "king_mobility": "王活動",
+            "king_pawn_shield": "王盾", "king_zone_attacks": "王區攻擊",
+            "king_file_exposure": "王線暴露", "bishop_pair": "雙象",
+            "rook_open_file": "車開放線", "rook_half_open_file": "車半開放線",
+        }
+        terms = [(name, term) for name, term in breakdown.terms.items() if term.enabled]
+        if not terms:
+            self.draw_label(self.small_font, "目前沒有啟用的評分項", (x, 300), MUTED, 232)
+            return
+
+        max_contribution = max(abs(term.contribution) for _, term in terms) or 1.0
+        center_x = self.point(x + 121, 0)[0]
+        bar_half_width = round(41 * self.scale)
+        row_height = 10
+        for index, (name, term) in enumerate(terms):
+            y = 294 + index * row_height
+            self.draw_label(self.evaluation_font, labels.get(name, name), (x, y), TEXT, 65)
+            row_y = self.point(x, y + 5)[1]
+            pygame.draw.line(self.screen, BORDER, (center_x, row_y - 3), (center_x, row_y + 4), 1)
+            length = round(bar_half_width * min(1.0, abs(term.contribution) / max_contribution))
+            if length:
+                color = (110, 203, 146) if term.contribution > 0 else (231, 119, 119)
+                rect = pygame.Rect(center_x if term.contribution > 0 else center_x - length,
+                                   row_y - 2, length, max(2, round(5 * self.scale)))
+                pygame.draw.rect(self.screen, color, rect)
+            value = f"{term.contribution:+}" if term.contribution else "0.0"
+            self.draw_label(self.evaluation_font, value, (x + 167, y), TEXT, 64)
 
     @staticmethod
     def comparison_reason(reason):
