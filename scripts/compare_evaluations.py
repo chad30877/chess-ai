@@ -26,11 +26,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Compare evaluation settings using fixed-depth Greedy or AlphaBeta players.",
     )
-    parser.add_argument("--candidate-config", type=Path, required=True)
+    parser.add_argument("--candidate-config", type=Path, action="append", required=True,
+                        help="Candidate evaluation configuration; repeat to compare several candidates.")
     baseline = parser.add_mutually_exclusive_group(required=True)
     baseline.add_argument("--baseline-config", type=Path)
     baseline.add_argument("--baseline-random", action="store_true")
-    parser.add_argument("--candidate-label", default="candidate")
+    parser.add_argument("--candidate-label", default="candidate",
+                        help="Label for the first candidate; additional candidates use their file names.")
     parser.add_argument("--baseline-label")
     parser.add_argument("--strategy", choices=("greedy", "alphabeta"), default="greedy")
     parser.add_argument("--depth", type=int, help="Regular depth in plies; Greedy=1, AlphaBeta default=2")
@@ -82,7 +84,8 @@ def main() -> None:
             return ComparisonParticipant.alphabeta(label, config, search=search)
         return ComparisonParticipant.greedy(label, config)
 
-    candidate = participant(args.candidate_label, args.candidate_config)
+    candidates = [participant(args.candidate_label if index == 0 else path.stem, path)
+                 for index, path in enumerate(args.candidate_config)]
     baseline_label = args.baseline_label or ("Random" if args.baseline_random else "stable")
     if args.baseline_random:
         baseline_participant = ComparisonParticipant.random_baseline(baseline_label)
@@ -90,7 +93,7 @@ def main() -> None:
         baseline_participant = participant(baseline_label, args.baseline_config)
     result = run_evaluation_comparison(
         baseline=baseline_participant,
-        candidate=candidate,
+        candidates=candidates,
         initial_fens=args.initial_fen or [chess.STARTING_FEN],
         repetitions=args.repetitions,
         base_seed=args.seed,
@@ -100,17 +103,14 @@ def main() -> None:
         claim_draw=args.claim_draw,
         max_plies=args.max_plies,
     )
-    stats = result.candidate_stats
     print(f"Comparison batch: {result.path}")
     depth = search.depth_plies if search is not None else 1
     print(f"Budget: fixed_depth, {depth} {'ply' if depth == 1 else 'plies'}")
     print(f"Strategy: {args.strategy}")
     print(f"Baseline: {baseline_label}")
-    print(f"Candidate: {args.candidate_label}")
-    print(
-        f"wins={stats.wins} draws={stats.draws} losses={stats.losses} "
-        f"unfinished={stats.unfinished}",
-    )
+    for candidate, stats in zip(candidates, result.candidate_results):
+        print(f"Candidate: {candidate.label}")
+        print(f"wins={stats.wins} draws={stats.draws} losses={stats.losses} unfinished={stats.unfinished}")
     print("Small samples validate the flow; they do not prove playing strength.")
 
 

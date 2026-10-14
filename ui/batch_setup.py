@@ -15,7 +15,8 @@ class EvaluationFields:
         self.project = project
         self.files = sorted((project / "configs/evaluation").glob("*.json"))
         self.baseline = next((p for p in self.files if p.name == "stable.json"), self.files[0] if self.files else None)
-        self.candidate = next((p for p in self.files if p.name == "example_tapered.json"), self.baseline)
+        first_candidate = next((p for p in self.files if p.name == "example_tapered.json"), self.baseline)
+        self.candidates = [first_candidate] if first_candidate else []
         self.values = dict(openings="", depth="2", repetitions="1", seed="10000", max_plies="",
                            name="", tags="")
         self.focus = None
@@ -30,10 +31,13 @@ class EvaluationFields:
 
     def options(self):
         self.commit()
-        if self.baseline is None or self.candidate is None:
-            raise ValueError("請先在 configs/evaluation 放入基準與候選設定檔")
+        if self.baseline is None or not self.candidates:
+            raise ValueError("請先選擇一份基準與至少一份候選評分設定檔")
+        if self.baseline in self.candidates:
+            raise ValueError("同一份評分設定檔不能同時作為基準與候選")
         configs = [EvaluationConfig.from_dict(json.loads(p.read_text(encoding="utf-8")))
-                   for p in (self.baseline, self.candidate)]
+                   for p in self.candidates]
+        baseline_config = EvaluationConfig.from_dict(json.loads(self.baseline.read_text(encoding="utf-8")))
         depth, repetitions, seed = [int(self.values[key]) for key in ("depth", "repetitions", "seed")]
         if repetitions < 1 or seed < 0:
             raise ValueError("每局面配對數需為正整數，種子需為非負整數")
@@ -49,8 +53,9 @@ class EvaluationFields:
         maximum = int(self.values["max_plies"]) if self.values["max_plies"].strip() else None
         if maximum is not None and maximum < 0:
             raise ValueError("手數上限需為非負整數或留白")
-        return dict(baseline=ComparisonParticipant.alphabeta("baseline", configs[0], search=search),
-                    candidate=ComparisonParticipant.alphabeta("candidate", configs[1], search=search),
+        return dict(baseline=ComparisonParticipant.alphabeta(self.baseline.stem, baseline_config, search=search),
+                    candidates=[ComparisonParticipant.alphabeta(path.stem, config, search=search)
+                                for path, config in zip(self.candidates, configs)],
                     initial_fens=tuple(fens), repetitions=repetitions, base_seed=seed,
                     batch_root=self.project / "data/batches", name=self.values["name"].strip() or None,
                     tags=[tag.strip() for tag in self.values["tags"].split(",") if tag.strip()],
@@ -63,6 +68,15 @@ class EvaluationFields:
             if self.files:
                 current = getattr(self, side)
                 setattr(self, side, self.files[(self.files.index(current) + 1) % len(self.files)])
+        elif action == "comparison_candidate_add":
+            self.commit()
+            available = [path for path in self.files if path != self.baseline and path not in self.candidates]
+            if available and len(self.candidates) < 7:
+                self.candidates.append(available[0])
+        elif action.startswith("comparison_candidate_remove:"):
+            index = int(action.split(":")[1])
+            if 0 <= index < len(self.candidates) and len(self.candidates) > 1:
+                self.candidates.pop(index)
         elif action.startswith("comparison_field:"):
             self.commit()
             self.focus = action.split(":")[1]
@@ -71,20 +85,27 @@ class EvaluationFields:
 
     def render(self, app):
         app.text("點選設定檔切換；文字欄位 Ctrl+A 清空，Enter 確認。", 64, 158, muted=True)
-        fields = [("baseline", "基準設定檔"), ("candidate", "候選設定檔"),
-                  ("openings", "開局集路徑（留白為標準開局）"), ("depth", "一般搜尋深度（ply）"),
-                  ("repetitions", "每局面配對數（每對兩局）"), ("seed", "種子"),
-                  ("max_plies", "手數上限（留白無上限）"), ("name", "批次名稱"), ("tags", "標籤（以逗號分隔）")]
+        fields = [("baseline", "基準"), ("openings", "開局集路徑"), ("depth", "搜尋深度（ply）"),
+                  ("repetitions", "每局面配對數"), ("seed", "種子"), ("max_plies", "手數上限"),
+                  ("name", "批次名稱"), ("tags", "標籤")]
         for index, (key, label) in enumerate(fields):
-            x, y = 64 + 396 * (index % 2), 199 + 79 * (index // 2)
-            app.draw_label(app.small_font, label, (x, y), width=376)
-            if key in ("baseline", "candidate"):
+            x, y = 64, 199 + 51 * index
+            app.draw_label(app.small_font, label, (x, y + 8), width=122)
+            if key == "baseline":
                 path = getattr(self, key)
                 value = path.name if path else "沒有設定檔"
                 action = f"comparison_file:{key}"
             else:
                 value = (self.draft + " |") if self.focus == key else (self.values[key] or "（留白）")
                 action = f"comparison_field:{key}"
-            app.button(action, value, (x, y + 25, 376, 39), primary=self.focus == key)
-        app.text(self.message or "雙方使用相同搜尋設定，交換黑白；和棋政策為不自動申請。", 64, 611, muted=True, width=772)
+            app.button(action, value, (x + 128, y, 248, 38), primary=self.focus == key)
+        app.draw_label(app.small_font, "候選評分設定檔（各自與基準交換黑白比較）", (460, 199), width=376)
+        for index, path in enumerate(self.candidates[:7]):
+            app.button(f"comparison_candidate_remove:{index}", f"移除　{path.name}",
+                       (460, 226 + index * 48, 376, 40))
+        app.button("comparison_candidate_add", "加入下一份不同設定檔",
+                   (460, min(226 + len(self.candidates[:7]) * 48, 574), 376, 40),
+                   enabled=len(self.candidates) < 7 and any(
+                       path != self.baseline and path not in self.candidates for path in self.files))
+        app.text(self.message or "候選共用起始局面、搜尋設定與預算；交換黑白，和棋政策為不自動申請。", 64, 611, muted=True, width=772)
         app.button("start", "開始生成", (460, 672, 376, 40), primary=True)
