@@ -518,7 +518,10 @@ class ChessApplication:
                 self.opponent = options[(options.index(self.opponent) + 1) % len(options)]
             else:
                 setattr(self, action, "Greedy" if getattr(self, action) == "Random" else "Random")
-        elif action == "live_evaluation" and self.live is None and self.live_evaluation_files:
+        elif action == "live_evaluation" and self.live is None:
+            self._refresh_evaluation_profiles()
+            if not self.live_evaluation_files:
+                return
             current = self.live_evaluation_files.index(self.live_evaluation_file)
             self.live_evaluation_file = self.live_evaluation_files[(current + 1) % len(self.live_evaluation_files)]
         elif action == "live_depth" and self.live is None:
@@ -894,6 +897,18 @@ class ChessApplication:
                             for field in fields if field[0] == key)
         return rows
 
+    def _refresh_evaluation_profiles(self):
+        current = self.live_evaluation_file
+        files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
+        self.live_evaluation_files = files
+        if current in files:
+            self.live_evaluation_file = current
+        else:
+            self.live_evaluation_file = next(
+                (path for path in files if path.name == "stable.json"), files[0] if files else None,
+            )
+        self.evaluation_fields.files = files
+
     def _save_replay_evaluation(self):
         editor = self.replay_editor
         if editor is None:
@@ -919,7 +934,7 @@ class ChessApplication:
             return
         self.replay_editor = None
         self.replay_evaluator = HandcraftedEvaluator(config=editor.config)
-        self.evaluation_fields.files = sorted(set([*self.evaluation_fields.files, path]))
+        self._refresh_evaluation_profiles()
         self._replay_breakdown_ply = -1
         self.message = f"已另存評分設定：{name}.json"
 
