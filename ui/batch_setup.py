@@ -73,6 +73,15 @@ class EvaluationFields:
             available = [path for path in self.files if path != self.baseline and path not in self.candidates]
             if available and len(self.candidates) < 7:
                 self.candidates.append(available[0])
+        elif action.startswith("comparison_candidate_select:"):
+            index = int(action.split(":")[1])
+            if 0 <= index < len(self.candidates):
+                current = self.candidates[index]
+                available = [path for path in self.files
+                             if path != self.baseline and (path == current or path not in self.candidates)]
+                if available:
+                    current_index = available.index(current) if current in available else -1
+                    self.candidates[index] = available[(current_index + 1) % len(available)]
         elif action.startswith("comparison_candidate_remove:"):
             index = int(action.split(":")[1])
             if 0 <= index < len(self.candidates) and len(self.candidates) > 1:
@@ -84,7 +93,7 @@ class EvaluationFields:
             pygame.key.start_text_input()
 
     def render(self, app):
-        app.text("點選設定檔切換；文字欄位 Ctrl+A 清空，Enter 確認。", 64, 158, muted=True)
+        app.text("點選候選設定檔切換；文字欄位 Ctrl+A 清空，Enter 確認。", 64, 158, muted=True)
         fields = [("baseline", "基準"), ("openings", "開局集路徑"), ("depth", "搜尋深度（ply）"),
                   ("repetitions", "每局面配對數"), ("seed", "種子"), ("max_plies", "手數上限"),
                   ("name", "批次名稱"), ("tags", "標籤")]
@@ -101,8 +110,9 @@ class EvaluationFields:
             app.button(action, value, (x + 128, y, 248, 38), primary=self.focus == key)
         app.draw_label(app.small_font, "候選評分設定檔（各自與基準交換黑白比較）", (460, 199), width=376)
         for index, path in enumerate(self.candidates[:7]):
-            app.button(f"comparison_candidate_remove:{index}", f"移除　{path.name}",
-                       (460, 226 + index * 48, 376, 40))
+            y = 226 + index * 48
+            app.button(f"comparison_candidate_select:{index}", path.name, (460, y, 315, 40))
+            app.button(f"comparison_candidate_remove:{index}", "移除", (780, y, 56, 40))
         app.button("comparison_candidate_add", "加入下一份不同設定檔",
                    (460, min(226 + len(self.candidates[:7]) * 48, 574), 376, 40),
                    enabled=len(self.candidates) < 7 and any(
