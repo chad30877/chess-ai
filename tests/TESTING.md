@@ -1,7 +1,7 @@
 # 測試說明
 
 - `search/test_transposition.py`：置換表容量、深度／界限／世代保留偏好、小容量將死搜尋、歷史鍵值與每次搜尋失效。
-- `self_play/test_alphabeta_comparison.py`：完整比較流程的共同搜尋條件、容量保存、配對及舊紀錄相容。
+- `self_play/test_alphabeta_comparison.py`：完整比較流程、UI／CLI 的共同 worker 與容量、多候選逐場保存、真實兩層 spawn 停止及舊紀錄相容。
 
 - `search/test_parallel_search.py`：真實 spawn 的將死距離、完整重複歷史、取消／逾時、程序故障與清理。
 - `ui/test_live_session.py`：真人對局背景搜尋停止與舊結果隔離。

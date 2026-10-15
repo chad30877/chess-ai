@@ -1,6 +1,7 @@
 """手工評分設定的成對比較、進度與合作式停止。"""
 
 from dataclasses import dataclass, replace
+from contextlib import ExitStack
 from collections.abc import Callable
 from pathlib import Path
 import random
@@ -27,6 +28,7 @@ class ComparisonSearchConfig:
     """Shared fixed-depth Alpha-Beta settings for evaluation comparisons."""
 
     depth_plies: int = 2
+    search_workers: int = 1
     transposition_capacity: int = DEFAULT_TRANSPOSITION_CAPACITY
     move_ordering: bool = True
     quiescence_depth: int = 4
@@ -41,7 +43,7 @@ class ComparisonSearchConfig:
     def create_player(self, config: EvaluationConfig, *, claim_draw: bool) -> AlphaBetaPlayer:
         return AlphaBetaPlayer.from_evaluator(
             HandcraftedEvaluator(config=config), limits=SearchLimits(max_depth=self.depth_plies, transposition_capacity=self.transposition_capacity),
-            claim_draw=claim_draw, move_ordering=self.move_ordering,
+            claim_draw=claim_draw, search_workers=self.search_workers, move_ordering=self.move_ordering,
             quiescence_depth=self.quiescence_depth, use_transposition_table=self.use_transposition_table,
             use_pvs=self.use_pvs, aspiration_window=self.aspiration_window,
         )
@@ -198,6 +200,11 @@ class _ControlledPlayer:
 
     def __init__(self, player, control):
         self.player, self.control = player, control
+
+    def close(self):
+        close = getattr(self.player, "close", None)
+        if close is not None:
+            close()
 
     def choose_move(self, board):
         if isinstance(self.player, AlphaBetaPlayer):
@@ -429,23 +436,29 @@ def run_evaluation_comparison(
                                     break
                                 current_game += 1
                                 notify()
-                                rng = random.Random(pair_seed)
-                                white_player = white.create_player(rng, claim_draw=claim_draw)
-                                black_player = black.create_player(rng, claim_draw=claim_draw)
-                                for participant, player in ((white, white_player), (black, black_player)):
-                                    key = "candidate" if participant is candidate_participant else "baseline"
-                                    if participant.settings_snapshot(player=player) != participant_settings[key]:
-                                        raise ValueError("Actual player settings changed during comparison")
-                                if control is not None:
-                                    white_player = _ControlledPlayer(white_player, control)
-                                    black_player = _ControlledPlayer(black_player, control)
-                                started = perf_counter()
-                                game_options = dict(initial_fen=initial_fen, claim_draw=claim_draw, max_plies=max_plies)
-                                if control is not None:
-                                    game_options["control"] = control
-                                game = play_game(current_game, white_player, black_player, white.label, black.label,
-                                                 **game_options)
-                                elapsed_seconds = perf_counter() - started
+                                with ExitStack() as cleanup:
+                                    rng = random.Random(pair_seed)
+                                    white_player = white.create_player(rng, claim_draw=claim_draw)
+                                    if hasattr(white_player, "close"):
+                                        cleanup.callback(white_player.close)
+                                    black_player = black.create_player(rng, claim_draw=claim_draw)
+                                    if hasattr(black_player, "close"):
+                                        cleanup.callback(black_player.close)
+                                    for participant, player in ((white, white_player), (black, black_player)):
+                                        key = "candidate" if participant is candidate_participant else "baseline"
+                                        expected = candidate_settings[candidate_index] if key == "candidate" else participant_settings[key]
+                                        if participant.settings_snapshot(player=player) != expected:
+                                            raise ValueError("Actual player settings changed during comparison")
+                                    if control is not None:
+                                        white_player = _ControlledPlayer(white_player, control)
+                                        black_player = _ControlledPlayer(black_player, control)
+                                    started = perf_counter()
+                                    game_options = dict(initial_fen=initial_fen, claim_draw=claim_draw, max_plies=max_plies)
+                                    if control is not None:
+                                        game_options["control"] = control
+                                    game = play_game(current_game, white_player, black_player, white.label, black.label,
+                                                     **game_options)
+                                    elapsed_seconds = perf_counter() - started
                                 save(task_number, candidate_index, game, pair_seed, elapsed_seconds)
                                 work_progress.update(finished_games=len([g for p in pair_records for g in p["games"]]))
                                 notify()
