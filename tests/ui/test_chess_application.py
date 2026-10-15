@@ -73,6 +73,24 @@ class ChessApplicationTest(unittest.TestCase):
         x, y = self.app.board_view._square_to_screen(square, self.app.flipped)
         self.app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(x + 40, y + 40)))
 
+    def test_general_batch_alphabeta_setup_runs_selected_conditions(self):
+        self.click("mode:auto")
+        self.click("white")
+        self.click("white")
+        self.click("black")
+        self.assertEqual((self.app.white, self.app.black), ("AlphaBeta", "AlphaBeta"))
+        self.app.batch_search_workers = 2
+        self.app.batch_transposition_capacity = 31
+        self.app.batch_search_depth = 1
+        self.app.game_count = 1
+        self.click("start")
+        from dataclasses import replace
+        self.app.batch.settings = replace(self.app.batch.settings, max_plies=1)
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["status"], "completed")
+        manifest = json.loads((Path(self.app.batch.snapshot()["path"]) / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["settings"]["strategies"]["white"]["search"]["search_workers"], 2)
+
     def test_startup_has_home_and_three_modes_without_default_game(self):
         self.app.render()
         self.assertEqual(self.app.mode, "home")
