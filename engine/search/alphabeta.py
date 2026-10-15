@@ -175,12 +175,14 @@ class AlphaBetaSearcher:
             deadline=deadline,
             stop_requested=resolved_limits.stop_requested,
             transposition_table=(
-                TranspositionTable() if self.use_transposition_table else None
+                TranspositionTable(resolved_limits.transposition_capacity) if self.use_transposition_table else None
             ),
         )
         last_completed = fallback
 
         for target_depth in range(1, resolved_limits.max_depth + 1):
+            if context.transposition_table is not None:
+                context.transposition_table.advance_generation()
             try:
                 aspiration_window = self.aspiration_window
                 use_aspiration = (

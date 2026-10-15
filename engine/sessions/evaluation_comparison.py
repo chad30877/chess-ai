@@ -12,6 +12,7 @@ from engine.evaluation.config import EvaluationConfig
 from engine.evaluation.evaluator import HandcraftedEvaluator
 from engine.players import AlphaBetaPlayer, GreedyPlayer, RandomPlayer
 from engine.search import SearchLimits
+from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.sessions.self_play import PlayedGame, play_game
 from engine.storage.batch_storage import BatchWriter, write_json_atomic
 from engine.strategy_config import strategy_config
@@ -26,6 +27,7 @@ class ComparisonSearchConfig:
     """Shared fixed-depth Alpha-Beta settings for evaluation comparisons."""
 
     depth_plies: int = 2
+    transposition_capacity: int = DEFAULT_TRANSPOSITION_CAPACITY
     move_ordering: bool = True
     quiescence_depth: int = 4
     use_transposition_table: bool = True
@@ -38,7 +40,7 @@ class ComparisonSearchConfig:
 
     def create_player(self, config: EvaluationConfig, *, claim_draw: bool) -> AlphaBetaPlayer:
         return AlphaBetaPlayer.from_evaluator(
-            HandcraftedEvaluator(config=config), limits=SearchLimits(max_depth=self.depth_plies),
+            HandcraftedEvaluator(config=config), limits=SearchLimits(max_depth=self.depth_plies, transposition_capacity=self.transposition_capacity),
             claim_draw=claim_draw, move_ordering=self.move_ordering,
             quiescence_depth=self.quiescence_depth, use_transposition_table=self.use_transposition_table,
             use_pvs=self.use_pvs, aspiration_window=self.aspiration_window,
