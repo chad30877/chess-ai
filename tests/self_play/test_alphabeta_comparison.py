@@ -35,7 +35,7 @@ class AlphaBetaComparisonTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.config = EvaluationConfig.from_dict(read(ROOT / "configs/evaluation/example_coordination.json"))
-        self.search = ComparisonSearchConfig(depth_plies=2, quiescence_depth=0,
+        self.search = ComparisonSearchConfig(depth_plies=2, quiescence_depth=0, transposition_capacity=3,
                                              move_ordering=False, use_transposition_table=False,
                                              use_pvs=False, aspiration_window=None)
         self.baseline = ComparisonParticipant.alphabeta("stable", EvaluationConfig(), search=self.search)
@@ -121,7 +121,8 @@ class AlphaBetaComparisonTest(unittest.TestCase):
             evaluator.pop("type")
             self.assertEqual(EvaluationConfig.from_dict(evaluator), participant.evaluation_config)
             self.assertEqual(saved["search"], {
-                "schema_version": 1, "algorithm": "alpha_beta", "max_depth": 2,
+                "schema_version": 2, "algorithm": "alpha_beta", "max_depth": 2,
+                "transposition_capacity": 3,
                 "claim_draw": True, "move_ordering": False, "quiescence_depth": 0,
                 "use_transposition_table": False, "use_pvs": False, "aspiration_window": None,
             })

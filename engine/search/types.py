@@ -6,6 +6,8 @@ from typing import Protocol, runtime_checkable
 
 import chess
 
+from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
+
 CHECKMATE_SCORE = 1_000_000.0
 DRAW_SCORE = 0.0
 
@@ -17,6 +19,7 @@ class SearchLimits:
     max_depth: int = 1
     time_ms: int | None = None
     stop_requested: Callable[[], bool] | None = None
+    transposition_capacity: int = DEFAULT_TRANSPOSITION_CAPACITY
 
     def __post_init__(self) -> None:
         if (
@@ -31,6 +34,12 @@ class SearchLimits:
             or self.time_ms <= 0
         ):
             raise ValueError("time_ms must be a positive integer when provided.")
+        if (
+            isinstance(self.transposition_capacity, bool)
+            or not isinstance(self.transposition_capacity, int)
+            or self.transposition_capacity <= 0
+        ):
+            raise ValueError("transposition_capacity must be a positive integer.")
         if self.stop_requested is not None and not callable(self.stop_requested):
             raise ValueError("stop_requested must be callable when provided.")
 
