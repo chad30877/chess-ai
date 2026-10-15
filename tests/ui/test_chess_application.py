@@ -47,6 +47,23 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.batch_workers = 1
         self.addCleanup(self.app.close)
 
+    def test_human_alpha_beta_worker_input_runs_and_saves_actual_conditions(self):
+        self.click("mode:human")
+        self.app.opponent = "AlphaBeta"
+        self.app.human_color = chess.BLACK
+        self.app.live_search_depth = 1
+        self.click("live_workers")
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
+        self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text="2"))
+        self.click("start")
+        self.app.live.tick(101, self.executor)
+        self.executor.finish()
+        self.app.live.tick(101, self.executor)
+        payload = self.app.live.replay_payload()
+        self.assertEqual(len(payload["moves_uci"]), 1)
+        self.assertEqual(payload["metadata"]["strategies"]["white"]["search"]["search_workers"], 2)
+        self.assertTrue(self.app.live.human_turn)
+
     def click(self, action):
         self.app.render()
         button = next(b for b in self.app.buttons if b.action == action)
@@ -238,7 +255,7 @@ class ChessApplicationTest(unittest.TestCase):
 
     def test_catalog_navigation_invalid_json_and_sample_remain_usable(self):
         folder = self.project / "data/replays"
-        folder.mkdir(parents=True)
+        folder.mkdir(parents=True, exist_ok=True)
         sample = json.loads(Path("data/replays/sample_replay.json").read_text(encoding="utf-8"))
         sample["metadata"].update(started_at="2026-09-09T12:34:56+08:00", game_id="20260909_000001")
         valid = folder / "20260909_000001.json"
@@ -509,7 +526,7 @@ class ChessApplicationTest(unittest.TestCase):
 
     def test_missing_standalone_result_is_not_replaced_by_loader_default_in_display(self):
         folder = self.project / "data/replays"
-        folder.mkdir(parents=True)
+        folder.mkdir(parents=True, exist_ok=True)
         (folder / "missing-result.json").write_text(json.dumps({
             "initial_fen": chess.STARTING_FEN, "moves_uci": []}), encoding="utf-8")
         self.click("mode:records")
@@ -530,7 +547,7 @@ class ChessApplicationTest(unittest.TestCase):
 
     def prepare_comparison_configs(self):
         folder = self.project / "configs/evaluation"
-        folder.mkdir(parents=True)
+        folder.mkdir(parents=True, exist_ok=True)
         (folder / "stable.json").write_text(json.dumps(EvaluationConfig().to_dict()), encoding="utf-8")
         (folder / "example_tapered.json").write_text(json.dumps(EvaluationConfig(phase_enabled=True).to_dict()), encoding="utf-8")
 

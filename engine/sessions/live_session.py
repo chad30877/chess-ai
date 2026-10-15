@@ -14,6 +14,7 @@ from engine.storage.data_ids import now_iso
 from engine.strategy_config import strategy_config
 from engine.players import AlphaBetaPlayer, GreedyPlayer, RandomPlayer
 from engine.search import SearchLimits
+from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 
 
 @dataclass(frozen=True)
@@ -29,8 +30,10 @@ class LiveSettings:
     black_evaluation: EvaluationConfig | None = None
     search_depth: int = 2
     search_workers: int = 1
+    transposition_capacity: int = DEFAULT_TRANSPOSITION_CAPACITY
 
     def __post_init__(self):
+        SearchLimits(max_depth=self.search_depth, transposition_capacity=self.transposition_capacity)
         players = ("Random", "Greedy", "AlphaBeta", "Human")
         if self.white not in players or self.black not in players:
             raise ValueError("Unsupported player")
@@ -73,6 +76,7 @@ class LiveSession:
         self.players = {
             color: self._create_player(
                 name, rng, evaluations[color], settings.claim_draw, settings.search_depth, settings.search_workers,
+                settings.transposition_capacity,
             ) if name != "Human" else None
             for color, name in ((chess.WHITE, settings.white), (chess.BLACK, settings.black))
         }
@@ -90,6 +94,7 @@ class LiveSession:
         claim_draw: bool,
         search_depth: int,
         search_workers: int = 1,
+        transposition_capacity: int = DEFAULT_TRANSPOSITION_CAPACITY,
     ) -> RandomPlayer | GreedyPlayer | AlphaBetaPlayer:
         if name == "Random":
             return RandomPlayer(rng=rng)
@@ -99,7 +104,7 @@ class LiveSession:
             config = evaluation if evaluation is not None else EvaluationConfig()
             return AlphaBetaPlayer.from_evaluator(
                 HandcraftedEvaluator(config=config),
-                limits=SearchLimits(max_depth=search_depth),
+                limits=SearchLimits(max_depth=search_depth, transposition_capacity=transposition_capacity),
                 claim_draw=claim_draw,
                 search_workers=search_workers,
             )

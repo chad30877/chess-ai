@@ -22,6 +22,7 @@ from engine.sessions.batch_run import BatchSettings
 from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
 from engine.sessions.live_session import LiveSession, LiveSettings
+from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.replay.replay_loader import load_replay_json
 from ui.board_view import BOARD_PIXELS, WINDOW_HEIGHT, BoardView
 from ui.controls import ACCENT, BACKGROUND, BORDER, MUTED, PANEL, TEXT, Button, draw_text, ui_font
@@ -65,6 +66,7 @@ class ChessApplication:
         )
         self.live_search_depth = 2
         self.live_search_workers = 1
+        self.live_transposition_capacity = DEFAULT_TRANSPOSITION_CAPACITY
         self.interval = 1.0
         self.batch_interval = 0.0
         self.batch_workers = 4
@@ -165,7 +167,7 @@ class ChessApplication:
         self._last_ply = -1
 
     def _set_move_view_layout(self):
-        origin_y = 566 if self.mode == "replay" else 392
+        origin_y = 566 if self.mode == "replay" else (490 if self.mode == "human" and self.live is None else 392)
         self.move_view.origin_y = self.point(640, origin_y)[1]
         self.move_view.height = round((768 - origin_y) * self.scale)
         self.move_view.panel_rect = pygame.Rect(
@@ -216,6 +218,7 @@ class ChessApplication:
             black_evaluation=black_evaluation,
             search_depth=self.live_search_depth,
             search_workers=self.live_search_workers,
+            transposition_capacity=self.live_transposition_capacity,
         ))
         self.live.start(self.now())
         self.saved = False
@@ -529,8 +532,11 @@ class ChessApplication:
         elif action == "live_depth" and self.live is None:
             depths = (1, 2, 3, 4, 5)
             self.live_search_depth = depths[(depths.index(self.live_search_depth) + 1) % len(depths)]
-        elif action == "live_workers" and self.live is None:
-            self.live_search_workers += 1
+        elif action in ("live_workers", "live_capacity") and self.live is None:
+            if self._commit_number():
+                self.numeric_focus = action
+                self.numeric_text = str(self.live_search_workers if action == "live_workers" else self.live_transposition_capacity)
+                pygame.key.start_text_input()
         elif action == "color" and self.live is None:
             self.human_color = not self.human_color
             self.flipped = not self.human_color
@@ -571,18 +577,24 @@ class ChessApplication:
         if self.numeric_focus is None:
             return True
         try:
-            value = int(self.numeric_text) if self.numeric_focus in ("count", "workers") else float(self.numeric_text)
+            value = int(self.numeric_text) if self.numeric_focus in ("count", "workers", "live_workers", "live_capacity") else float(self.numeric_text)
             import math
-            if not math.isfinite(value) or (value < 1 if self.numeric_focus in ("count", "workers") else value < 0):
+            if not math.isfinite(value) or (value < 1 if self.numeric_focus in ("count", "workers", "live_workers", "live_capacity") else value < 0):
                 raise ValueError()
-            if self.numeric_focus == "workers":
+            if self.numeric_focus == "live_workers":
+                self.live_search_workers = value
+            elif self.numeric_focus == "live_capacity":
+                self.live_transposition_capacity = value
+            elif self.numeric_focus == "workers":
                 self.batch_workers = value
             elif self.numeric_focus == "count":
                 self.game_count = value
             else:
                 self.batch_interval = value
         except (ValueError, OverflowError):
-            self.message = "場次與同時對戰場數需為正整數；場間間隔需為非負秒數。"
+            self.message = ("搜尋 worker 與表項上限需為正整數。"
+                            if self.numeric_focus in ("live_workers", "live_capacity")
+                            else "場次與同時對戰場數需為正整數；場間間隔需為非負秒數。")
             return False
         self.numeric_focus = None
         pygame.key.stop_text_input()
@@ -778,7 +790,7 @@ class ChessApplication:
         destinations = {m.to_square for m in self.live.legal_from(self.selected)} if self.live and self.selected is not None else set()
         self.board_view.render(board, ply, len(items), self.flipped,
                                selected=self.selected, destinations=destinations)
-        panel_height = 510 if self.mode == "replay" else 336
+        panel_height = 510 if self.mode == "replay" else (434 if self.mode == "human" and self.live is None else 336)
         self.draw_rect(PANEL, (BOARD_PIXELS, HEADER_HEIGHT, MOVE_LIST_WIDTH, panel_height))
         x = BOARD_PIXELS + 14
         title = {"auto": "自動對戰", "human": "真人對 AI", "replay": "棋譜回放"}[self.mode]
@@ -823,16 +835,19 @@ class ChessApplication:
                        if self.live_evaluation_file else "沒有設定檔")]
             if self.opponent == "AlphaBeta":
                 fields.append(("live_depth", "搜尋深度", str(self.live_search_depth)))
-                fields.append(("live_workers", "搜尋 worker", str(self.live_search_workers)))
+                fields.append(("live_workers", "Workers", str(self.live_search_workers)))
+                fields.append(("live_capacity", "表項上限", str(self.live_transposition_capacity)))
             fields.append(("interval", "間隔", f"{self.interval:g} 秒"))
         for i, (action, label, value) in enumerate(fields):
             y = 112 + i * 42 if self.mode == "human" else 119 + i * 46
             self.text(label, x, y + 7)
+            if self.numeric_focus == action:
+                value = self.numeric_text + " |"
             self.button(action, value, (x + 70, y, 162, 36) if self.mode == "human" else (x + 56, y, 176, 36))
-        start_y = 365 if self.mode == "human" else 270
+        start_y = 406 if self.mode == "human" else 270
         self.button("start", "開始對戰", (x, start_y, 232, 42), primary=True)
         if self.mode == "human":
-            self.draw_label(self.small_font, "點選設定切換；深度選項為 1–5", (x, 416), MUTED, 232)
+            self.draw_label(self.small_font, "點選設定切換；深度選項為 1–5", (x, 457), MUTED, 232)
         else:
             self.text("點選設定可切換選項", x, start_y + 51, muted=True)
             self.draw_label(self.small_font, "和棋政策：不自動申請", (x, start_y + 79), MUTED)
