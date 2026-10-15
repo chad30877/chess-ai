@@ -106,6 +106,28 @@ class TranspositionTableTest(unittest.TestCase):
         self.assertIs(table.probe(self.key), deeper)
         self.assertEqual(len(table), 1)
 
+    def test_capacity_preserves_deep_exact_entries_and_ages_old_results(self) -> None:
+        table = TranspositionTable(capacity=2)
+        keys = [make_transposition_key(chess.Board(), ply_from_root=i) for i in range(5)]
+        deep = TranspositionEntry(4, 4.0, BoundType.LOWER, None)
+        exact = TranspositionEntry(4, 3.0, BoundType.EXACT, None)
+        shallow = TranspositionEntry(1, 1.0, BoundType.UPPER, None)
+        table.store(keys[0], deep)
+        table.store(keys[1], exact)
+        self.assertFalse(table.store(keys[2], shallow))
+        self.assertTrue(table.store(keys[2], deep))
+        self.assertIs(table.probe(keys[1]), exact)
+        table.advance_generation()
+        table.advance_generation()
+        self.assertTrue(table.store(keys[3], shallow))
+        self.assertIsNone(table.probe(keys[0]))
+        self.assertIs(table.probe(keys[1]), exact)
+        self.assertTrue(table.store(keys[1], shallow))
+        self.assertIs(table.probe(keys[1]), shallow)
+        for i in range(100):
+            table.store(keys[i % 5], exact)
+            self.assertLessEqual(len(table), 2)
+
     def test_rejects_negative_entry_depth(self) -> None:
         for invalid in (-1, True, 1.5):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
@@ -198,6 +220,18 @@ class AlphaBetaTranspositionIntegrationTest(unittest.TestCase):
         self.assertGreater(cached.transposition_stores, 0)
         self.assertEqual(uncached.transposition_hits, 0)
         self.assertEqual(uncached.transposition_stores, 0)
+
+    def test_tiny_table_completes_mate_search_without_mutating_history(self) -> None:
+        board = chess.Board("7k/8/5KQ1/8/8/8/8/8 w - - 0 1")
+        original = board.copy(stack=True)
+        result = AlphaBetaSearcher(MaterialEvaluator(), quiescence_depth=0).search(
+            board, SearchLimits(max_depth=3, transposition_capacity=1),
+        )
+        self.assertEqual(result.completed_depth, 3)
+        self.assertEqual(result.score, 999999.0)
+        self.assertIn(result.best_move, board.legal_moves)
+        self.assertEqual(board.fen(), original.fen())
+        self.assertEqual(board.move_stack, original.move_stack)
 
     def test_each_search_uses_a_fresh_table_after_evaluator_change(self) -> None:
         evaluator = MutableEvaluator(1.0)
