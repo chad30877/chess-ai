@@ -433,9 +433,10 @@ class ChessApplicationTest(unittest.TestCase):
         for size in ((900, 768), APP_SIZE, (1800, 1536)):
             with self.subTest(size=size):
                 self.app.resize(pygame.Surface(size))
-                with patch.object(self.app, "text", wraps=self.app.text) as labels:
-                    self.app.render()
-                self.assertTrue(any("得分率：無資料" in str(call.args[0]) for call in labels.call_args_list))
+                self.app.render()
+                candidate = self.app.records_view.summary.comparison.candidate_summaries[0]
+                self.assertIsNone(candidate["paired_score_rate"])
+                self.assertEqual(candidate["label"], "candidate")
                 for button in self.app.buttons:
                     self.assertTrue(self.app.screen.get_rect().contains(button.rect))
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
@@ -574,6 +575,33 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
         self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=value))
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+
+    def test_comparison_search_worker_fields_run_multicandidate_games_and_save_snapshots(self):
+        self.prepare_comparison_configs()
+        profile = self.project / "configs/evaluation/third.json"
+        profile.write_text(json.dumps(EvaluationConfig(pst_weight=2).to_dict()), encoding="utf8")
+        (self.project / "openings.txt").write_text("7k/7p/8/8/8/8/P7/K7 w - - 0 1", encoding="utf8")
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        self.enter_comparison_field("openings", "openings.txt")
+        self.enter_comparison_field("depth", "1")
+        self.enter_comparison_field("search_workers", "2")
+        self.enter_comparison_field("transposition_capacity", "3")
+        self.enter_comparison_field("max_plies", "1")
+        self.click("comparison_candidate_add")
+        self.click("start")
+        self.app.render()
+        self.assertNotIn("pause", {button.action for button in self.app.buttons})
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["saved_games"], 4)
+        self.click("batch_results")
+        summary = self.app.records_view.summary
+        participants = summary.comparison.participants
+        for side in [participants["baseline"], *participants["candidates"]]:
+            self.assertEqual(side["search"]["search_workers"], 2)
+            self.assertEqual(side["search"]["transposition_capacity"], 3)
+        self.assertEqual(len(summary.games), 4)
+        self.assertEqual({game.candidate_label for game in summary.games}, {"example_tapered", "third"})
 
     def test_comparison_setup_background_save_and_results(self):
         self.prepare_comparison_configs()

@@ -7,6 +7,7 @@ import chess
 import pygame
 
 from engine.evaluation.config import EvaluationConfig
+from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.sessions.evaluation_comparison import ComparisonParticipant, ComparisonSearchConfig, _normalized_positions
 
 
@@ -18,7 +19,8 @@ class EvaluationFields:
         first_candidate = next((p for p in self.files if p.name == "example_tapered.json"), self.baseline)
         self.candidates = [first_candidate] if first_candidate else []
         self.values = dict(openings="", depth="2", repetitions="1", seed="10000", max_plies="",
-                           name="", tags="")
+                           name="", tags="", search_workers="1",
+                           transposition_capacity=str(DEFAULT_TRANSPOSITION_CAPACITY))
         self.focus = None
         self.draft = ""
         self.message = ""
@@ -41,7 +43,8 @@ class EvaluationFields:
         depth, repetitions, seed = [int(self.values[key]) for key in ("depth", "repetitions", "seed")]
         if repetitions < 1 or seed < 0:
             raise ValueError("每局面配對數需為正整數，種子需為非負整數")
-        search = ComparisonSearchConfig(depth_plies=depth)
+        search = ComparisonSearchConfig(depth_plies=depth, search_workers=int(self.values["search_workers"]),
+                                        transposition_capacity=int(self.values["transposition_capacity"]))
         fens = [chess.STARTING_FEN]
         if self.values["openings"].strip():
             path = Path(self.values["openings"].strip())
@@ -95,10 +98,11 @@ class EvaluationFields:
     def render(self, app):
         app.text("點選候選設定檔切換；文字欄位 Ctrl+A 清空，Enter 確認。", 64, 158, muted=True)
         fields = [("baseline", "基準"), ("openings", "開局集路徑"), ("depth", "搜尋深度（ply）"),
+                  ("search_workers", "搜尋 worker"), ("transposition_capacity", "表項上限"),
                   ("repetitions", "每局面配對數"), ("seed", "種子"), ("max_plies", "手數上限"),
                   ("name", "批次名稱"), ("tags", "標籤")]
         for index, (key, label) in enumerate(fields):
-            x, y = 64, 199 + 51 * index
+            x, y = 64, 199 + 42 * index
             app.draw_label(app.small_font, label, (x, y + 8), width=122)
             if key == "baseline":
                 path = getattr(self, key)
@@ -110,12 +114,13 @@ class EvaluationFields:
             app.button(action, value, (x + 128, y, 248, 38), primary=self.focus == key)
         app.draw_label(app.small_font, "候選評分設定檔（各自與基準交換黑白比較）", (460, 199), width=376)
         for index, path in enumerate(self.candidates[:7]):
-            y = 226 + index * 48
-            app.button(f"comparison_candidate_select:{index}", path.name, (460, y, 315, 40))
-            app.button(f"comparison_candidate_remove:{index}", "移除", (780, y, 56, 40))
+            y = 226 + index * 38
+            app.button(f"comparison_candidate_select:{index}", path.name, (460, y, 315, 32))
+            app.button(f"comparison_candidate_remove:{index}", "移除", (780, y, 56, 32))
         app.button("comparison_candidate_add", "加入下一份不同設定檔",
-                   (460, min(226 + len(self.candidates[:7]) * 48, 574), 376, 40),
+                   (460, min(226 + len(self.candidates[:7]) * 38, 492), 376, 32),
                    enabled=len(self.candidates) < 7 and any(
                        path != self.baseline and path not in self.candidates for path in self.files))
-        app.text(self.message or "候選共用起始局面、搜尋設定與預算；交換黑白，和棋政策為不自動申請。", 64, 611, muted=True, width=772)
+        if self.message:
+            app.text(self.message, 64, 642, muted=True, width=772)
         app.button("start", "開始生成", (460, 672, 376, 40), primary=True)

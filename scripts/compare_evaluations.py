@@ -7,6 +7,7 @@ from pathlib import Path
 import chess
 
 from engine.evaluation.config import EvaluationConfig
+from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.sessions.evaluation_comparison import (
     ComparisonParticipant,
     ComparisonSearchConfig,
@@ -37,6 +38,9 @@ def main() -> None:
     parser.add_argument("--strategy", choices=("greedy", "alphabeta"), default="greedy")
     parser.add_argument("--depth", type=int, help="Regular depth in plies; Greedy=1, AlphaBeta default=2")
     parser.add_argument("--quiescence-depth", type=int)
+    parser.add_argument("--workers", type=int, default=1, help="Concurrent color-swapped pairs.")
+    parser.add_argument("--search-workers", type=int, help="CPU search workers per AlphaBeta search.")
+    parser.add_argument("--transposition-capacity", type=int, help="Maximum entries in each transposition table.")
     parser.add_argument("--move-ordering", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--transposition-table", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--pvs", action=argparse.BooleanOptionalAction, default=None)
@@ -55,18 +59,23 @@ def main() -> None:
     parser.add_argument("--name")
     parser.add_argument("--tag", action="append", default=[])
     args = parser.parse_args()
+    if args.workers < 1:
+        parser.error("--workers must be a positive integer")
 
     search = None
     if args.strategy == "greedy":
         if args.depth not in (None, 1) or any(value is not None for value in (
             args.quiescence_depth, args.move_ordering, args.transposition_table,
-            args.pvs, args.aspiration_window,
+            args.pvs, args.aspiration_window, args.search_workers, args.transposition_capacity,
         )) or args.no_aspiration:
             parser.error("Greedy supports depth 1 only; search options require --strategy alphabeta")
     else:
         try:
             search = ComparisonSearchConfig(
                 depth_plies=args.depth if args.depth is not None else 2,
+                search_workers=args.search_workers if args.search_workers is not None else 1,
+                transposition_capacity=(args.transposition_capacity if args.transposition_capacity is not None
+                                        else DEFAULT_TRANSPOSITION_CAPACITY),
                 quiescence_depth=args.quiescence_depth if args.quiescence_depth is not None else 4,
                 move_ordering=args.move_ordering if args.move_ordering is not None else True,
                 use_transposition_table=args.transposition_table if args.transposition_table is not None else True,
@@ -102,6 +111,7 @@ def main() -> None:
         tags=args.tag,
         claim_draw=args.claim_draw,
         max_plies=args.max_plies,
+        workers=args.workers,
     )
     print(f"Comparison batch: {result.path}")
     depth = search.depth_plies if search is not None else 1
