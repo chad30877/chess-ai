@@ -36,6 +36,9 @@ class ChessApplicationTest(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.project = Path(self.temporary.name)
+        profiles = self.project / "configs/evaluation"
+        profiles.mkdir(parents=True)
+        (profiles / "stable.json").write_text(json.dumps(EvaluationConfig().to_dict()), encoding="utf-8")
         project_patch = patch("apps.chess_application.PROJECT_ROOT", self.project)
         project_patch.start()
         self.addCleanup(project_patch.stop)

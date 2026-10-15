@@ -64,6 +64,7 @@ class ChessApplication:
             self.live_evaluation_files[0] if self.live_evaluation_files else None,
         )
         self.live_search_depth = 2
+        self.live_search_workers = 1
         self.interval = 1.0
         self.batch_interval = 0.0
         self.batch_workers = 4
@@ -214,6 +215,7 @@ class ChessApplication:
             white_evaluation=white_evaluation,
             black_evaluation=black_evaluation,
             search_depth=self.live_search_depth,
+            search_workers=self.live_search_workers,
         ))
         self.live.start(self.now())
         self.saved = False
@@ -527,6 +529,8 @@ class ChessApplication:
         elif action == "live_depth" and self.live is None:
             depths = (1, 2, 3, 4, 5)
             self.live_search_depth = depths[(depths.index(self.live_search_depth) + 1) % len(depths)]
+        elif action == "live_workers" and self.live is None:
+            self.live_search_workers += 1
         elif action == "color" and self.live is None:
             self.human_color = not self.human_color
             self.flipped = not self.human_color
@@ -819,15 +823,16 @@ class ChessApplication:
                        if self.live_evaluation_file else "沒有設定檔")]
             if self.opponent == "AlphaBeta":
                 fields.append(("live_depth", "搜尋深度", str(self.live_search_depth)))
+                fields.append(("live_workers", "搜尋 worker", str(self.live_search_workers)))
             fields.append(("interval", "間隔", f"{self.interval:g} 秒"))
         for i, (action, label, value) in enumerate(fields):
             y = 112 + i * 42 if self.mode == "human" else 119 + i * 46
             self.text(label, x, y + 7)
             self.button(action, value, (x + 70, y, 162, 36) if self.mode == "human" else (x + 56, y, 176, 36))
-        start_y = 322 if self.mode == "human" else 270
+        start_y = 365 if self.mode == "human" else 270
         self.button("start", "開始對戰", (x, start_y, 232, 42), primary=True)
         if self.mode == "human":
-            self.draw_label(self.small_font, "點選設定切換；深度選項為 1–5", (x, 373), MUTED, 232)
+            self.draw_label(self.small_font, "點選設定切換；深度選項為 1–5", (x, 416), MUTED, 232)
         else:
             self.text("點選設定可切換選項", x, start_y + 51, muted=True)
             self.draw_label(self.small_font, "和棋政策：不自動申請", (x, start_y + 79), MUTED)
