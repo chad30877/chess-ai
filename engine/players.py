@@ -110,6 +110,7 @@ class AlphaBetaPlayer(Player):
         use_transposition_table: bool = True,
         use_pvs: bool = True,
         aspiration_window: float | None = 1.0,
+        search_workers: int = 1,
     ) -> "AlphaBetaPlayer":
         """Build a player whose searcher owns the injected evaluator."""
 
@@ -124,8 +125,14 @@ class AlphaBetaPlayer(Player):
                 use_transposition_table=use_transposition_table,
                 use_pvs=use_pvs,
                 aspiration_window=aspiration_window,
+                search_workers=search_workers,
             )
         )
+
+    def close(self) -> None:
+        close = getattr(self.searcher, "close", None)
+        if close is not None:
+            close()
 
     def choose_move(self, board: chess.Board) -> chess.Move:
         result = self.searcher.search(board)

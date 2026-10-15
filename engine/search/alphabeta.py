@@ -103,6 +103,7 @@ class AlphaBetaSearcher:
         use_transposition_table: bool = True,
         use_pvs: bool = True,
         aspiration_window: float | None = 1.0,
+        search_workers: int = 1,
     ) -> None:
         if limits is not None and default_max_depth != 1:
             raise ValueError("Pass either limits or default_max_depth, not both.")
@@ -130,6 +131,10 @@ class AlphaBetaSearcher:
         ):
             raise ValueError("quiescence_depth must be a non-negative integer.")
 
+        if isinstance(search_workers, bool) or not isinstance(search_workers, int) or search_workers < 1:
+            raise ValueError("search_workers must be a positive integer.")
+        self.search_workers = search_workers
+        self._parallel = None
         self.evaluator = evaluator
         self.default_limits = limits if limits is not None else SearchLimits(max_depth=default_max_depth)
         self.claim_draw = claim_draw
@@ -144,6 +149,11 @@ class AlphaBetaSearcher:
     def search(self, board: chess.Board, limits: SearchLimits | None = None) -> SearchResult:
         """Search by iterative deepening and return the last completed iteration."""
         resolved_limits = limits if limits is not None else self.default_limits
+        if self.search_workers > 1:
+            from engine.search.parallel import ParallelRootSearch
+            if self._parallel is None:
+                self._parallel = ParallelRootSearch(self)
+            return self._parallel.search(board, resolved_limits)
         deadline = (
             monotonic() + resolved_limits.time_ms / 1000
             if resolved_limits.time_ms is not None
@@ -250,6 +260,17 @@ class AlphaBetaSearcher:
             )
 
         return last_completed
+
+    def cancel(self) -> None:
+        """要求在途搜尋合作式停止。"""
+        if self._parallel is not None:
+            self._parallel.cancel()
+
+    def close(self) -> None:
+        """結束可重用的搜尋程序池。"""
+        if self._parallel is not None:
+            self._parallel.close()
+            self._parallel = None
 
     def _search_recursive(
         self,

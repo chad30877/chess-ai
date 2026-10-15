@@ -35,6 +35,7 @@ def strategy_config(name: str, player: Player | None) -> dict:
             "search": {
                 "schema_version": 2,
                 "algorithm": "alpha_beta",
+                "search_workers": searcher.search_workers,
                 "max_depth": limits.max_depth,
                 "transposition_capacity": limits.transposition_capacity,
                 "claim_draw": searcher.claim_draw,

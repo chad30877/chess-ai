@@ -1,6 +1,9 @@
 """Live-game state transitions, worker isolation, and shared rule outcomes."""
 
 import unittest
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
+from time import monotonic, sleep
 from tests.helpers.executors import ManualExecutor
 
 import chess
@@ -13,6 +16,29 @@ from engine.replay.replay_session import ReplaySession
 class LiveSessionTest(unittest.TestCase):
     def setUp(self):
         self.executor = ManualExecutor()
+
+    def test_parallel_ai_stop_finishes_work_without_applying_old_move(self):
+        before = {child.pid for child in multiprocessing.active_children()}
+        game = LiveSession(LiveSettings(white="AlphaBeta", black="Human", interval=0,
+                                       search_depth=10, search_workers=2))
+        game.start()
+        try:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                game.tick(0, executor)
+                deadline = monotonic() + 10
+                while not any(child.pid not in before for child in multiprocessing.active_children()):
+                    self.assertLess(monotonic(), deadline)
+                    sleep(.01)
+                game.stop()
+            game.tick(1, executor)
+            replacement = LiveSession(LiveSettings(white="Human", black="Human"))
+            self.assertEqual(game.status, "stopped")
+            self.assertEqual(game.board.fen(), chess.STARTING_FEN)
+            self.assertEqual(replacement.board.fen(), chess.STARTING_FEN)
+            self.assertEqual(game.replay_payload()["moves_uci"], [])
+        finally:
+            game.cancel_pending()
+        self.assertTrue({child.pid for child in multiprocessing.active_children()} <= before)
 
     def test_start_wait_interval_and_snapshot_isolation(self):
         game = LiveSession(LiveSettings(interval=1))
