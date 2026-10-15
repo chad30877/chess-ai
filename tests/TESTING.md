@@ -8,3 +8,5 @@
 - `ui/test_chess_application.py`：輸入搜尋 worker 後執行 AI 落子，並保存實際條件。
 
 完整測試方式與其他檔案見 [測試導覽](README.md)。
+
+- `self_play/test_alphabeta_batch.py`：一般批次雙方 Alpha-Beta、獨立的兩層 worker 設定與逐場保存；真實 spawn 的暫停／停止、內層故障、保存失敗及後代程序清理（程序觀測使用選用 psutil）。
