@@ -70,6 +70,10 @@ class ChessApplication:
         self.interval = 1.0
         self.batch_interval = 0.0
         self.batch_workers = 4
+        self.batch_search_depth = 2
+        self.batch_search_workers = 1
+        self.batch_transposition_capacity = self.live_transposition_capacity
+        self.batch_evaluation_files = {side: self.live_evaluation_file for side in ("white", "black")}
         self.game_count = 20
         self.batch = None
         self.pending_leave = None
@@ -183,7 +187,11 @@ class ChessApplication:
                 try:
                     settings = (self.evaluation_fields.options() if self.batch_mode == "evaluation"
                                 else BatchSettings(white=self.white, black=self.black,
-                                                   games=self.game_count, interval=self.batch_interval, workers=self.batch_workers))
+                                                   games=self.game_count, interval=self.batch_interval, workers=self.batch_workers,
+                                                   search_depth=self.batch_search_depth, search_workers=self.batch_search_workers,
+                                                   transposition_capacity=self.batch_transposition_capacity,
+                                                   **{side + "_evaluation": self._batch_evaluation(side)
+                                                      for side in ("white", "black")}))
                     if self.batch_mode == "evaluation":
                         settings["workers"] = self.batch_workers
                     self.batch = start_batch(self.batch_mode, settings, PROJECT_ROOT / "data/batches", self.executor)
@@ -501,6 +509,22 @@ class ChessApplication:
             else:
                 self.batch.pause()
             return
+        if self.mode == "auto" and self.batch is None and action.startswith("batch_"):
+            if action in ("batch_depth", "batch_search_workers", "batch_capacity"):
+                if self._commit_number():
+                    attr = {"batch_depth": "batch_search_depth", "batch_search_workers": "batch_search_workers",
+                            "batch_capacity": "batch_transposition_capacity"}[action]
+                    self.numeric_focus = action
+                    self.numeric_text = str(getattr(self, attr))
+                    pygame.key.start_text_input()
+                return
+            if action in ("batch_evaluation_white", "batch_evaluation_black"):
+                side = action.rsplit("_", 1)[1]
+                files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
+                if files:
+                    current = self.batch_evaluation_files[side]
+                    self.batch_evaluation_files[side] = files[(files.index(current) + 1) % len(files)] if current in files else files[0]
+                return
         if self.mode == "auto" and action in ("interval", "count", "workers") and self.batch is None:
             self.evaluation_fields.commit()
             if self._commit_number():
@@ -522,7 +546,8 @@ class ChessApplication:
                 options = ("Random", "Greedy", "AlphaBeta")
                 self.opponent = options[(options.index(self.opponent) + 1) % len(options)]
             else:
-                setattr(self, action, "Greedy" if getattr(self, action) == "Random" else "Random")
+                options = ("Random", "Greedy", "AlphaBeta")
+                setattr(self, action, options[(options.index(getattr(self, action)) + 1) % len(options)])
         elif action == "live_evaluation" and self.live is None:
             self._refresh_evaluation_profiles()
             if not self.live_evaluation_files:
@@ -573,15 +598,25 @@ class ChessApplication:
         elif self.replay and action in ("first", "prev", "next", "last"):
             getattr(self.replay, action)()
 
+    def _batch_evaluation(self, side):
+        if getattr(self, side) == "Random":
+            return None
+        profile = self.batch_evaluation_files[side]
+        return EvaluationConfig.from_dict(json.loads(profile.read_text(encoding="utf-8"))) if profile else EvaluationConfig()
+
     def _commit_number(self):
         if self.numeric_focus is None:
             return True
         try:
-            value = int(self.numeric_text) if self.numeric_focus in ("count", "workers", "live_workers", "live_capacity") else float(self.numeric_text)
+            value = int(self.numeric_text) if self.numeric_focus in ("count", "workers", "live_workers", "live_capacity", "batch_depth", "batch_search_workers", "batch_capacity") else float(self.numeric_text)
             import math
-            if not math.isfinite(value) or (value < 1 if self.numeric_focus in ("count", "workers", "live_workers", "live_capacity") else value < 0):
+            if not math.isfinite(value) or (value < 1 if self.numeric_focus in ("count", "workers", "live_workers", "live_capacity", "batch_depth", "batch_search_workers", "batch_capacity") else value < 0):
                 raise ValueError()
-            if self.numeric_focus == "live_workers":
+            if self.numeric_focus in ("batch_depth", "batch_search_workers", "batch_capacity"):
+                attr = {"batch_depth": "batch_search_depth", "batch_search_workers": "batch_search_workers",
+                        "batch_capacity": "batch_transposition_capacity"}[self.numeric_focus]
+                setattr(self, attr, value)
+            elif self.numeric_focus == "live_workers":
                 self.live_search_workers = value
             elif self.numeric_focus == "live_capacity":
                 self.live_transposition_capacity = value
@@ -1095,24 +1130,27 @@ class ChessApplication:
             if self.batch_mode == "evaluation":
                 self.evaluation_fields.render(self)
             else:
-                self.text("固定白黑方配置；間隔是兩場之間的等待秒數。", 100, 166, muted=True)
                 fields = [("white", "白方", self.white), ("black", "黑方", self.black),
-                          ("interval", "場間間隔（秒）", f"{self.batch_interval:g}"),
-                          ("count", "場次", str(self.game_count))]
+                          ("batch_evaluation_white", "白方評分", self.batch_evaluation_files["white"].stem if self.batch_evaluation_files["white"] else "預設"),
+                          ("batch_evaluation_black", "黑方評分", self.batch_evaluation_files["black"].stem if self.batch_evaluation_files["black"] else "預設"),
+                          ("interval", "場間秒數", f"{self.batch_interval:g}"), ("count", "場次", str(self.game_count)),
+                          ("batch_depth", "搜尋深度", str(self.batch_search_depth)),
+                          ("batch_search_workers", "搜尋 worker", str(self.batch_search_workers)),
+                          ("batch_capacity", "表項上限", str(self.batch_transposition_capacity))]
                 for index, (action, label, value) in enumerate(fields):
-                    y = 225 + index * 64
-                    self.text(label, 100, y + 9)
+                    column, row = index % 2, index // 2
+                    x, y = 64 + column * 396, 185 + row * 70
+                    self.draw_label(self.small_font, label, (x, y))
                     if self.numeric_focus == action:
                         value = self.numeric_text + " |"
-                    self.button(action, value, (340, y, 360, 44), primary=self.numeric_focus == action)
-                self.text("數字欄位可輸入，Ctrl+A 清空，Enter 確認。", 100, 532, muted=True)
-                self.button("start", "開始生成", (100, 564, 600, 48), primary=True)
+                    self.button(action, value, (x, y + 23, 376, 38), primary=self.numeric_focus == action)
+                self.button("start", "開始生成", (148, 568, 600, 48), primary=True)
             if self.batch_mode == "evaluation":
-                self.draw_label(self.small_font, "同時對戰場數（每個程序執行一組配對）", (460, 515), width=376)
-                worker_rect = (460, 540, 376, 39)
+                self.draw_label(self.small_font, "同時對戰場數（每個程序執行一組配對）", (460, 570), width=376)
+                worker_rect = (460, 595, 376, 39)
             else:
-                self.text("同時對戰場數", 100, 490)
-                worker_rect = (340, 481, 360, 44)
+                self.draw_label(self.small_font, "同時對戰場數", (460, 465))
+                worker_rect = (460, 488, 376, 38)
             value = self.numeric_text + " |" if self.numeric_focus == "workers" else str(self.batch_workers)
             self.button("workers", value, worker_rect, primary=self.numeric_focus == "workers")
             self.text(self.message, 64, 642, width=772, muted=True)

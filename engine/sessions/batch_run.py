@@ -1,17 +1,21 @@
 """一般批次的固定顏色政策與逐局保存，背景控制使用共用執行機制。"""
 
 import random
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from pathlib import Path
 from engine.sessions.batch_execution import BatchExecution
-from engine.sessions.batch_workers import general_player
+from engine.sessions.batch_workers import general_player, own_player
+from engine.sessions.evaluation_comparison import _ControlledPlayer
+from engine.search import SearchLimits
+from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.sessions.parallel_batch import actual_workers, run_parallel
 
 import chess
 
 from engine.evaluation.config import EvaluationConfig
 from engine.storage.batch_storage import BatchWriter
-from engine.players import GreedyPlayer, RandomPlayer
+from engine.players import AlphaBetaPlayer, GreedyPlayer, RandomPlayer
 from engine.sessions.self_play import play_game
 from engine.strategy_config import strategy_config
 
@@ -29,13 +33,19 @@ class BatchSettings:
     black_evaluation: EvaluationConfig | None = None
     workers: int = 1
     base_seed: int | None = None
+    search_depth: int = 2
+    search_workers: int = 1
+    transposition_capacity: int = DEFAULT_TRANSPOSITION_CAPACITY
 
     def __post_init__(self):
         actual_workers(self.workers, self.games)
+        SearchLimits(max_depth=self.search_depth, transposition_capacity=self.transposition_capacity)
+        if isinstance(self.search_workers, bool) or not isinstance(self.search_workers, int) or self.search_workers < 1:
+            raise ValueError("搜尋 worker 數需為正整數")
         if self.base_seed is not None and (isinstance(self.base_seed, bool)
                 or not isinstance(self.base_seed, int) or self.base_seed < 0):
             raise ValueError("base_seed 必須為非負整數")
-        if self.white not in ("Random", "Greedy") or self.black not in ("Random", "Greedy"):
+        if self.white not in ("Random", "Greedy", "AlphaBeta") or self.black not in ("Random", "Greedy", "AlphaBeta"):
             raise ValueError("Batch players must be AI strategies")
         if self.games <= 0 or self.interval < 0 or (self.max_plies is not None and self.max_plies < 0):
             raise ValueError("Invalid batch count or execution limit")
@@ -43,10 +53,10 @@ class BatchSettings:
             raise ValueError("white_evaluation must be an EvaluationConfig")
         if self.black_evaluation is not None and not isinstance(self.black_evaluation, EvaluationConfig):
             raise ValueError("black_evaluation must be an EvaluationConfig")
-        if self.white != "Greedy" and self.white_evaluation is not None:
-            raise ValueError("white_evaluation is only valid for Greedy")
-        if self.black != "Greedy" and self.black_evaluation is not None:
-            raise ValueError("black_evaluation is only valid for Greedy")
+        if self.white not in ("Greedy", "AlphaBeta") and self.white_evaluation is not None:
+            raise ValueError("white_evaluation is only valid for Greedy or AlphaBeta")
+        if self.black not in ("Greedy", "AlphaBeta") and self.black_evaluation is not None:
+            raise ValueError("black_evaluation is only valid for Greedy or AlphaBeta")
 
 
 class BatchRun(BatchExecution):
@@ -64,20 +74,18 @@ class BatchRun(BatchExecution):
         s = self.settings
         workers = actual_workers(s.workers, s.games)
         base_seed = s.base_seed if s.base_seed is not None else random.SystemRandom().randrange(2**63)
-        templates = {
-            "white": self._create_player(
-                s.white, random.Random(0), s.white_evaluation, s.claim_draw,
-            ),
-            "black": self._create_player(
-                s.black, random.Random(0), s.black_evaluation, s.claim_draw,
-            ),
-        }
-        settings = dict(initial_fen=s.initial_fen, rules={"claim_draw": s.claim_draw},
-                        strategies={"white": strategy_config(s.white, templates["white"]),
-                                    "black": strategy_config(s.black, templates["black"])},
-                        color_assignment="fixed", interval_seconds=s.interval, workers=workers,
-                        requested_workers=s.workers, base_seed=base_seed,
-                        seed_derivation="base_seed + work_number - 1", publication_order="arrival")
+        with ExitStack() as stack:
+            templates = {}
+            for side in ("white", "black"):
+                templates[side] = own_player(stack, self._create_player(
+                    getattr(s, side), random.Random(0), getattr(s, side + "_evaluation"), s.claim_draw,
+                    s.search_depth, s.search_workers, s.transposition_capacity))
+            settings = dict(initial_fen=s.initial_fen, rules={"claim_draw": s.claim_draw},
+                            strategies={side: strategy_config(getattr(s, side), templates[side])
+                                        for side in ("white", "black")},
+                            color_assignment="fixed", interval_seconds=s.interval, workers=workers,
+                            requested_workers=s.workers, base_seed=base_seed,
+                            seed_derivation="base_seed + work_number - 1", publication_order="arrival")
         if s.max_plies is not None:
             settings["max_plies"] = s.max_plies
         with BatchWriter(self.root, name=None, tags=[], settings={"num_games": s.games, **settings}) as writer:
@@ -94,7 +102,8 @@ class BatchRun(BatchExecution):
                                     last_replay=str(writer.path / "replays" / f"{game_id}.json")))
 
             if workers > 1:
-                player_settings = dict(white=s.white, black=s.black, claim_draw=s.claim_draw, max_plies=s.max_plies,
+                player_settings = dict(search_depth=s.search_depth, search_workers=s.search_workers,
+                                       transposition_capacity=s.transposition_capacity, white=s.white, black=s.black, claim_draw=s.claim_draw, max_plies=s.max_plies,
                                        white_evaluation=s.white_evaluation.to_dict() if s.white_evaluation else None,
                                        black_evaluation=s.black_evaluation.to_dict() if s.black_evaluation else None)
                 stopped = run_parallel(work_count=s.games, workers=workers,
@@ -117,13 +126,15 @@ class BatchRun(BatchExecution):
             self._progress(dict(current_game=number, waiting_work=s.games - number, running_work=1))
             seed = base_seed + number - 1
             rng = random.Random(seed)
-            game = play_game(
-                number,
-                self._create_player(s.white, rng, s.white_evaluation, s.claim_draw),
-                self._create_player(s.black, rng, s.black_evaluation, s.claim_draw),
-                s.white, s.black, initial_fen=s.initial_fen,
-                claim_draw=s.claim_draw, max_plies=s.max_plies, control=self._control,
-            )
+            with ExitStack() as stack:
+                players = []
+                for side in ("white", "black"):
+                    player = own_player(stack, self._create_player(getattr(s, side), rng,
+                        getattr(s, side + "_evaluation"), s.claim_draw, s.search_depth,
+                        s.search_workers, s.transposition_capacity))
+                    players.append(_ControlledPlayer(player, self._dispatch_control))
+                game = play_game(number, *players, s.white, s.black, initial_fen=s.initial_fen,
+                                 claim_draw=s.claim_draw, max_plies=s.max_plies, control=self._control)
             save(number, game, seed, 0)
             self._progress(dict(running_work=0, finished_work=number, finished_games=number))
             if number < s.games and not self._interval():
@@ -138,5 +149,6 @@ class BatchRun(BatchExecution):
         rng: random.Random,
         evaluation: EvaluationConfig | None,
         claim_draw: bool,
-    ) -> RandomPlayer | GreedyPlayer:
-        return general_player(name, rng, evaluation, claim_draw)
+        search_depth=2, search_workers=1, transposition_capacity=DEFAULT_TRANSPOSITION_CAPACITY,
+    ) -> RandomPlayer | GreedyPlayer | AlphaBetaPlayer:
+        return general_player(name, rng, evaluation, claim_draw, search_depth, search_workers, transposition_capacity)
