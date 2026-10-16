@@ -15,7 +15,7 @@
 | `search/test_alphabeta_searcher.py`、`test_alphabeta_player.py`、`test_search_types.py` | Minimax 比對、搜尋契約、玩家與參數 |
 | `search/test_greedy_terminal_scoring.py` | Greedy 與 Alpha-Beta 共用終局計分 |
 | `search/test_iterative_deepening.py`、`test_move_ordering.py`、`test_quiescence.py`、`test_pvs.py`、`test_aspiration.py` | 迭代加深、排序、延伸、窄窗重搜及取消／逾時 |
-| `search/test_transposition.py` | 容量與深度／界限／世代替換、歷史／將死鍵值與搜尋隔離 |
+| `search/test_transposition.py` | 容量與替換、易位／吃過路兵、歷史／將死鍵值與搜尋隔離 |
 | `search/test_parallel_search.py` | 真實 spawn 搜尋、將死／歷史、取消、故障與程序清理 |
 | `self_play/test_batch_generation.py`、`test_batch_ui_storage.py` | 批次格式、保存失敗、流水號與日期分類 |
 | `self_play/test_batch_execution.py`、`test_parallel_batch.py` | 共用派工、逐局發布、暫停／停止與失敗清理 |

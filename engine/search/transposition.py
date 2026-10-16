@@ -9,7 +9,7 @@ DEFAULT_TRANSPOSITION_CAPACITY = 4_096
 import chess
 
 
-PositionIdentity = tuple[str, str, str, str]
+PositionIdentity = tuple[int, int, int, int, int, int, int, int, bool, int, int | None]
 
 
 class BoundType(str, Enum):
@@ -59,8 +59,14 @@ def classify_bound(score: float, alpha: float, beta: float) -> BoundType:
 
 
 def _position_identity(board: chess.Board) -> PositionIdentity:
-    fields = board.fen(en_passant="legal").split()
-    return fields[0], fields[1], fields[2], fields[3]
+    # 直接保留完整局面資料，避免逐格產生 FEN，也不引入固定長度雜湊碰撞。
+    return (
+        board.pawns, board.knights, board.bishops, board.rooks,
+        board.queens, board.kings,
+        board.occupied_co[chess.WHITE], board.occupied_co[chess.BLACK],
+        board.turn, board.clean_castling_rights(),
+        board.ep_square if board.has_legal_en_passant() else None,
+    )
 
 
 def _reversible_history(board: chess.Board) -> tuple[PositionIdentity, ...]:
@@ -90,10 +96,11 @@ def make_transposition_key(
         or ply_from_root < 0
     ):
         raise ValueError("ply_from_root must be a non-negative integer.")
+    history = _reversible_history(board)
     return TranspositionKey(
-        position=_position_identity(board),
+        position=history[-1],
         halfmove_clock=board.halfmove_clock,
-        reversible_history=_reversible_history(board),
+        reversible_history=history,
         ply_from_root=ply_from_root,
     )
 
