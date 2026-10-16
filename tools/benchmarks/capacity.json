@@ -1,0 +1,736 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.13",
+  "logical_cpus": 16,
+  "psutil": "7.2.2",
+  "evaluation": {
+    "version": 6,
+    "phase": {
+      "enabled": false,
+      "model_version": 1
+    },
+    "perspective": "white",
+    "score_unit": "pawn",
+    "terms": {
+      "material": {
+        "enabled": true,
+        "weight": 1.0,
+        "piece_values": {
+          "P": 1.0,
+          "N": 3.0,
+          "B": 3.0,
+          "R": 5.0,
+          "Q": 9.0
+        },
+        "endgame_piece_values": {
+          "P": 1.0,
+          "N": 3.0,
+          "B": 3.0,
+          "R": 5.0,
+          "Q": 9.0
+        }
+      },
+      "piece_square": {
+        "enabled": true,
+        "weight": 1.0,
+        "table_version": 1,
+        "endgame_weight": 1.0,
+        "endgame_table_version": 1
+      },
+      "isolated_pawns": {
+        "enabled": false,
+        "weight": 0.15,
+        "endgame_weight": 0.2,
+        "feature_version": 1
+      },
+      "doubled_pawns": {
+        "enabled": false,
+        "weight": 0.1,
+        "endgame_weight": 0.15,
+        "feature_version": 1
+      },
+      "passed_pawns": {
+        "enabled": false,
+        "weight": 0.05,
+        "endgame_weight": 0.1,
+        "feature_version": 1
+      },
+      "pawn_mobility": {
+        "enabled": false,
+        "weight": 0.01,
+        "endgame_weight": 0.01,
+        "feature_version": 1
+      },
+      "knight_mobility": {
+        "enabled": false,
+        "weight": 0.03,
+        "endgame_weight": 0.03,
+        "feature_version": 1
+      },
+      "bishop_mobility": {
+        "enabled": false,
+        "weight": 0.03,
+        "endgame_weight": 0.03,
+        "feature_version": 1
+      },
+      "rook_mobility": {
+        "enabled": false,
+        "weight": 0.02,
+        "endgame_weight": 0.03,
+        "feature_version": 1
+      },
+      "queen_mobility": {
+        "enabled": false,
+        "weight": 0.01,
+        "endgame_weight": 0.02,
+        "feature_version": 1
+      },
+      "king_mobility": {
+        "enabled": false,
+        "weight": 0.01,
+        "endgame_weight": 0.02,
+        "feature_version": 1
+      },
+      "king_pawn_shield": {
+        "enabled": false,
+        "weight": 0.1,
+        "endgame_weight": 0.0,
+        "feature_version": 1
+      },
+      "king_zone_attacks": {
+        "enabled": false,
+        "weight": 0.05,
+        "endgame_weight": 0.0,
+        "feature_version": 1
+      },
+      "king_file_exposure": {
+        "enabled": false,
+        "weight": 0.08,
+        "endgame_weight": 0.0,
+        "feature_version": 1
+      },
+      "bishop_pair": {
+        "enabled": false,
+        "weight": 0.3,
+        "endgame_weight": 0.4,
+        "feature_version": 1
+      },
+      "rook_open_file": {
+        "enabled": false,
+        "weight": 0.15,
+        "endgame_weight": 0.2,
+        "feature_version": 1
+      },
+      "rook_half_open_file": {
+        "enabled": false,
+        "weight": 0.1,
+        "endgame_weight": 0.15,
+        "feature_version": 1
+      }
+    }
+  },
+  "options": {
+    "suite": "capacity",
+    "depth": 5,
+    "quiescence_depth": 0,
+    "cases": [
+      "start"
+    ],
+    "workers": [
+      1,
+      2,
+      4
+    ],
+    "repeats": 2,
+    "steps": 0,
+    "timeout_ms": 120000,
+    "capacities": [
+      128,
+      4096,
+      65536
+    ],
+    "age_weights": [
+      0,
+      2,
+      4
+    ],
+    "games": 4,
+    "plies": 2,
+    "matrix": [
+      "1x1",
+      "1x4",
+      "2x2",
+      "4x5"
+    ],
+    "output": "tools\\benchmarks\\capacity.json",
+    "no_memory_sampling": false
+  },
+  "search_defaults": {
+    "move_ordering": true,
+    "use_transposition_table": true,
+    "use_pvs": true,
+    "aspiration_window": 1.0,
+    "claim_draw": false
+  },
+  "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+  "rows": [
+    {
+      "suite": "capacity",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 128,
+      "age_weight": 0,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.798984100000098,
+          "nodes": 28726,
+          "hits": 375,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 31453184,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 128,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.987924499999963,
+          "nodes": 29202,
+          "hits": 332,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 31559680,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 128,
+      "age_weight": 4,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 8.05468339999993,
+          "nodes": 29202,
+          "hits": 345,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 31485952,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 4096,
+      "age_weight": 0,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.346156699999938,
+          "nodes": 26049,
+          "hits": 3942,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 38334464,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.396611200000052,
+          "nodes": 26231,
+          "hits": 3754,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 37924864,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 4096,
+      "age_weight": 4,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.396428600000036,
+          "nodes": 26630,
+          "hits": 3742,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 37933056,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 65536,
+      "age_weight": 0,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 6.799408600000106,
+          "nodes": 26049,
+          "hits": 5062,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 57376768,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 65536,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 6.865425799999912,
+          "nodes": 26049,
+          "hits": 5062,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 57303040,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 65536,
+      "age_weight": 4,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 6.706912999999986,
+          "nodes": 26049,
+          "hits": 5062,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 57487360,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 128,
+      "age_weight": 0,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.9523314999999,
+          "nodes": 28726,
+          "hits": 375,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 31612928,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 128,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.911593699999912,
+          "nodes": 29202,
+          "hits": 332,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 31539200,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 128,
+      "age_weight": 4,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 8.072641799999928,
+          "nodes": 29202,
+          "hits": 345,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 31399936,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 4096,
+      "age_weight": 0,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.202864699999964,
+          "nodes": 26049,
+          "hits": 3942,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 38354944,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.266620000000103,
+          "nodes": 26231,
+          "hits": 3754,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 38035456,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 4096,
+      "age_weight": 4,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 7.288774900000135,
+          "nodes": 26630,
+          "hits": 3742,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 37859328,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 65536,
+      "age_weight": 0,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 6.723463000000038,
+          "nodes": 26049,
+          "hits": 5062,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 57282560,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 65536,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 6.811251000000084,
+          "nodes": 26049,
+          "hits": 5062,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 57229312,
+      "max_processes": 2
+    },
+    {
+      "suite": "capacity",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 0,
+      "capacity": 65536,
+      "age_weight": 4,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 6.695520400000078,
+          "nodes": 26049,
+          "hits": 5062,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "e2e4",
+          "score": 0.71
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 57180160,
+      "max_processes": 2
+    }
+  ]
+}

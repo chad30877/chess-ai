@@ -1,12 +1,31 @@
 # 測試說明
 
-- `search/test_transposition.py`：置換表容量、深度／界限／世代保留偏好、小容量將死搜尋、歷史鍵值與每次搜尋失效。
-- `self_play/test_alphabeta_comparison.py`：完整比較流程、UI／CLI 的共同 worker 與容量、多候選逐場保存、真實兩層 spawn 停止及舊紀錄相容。
+從專案根目錄執行：
 
-- `search/test_parallel_search.py`：真實 spawn 的將死距離、完整重複歷史、取消／逾時、程序故障與清理。
-- `ui/test_live_session.py`：真人對局背景搜尋停止與舊結果隔離。
-- `ui/test_chess_application.py`：輸入搜尋 worker 後執行 AI 落子，並保存實際條件。
+```powershell
+& ./.venv/Scripts/python.exe -m unittest discover -s tests -t .
+```
 
-完整測試方式與其他檔案見 [測試導覽](README.md)。
+| 檔案 | 測試內容 |
+| --- | --- |
+| `rules/test_game_rules.py` | 共用棋規、特殊走法、重複歷史與終局 |
+| `evaluation/test_evaluation_config.py`、`test_evaluator_semantics.py` | 設定驗證、舊版本讀取、保存、總分與白方視角 |
+| `evaluation/test_piece_square_tables.py`、`test_tapered_evaluation.py` | 棋子位置表、鏡射與中殘局混合 |
+| `evaluation/test_pawn_structure.py`、`test_mobility.py`、`test_king_safety.py`、`test_coordination.py` | 兵形、活動力、國王安全與棋子協調評分 |
+| `search/test_alphabeta_searcher.py`、`test_alphabeta_player.py`、`test_search_types.py` | Minimax 比對、搜尋契約、玩家與參數 |
+| `search/test_greedy_terminal_scoring.py` | Greedy 與 Alpha-Beta 共用終局計分 |
+| `search/test_iterative_deepening.py`、`test_move_ordering.py`、`test_quiescence.py`、`test_pvs.py`、`test_aspiration.py` | 迭代加深、排序、延伸、窄窗重搜及取消／逾時 |
+| `search/test_transposition.py` | 容量與深度／界限／世代替換、歷史／將死鍵值與搜尋隔離 |
+| `search/test_parallel_search.py` | 真實 spawn 搜尋、將死／歷史、取消、故障與程序清理 |
+| `self_play/test_batch_generation.py`、`test_batch_ui_storage.py` | 批次格式、保存失敗、流水號與日期分類 |
+| `self_play/test_batch_execution.py`、`test_parallel_batch.py` | 共用派工、逐局發布、暫停／停止與失敗清理 |
+| `self_play/test_alphabeta_batch.py` | 一般 Alpha-Beta 批次、兩層真實 spawn、超額派工、保存失敗與後代清理 |
+| `self_play/test_evaluation_comparison.py`、`test_alphabeta_comparison.py`、`test_comparison_run.py` | 共同條件、交換黑白、多候選、逐場保存、停止與舊紀錄 |
+| `self_play/test_engine_match.py`、`test_cli_roundtrip.py` | 對戰 CLI、生成／匯出／回放往返 |
+| `replay/test_replay_session.py`、`test_records_catalog.py`、`test_comparison_catalog.py` | 回放跳步、日期查找與比較摘要 |
+| `ui/test_live_session.py` | 背景落子、真人回合、停止及舊結果隔離 |
+| `ui/test_chess_application.py` | UI 事件、搜尋設定生效、保存、回放與縮放 |
+| `test_discovery.py`、`test_engine_imports.py` | 測試發現及獨立程序載入 |
+| `helpers/executors.py` | 供流程測試手動完成背景工作 |
 
-- `self_play/test_alphabeta_batch.py`：一般批次雙方 Alpha-Beta、獨立的兩層 worker 設定與逐場保存；真實 spawn 的暫停／停止、內層故障、保存失敗及後代程序清理（程序觀測使用選用 psutil）。
+UI 測試使用 dummy 顯示驅動。含程序觀測的測試與獨立效能工具使用選用套件 `psutil`；效能量測見[搜尋與評分](../docs/搜尋與評分.md)，不在例行測試斷言深度 5 秒數。
