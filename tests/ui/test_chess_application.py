@@ -84,6 +84,74 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.batch_workers = 1
         self.addCleanup(self.app.close)
 
+    def test_profile_selection_isolates_groups_in_actual_evaluation_and_comparison(self):
+        import shutil
+        from engine.evaluation.evaluator import HandcraftedEvaluator
+        folder = self.project / "configs/evaluation"
+        for source in Path("configs/evaluation").glob("learning-*.json"):
+            shutil.copy(source, folder / source.name)
+        expected_groups = {
+            "coordination": {"bishop_pair", "rook_open_file", "rook_half_open_file"},
+            "king-safety": {"king_pawn_shield", "king_zone_attacks", "king_file_exposure"},
+            "material": set(),
+            "mobility": {"pawn_mobility", "knight_mobility", "bishop_mobility", "rook_mobility", "queen_mobility", "king_mobility"},
+            "pawn": {"isolated_pawns", "doubled_pawns", "passed_pawns"},
+            "piece-square": {"piece_square"},
+        }
+        self.app.open_replay(Path("data/replays/sample_replay.json"))
+        self.click("replay_edit")
+        board = chess.Board("r5k1/5ppp/8/3P4/2P5/2N5/5PPP/R1B1KB2 w Q - 0 1")
+        for group, terms in expected_groups.items():
+            with self.subTest(group=group):
+                self.click("editor_profile")
+                config = self.app.replay_editor.config
+                breakdown = HandcraftedEvaluator(config=config).evaluate_breakdown(board)
+                self.assertEqual({name for name, term in breakdown.terms.items() if term.enabled}, terms | {"material"})
+                self.assertAlmostEqual(breakdown.total_score, sum(term.contribution for term in breakdown.terms.values()))
+                self.assertTrue(config.phase_enabled)
+                self.assertEqual(dict(config.piece_values), dict(config.endgame_piece_values))
+        self.click("editor_discard")
+        self.click("home")
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        fields = self.app.evaluation_fields
+        fields.baseline = folder / "learning-material.json"
+        fields.candidates = [folder / "learning-pawn.json"]
+        options = fields.options()
+        self.assertFalse(options["baseline"].evaluation_config.pst_enabled)
+        self.assertTrue(all(term.enabled for term in options["candidates"][0].evaluation_config.pawn_terms.values()))
+
+    def test_single_group_profile_roundtrips_through_replay_and_live_game(self):
+        import shutil
+        from engine.evaluation.evaluator import HandcraftedEvaluator
+        folder = self.project / "configs/evaluation"
+        for source in Path("configs/evaluation").glob("learning-*.json"):
+            shutil.copy(source, folder / source.name)
+        self.assertTrue(self.app.open_replay(Path("data/replays/sample_replay.json")))
+        self.click("replay_edit")
+        self.assertIsNotNone(self.app.replay_editor)
+        self.click("editor_profile")
+        config = self.app.replay_editor.config
+        self.assertTrue(config.phase_enabled)
+        self.assertFalse(config.pst_enabled)
+        self.assertTrue(all(term.enabled for term in config.coordination_terms.values()))
+        board = chess.Board("6k1/8/8/8/8/8/8/2B1KB2 w - - 0 1")
+        expected = HandcraftedEvaluator(config=config).evaluate(board)
+        self.assertGreater(expected, HandcraftedEvaluator(config=EvaluationConfig.material_only()).evaluate(board))
+        self.app.replay_editor.name = "我的協調"
+        self.click("editor_save")
+        saved = folder / "我的協調.json"
+        restored = EvaluationConfig.from_dict(json.loads(saved.read_text(encoding="utf-8")))
+        self.assertEqual(restored, config)
+        self.click("home")
+        self.click("mode:human")
+        for _ in range(len(self.app.live_evaluation_files)):
+            if self.app.live_evaluation_file == saved:
+                break
+            self.click("live_evaluation")
+        self.click("start")
+        self.assertEqual(self.app.live.settings.black_evaluation, config)
+
     def test_sorted_candidates_replay_and_save_actual_snapshot(self):
         from dataclasses import replace
         configs = [replace(EvaluationConfig(), pst_weight=float(i + 2)) for i in range(9)]

@@ -37,3 +37,5 @@ UI 測試使用 dummy 顯示驅動。含程序觀測的測試與獨立效能工�
 比較實驗回歸另涵蓋中斷嘗試續跑後的結果表、回放與另存、相近權重不混淆，以及第八份以後設定檔的分頁操作。
 
 開局庫：`test_live_session` 驗證種子、上限與真人偏離後不回庫；`test_batch_ui_storage` 驗證一般批次序列在單程序及 spawn 一致並可保存；`test_chess_application` 驗證 UI 設定傳遞及載入錯誤顯示。
+
+單群組設定：`ui/test_chess_application.py` 透過 UI 事件驗證六組隔離、實際評分、回放另存及真人／比較載入。

@@ -21,6 +21,7 @@ from engine.storage.data_ids import TAIPEI, allocate_id, date_key, now_iso
 from engine.sessions.batch_run import BatchSettings
 from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
+from ui.evaluation_profiles import profile_name, profile_summary, config_summary
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.replay.replay_loader import load_replay_json
@@ -446,6 +447,18 @@ class ChessApplication:
                 self.replay_editor = None
                 self._replay_breakdown_ply = -1
                 pygame.key.stop_text_input()
+            elif action == "editor_profile":
+                files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
+                current = getattr(editor, "profile_path", None)
+                if files:
+                    path = files[(files.index(current) + 1) % len(files)] if current in files else files[0]
+                    try:
+                        config = EvaluationConfig.from_dict(json.loads(path.read_text(encoding="utf-8")))
+                        self.replay_editor = ReplayEvaluationEditor(config)
+                        self.replay_editor.profile_path = path
+                        self._replay_breakdown_ply = -1
+                    except (OSError, ValueError, TypeError, KeyError) as exc:
+                        editor.message = f"無法載入設定：{exc}"
             elif action == "editor_save":
                 self._save_replay_evaluation()
             elif action.startswith("editor_group:"):
@@ -458,8 +471,8 @@ class ChessApplication:
                 editor.begin_edit(action.split(":", 1)[1])
                 pygame.key.start_text_input()
             return
-        if self.replay_editor is not None and action == "replay_edit":
-            if self.replay_evaluator is not None and self.replay_evaluator_saved:
+        if action == "replay_edit" and self.mode == "replay":
+            if self.replay_evaluator is not None:
                 self.replay_editor = ReplayEvaluationEditor(self.replay_evaluator.config)
                 self._replay_breakdown_ply = -1
             return
@@ -888,8 +901,7 @@ class ChessApplication:
             opponent_name = "Alpha-Beta" if self.opponent == "AlphaBeta" else self.opponent
             fields = [("color", "我執", "白方" if self.human_color else "黑方"),
                       ("opponent", "對手", opponent_name),
-                      ("live_evaluation", "評分設定", self.live_evaluation_file.name
-                       if self.live_evaluation_file else "沒有設定檔")]
+                      ("live_evaluation", "評分設定", profile_name(self.live_evaluation_file))]
             if self.opponent == "AlphaBeta":
                 fields.extend([("opening_book", "開局庫", "開" if self.opening_book else "關"),
                                ("opening_limit", "半回合", str(self.opening_max_plies))])
@@ -903,6 +915,11 @@ class ChessApplication:
             if self.numeric_focus == action:
                 value = self.numeric_text + " |"
             self.button(action, value, (x + 80, y, 152, 32) if self.mode == "human" else (x + 56, y, 176, 36))
+        if self.mode == "human":
+            summary = profile_summary(self.live_evaluation_file)
+            groups, _, phase = summary.partition("｜")
+            self.draw_label(self.small_font, groups, (x, 578), MUTED, 232)
+            self.draw_label(self.small_font, phase, (x, 602), MUTED, 232)
         start_y = 490 if self.mode == "human" else 270
         self.button("start", "開始對戰", (x, start_y, 232, 42), primary=True)
         if self.mode == "human":
@@ -938,7 +955,7 @@ class ChessApplication:
         self.draw_label(self.small_font, label if self.replay_data else "尚未選擇對局", (x, 113), MUTED, 230)
         if self.replay_data:
             self.button("replay_edit", "調整評分", (x + 118, 68, 114, 32),
-                        enabled=self.replay_evaluator_saved)
+                        enabled=self.replay_evaluator is not None)
             metadata = self.replay_data.get("metadata", {})
             info = {key: metadata.get(key) or "未記錄" for key in ("white_player", "black_player", "game_id")}
             result = self.replay_record.result if self.replay_record is not None else self.replay_data.get("result")
@@ -1028,6 +1045,9 @@ class ChessApplication:
         self.draw_rect(BORDER, (24, 64, 852, 640), 1, border_radius=10)
         self.buttons = []
         self.text("調整回放評分", 48, 79, large=True)
+        self.button("editor_profile", profile_name(getattr(editor, "profile_path", None)), (300, 78, 180, 32))
+        self.draw_label(self.small_font, config_summary(editor.config), (490, 79), TEXT, 350)
+        self.draw_label(self.small_font, "分階段：" + ("開" if editor.config.phase_enabled else "關"), (490, 101), MUTED, 350)
         self.draw_label(self.small_font, "設定名稱", (48, 125), MUTED)
         name_value = (editor.input_draft + " |" if editor.focus == "name" else editor.name or "點此輸入新設定檔名稱")
         self.button("editor_field:name", name_value, (48, 148, 360, 38), primary=editor.focus == "name")
@@ -1155,8 +1175,8 @@ class ChessApplication:
                 self.evaluation_fields.render(self)
             else:
                 fields = [("white", "白方", self.white), ("black", "黑方", self.black),
-                          ("batch_evaluation_white", "白方評分", self.batch_evaluation_files["white"].stem if self.batch_evaluation_files["white"] else "預設"),
-                          ("batch_evaluation_black", "黑方評分", self.batch_evaluation_files["black"].stem if self.batch_evaluation_files["black"] else "預設"),
+                          ("batch_evaluation_white", "白方評分", profile_summary(self.batch_evaluation_files["white"])),
+                          ("batch_evaluation_black", "黑方評分", profile_summary(self.batch_evaluation_files["black"])),
                           ("interval", "場間秒數", f"{self.batch_interval:g}"), ("count", "場次", str(self.game_count)),
                           ("batch_depth", "搜尋深度", str(self.batch_search_depth)),
                           ("batch_search_workers", "搜尋 worker", str(self.batch_search_workers)),

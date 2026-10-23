@@ -7,6 +7,7 @@ import chess
 import pygame
 
 from engine.evaluation.config import EvaluationConfig
+from ui.evaluation_profiles import profile_button
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.sessions.evaluation_comparison import ComparisonParticipant, ComparisonSearchConfig, _normalized_positions
 
@@ -190,12 +191,15 @@ class EvaluationFields:
             app.draw_label(app.small_font, label, (x, y + 8), width=122)
             if key == "baseline":
                 path = getattr(self, key)
-                value = path.name if path else "沒有設定檔"
+                value = ""
                 action = f"comparison_file:{key}"
             else:
                 value = (self.draft + " |") if self.focus == key else (self.values[key] or "（留白）")
                 action = f"comparison_field:{key}"
-            app.button(action, value, (x + 128, y, 248, 38), primary=self.focus == key)
+            if key == "baseline":
+                profile_button(app, action, path, (x + 128, y, 248, 38))
+            else:
+                app.button(action, value, (x + 128, y, 248, 38), primary=self.focus == key)
         app.button("comparison_generated", "權重實驗" if self.generated else "設定檔比較", (460, 158, 376, 32))
         if self.generated:
             app.button("comparison_weight", self.weight_field or "無已啟用權重", (460, 205, 376, 36))
@@ -216,7 +220,7 @@ class EvaluationFields:
             offset = self.file_page * 7
             for index, path in enumerate(self.candidates[offset:offset + 7], offset):
                 y = 226 + (index - offset) * 38
-                app.button(f"comparison_candidate_select:{index}", path.name, (460, y, 315, 32))
+                profile_button(app, f"comparison_candidate_select:{index}", path, (460, y, 315, 32))
                 app.button(f"comparison_candidate_remove:{index}", "移除", (780, y, 56, 32))
             app.button("comparison_candidate_add", "加入下一份不同設定檔",
                        (460, 500, 376, 32),
