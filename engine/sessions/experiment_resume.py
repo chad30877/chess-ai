@@ -66,6 +66,27 @@ def recover_pairs(writer, definition):
         rows = csv.DictWriter(stream, fieldnames=GAME_FIELDS)
         rows.writeheader()
         rows.writerows(summaries)
+    import chess
+    from engine.storage.batch_storage import POSITION_FIELDS
+    with (writer.path/writer.manifest['files']['positions']).open('w', newline='', encoding='utf-8') as stream:
+        rows = csv.DictWriter(stream, fieldnames=POSITION_FIELDS)
+        if writer.output_format == 'csv':
+            rows.writeheader()
+        for _, replay in replays:
+            metadata = replay['metadata']
+            summary = metadata['summary']
+            board = chess.Board(replay['initial_fen'])
+            for ply, move in enumerate(replay['moves_uci'], 1):
+                position = dict(game_id=metadata['game_id'], ply=ply, fen=board.fen(),
+                    side_to_move='white' if board.turn else 'black', selected_move=move,
+                    result=summary['result'], white_player=summary['white_player'], black_player=summary['black_player'],
+                    batch_id=writer.batch_id, status=summary['status'], termination=summary['termination'],
+                    claim_draw=writer.manifest['settings']['rules']['claim_draw'])
+                if writer.output_format == 'csv':
+                    rows.writerow(position)
+                else:
+                    stream.write(json.dumps(position, ensure_ascii=False)+'\n')
+                board.push_uci(move)
     counts = writer.manifest['counts']
     counts.update(saved_games=len(summaries), completed_games=sum(s['status']=='completed' for s in summaries),
                   truncated_games=sum(s['status']=='truncated' for s in summaries), positions=sum(s['move_count'] for s in summaries))
