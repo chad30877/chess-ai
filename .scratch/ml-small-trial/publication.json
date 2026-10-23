@@ -1,0 +1,146 @@
+{
+  "repository": "chad30877/chess-ai",
+  "status": "verified",
+  "spec": {
+    "number": 26,
+    "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+    "url": "https://github.com/chad30877/chess-ai/issues/26",
+    "file": "spec.md",
+    "body_sha256": "f1e97cf9090f9474b42a5558671a32a8b94b7d6cfaa136d36ad2f3c6080f3b90"
+  },
+  "tickets": [
+    {
+      "number": 27,
+      "title": "M01：從 UI 辨識、選用與另存單群組設定",
+      "url": "https://github.com/chad30877/chess-ai/issues/27",
+      "code": "M01",
+      "file": "issues/01-readable-presets.md",
+      "blocked_by": [],
+      "body_sha256": "5732706921530ea80f63188e7e92fcc141c76949bd21448f54de1e92445a6cb9"
+    },
+    {
+      "number": 28,
+      "title": "M02：從 UI 建立可重現的棋譜資料分組與局面預覽",
+      "url": "https://github.com/chad30877/chess-ai/issues/28",
+      "code": "M02",
+      "file": "issues/02-dataset-preview.md",
+      "blocked_by": [],
+      "body_sha256": "2f3e0e33fae8d8ac07dab58b7b86e583e3c81e1cbcaebf4d1582d4da739749ed"
+    },
+    {
+      "number": 29,
+      "title": "M03：從 UI 量測 Stockfish 教師預算並保存選擇",
+      "url": "https://github.com/chad30877/chess-ai/issues/29",
+      "code": "M03",
+      "file": "issues/03-teacher-pilot.md",
+      "blocked_by": [
+        28
+      ],
+      "body_sha256": "1c354617afd4ba465b01607ca58bf10bbbeb02c85b0198522b92178ce96335f9"
+    },
+    {
+      "number": 30,
+      "title": "M04：逐局面教師標記、篩選與八小時停止續跑",
+      "url": "https://github.com/chad30877/chess-ai/issues/30",
+      "code": "M04",
+      "file": "issues/04-resumable-labeling.md",
+      "blocked_by": [
+        29
+      ],
+      "body_sha256": "fa0e227da69c0febeb4760f972c296cde4d1fb6449ac2513e927ce62252803a1"
+    },
+    {
+      "number": 31,
+      "title": "M05：完成單群組校準、學習、獨立誤差評估與另存",
+      "url": "https://github.com/chad30877/chess-ai/issues/31",
+      "code": "M05",
+      "file": "issues/05-single-group-learning.md",
+      "blocked_by": [
+        27,
+        30
+      ],
+      "body_sha256": "be05a63761c54c967a477c843926bf13a04046a1dccb609f06184646b8126c15"
+    },
+    {
+      "number": 32,
+      "title": "M06：五個單群組共用預算學習與完整結果比較",
+      "url": "https://github.com/chad30877/chess-ai/issues/32",
+      "code": "M06",
+      "file": "issues/06-five-group-report.md",
+      "blocked_by": [
+        31
+      ],
+      "body_sha256": "5c4d843b292a42f88c458c864b28fa3e5cde5cc9a372d2c915a5547379830e42"
+    },
+    {
+      "number": 33,
+      "title": "M07：自選群組直接組合、聯合訓練與搭配效果比較",
+      "url": "https://github.com/chad30877/chess-ai/issues/33",
+      "code": "M07",
+      "file": "issues/07-combinations.md",
+      "blocked_by": [
+        32
+      ],
+      "body_sha256": "ad3e6b41eec2054acdaeffde464d554eaaa55fbf2dd16b49d02031b8463d9f98"
+    },
+    {
+      "number": 34,
+      "title": "M08：一般與真人對戰可選開局庫並在離庫後搜尋",
+      "url": "https://github.com/chad30877/chess-ai/issues/34",
+      "code": "M08",
+      "file": "issues/08-live-opening-book.md",
+      "blocked_by": [],
+      "body_sha256": "28efa5deb9975ddd2f4d0fae3f6ae42e1d609c9fd0ae35bf8481963f8cf86e80"
+    },
+    {
+      "number": 35,
+      "title": "M09：固定共同開局線的成對比較、續跑與完整歷史回放",
+      "url": "https://github.com/chad30877/chess-ai/issues/35",
+      "code": "M09",
+      "file": "issues/09-common-opening-lines.md",
+      "blocked_by": [
+        34
+      ],
+      "body_sha256": "831f2e9bd4cfac2ef77388d84bd99dd891086a653d4f1c96e4aeeadcc2b5df76"
+    },
+    {
+      "number": 36,
+      "title": "M10：學習結果接入深度三共同開局驗證與研究報告",
+      "url": "https://github.com/chad30877/chess-ai/issues/36",
+      "code": "M10",
+      "file": "issues/10-learned-comparison.md",
+      "blocked_by": [
+        32,
+        35
+      ],
+      "body_sha256": "469ecaa20876c21934594c53b03fa2f7c214b12ea86b3be94f0b49f5dd5405db"
+    },
+    {
+      "number": 37,
+      "title": "M11：交付附實際截圖的離線教學並完成端到端驗收",
+      "url": "https://github.com/chad30877/chess-ai/issues/37",
+      "code": "M11",
+      "file": "issues/11-offline-guide-acceptance.md",
+      "blocked_by": [
+        33,
+        36
+      ],
+      "body_sha256": "ce20e4c91d84be4eb34476c3af1c87990682dab2534f1a3b93d01a4c662f820a"
+    }
+  ],
+  "verification": {
+    "issue_count": 12,
+    "parent_child_links": 11,
+    "blocking_links": 11,
+    "checks": [
+      "title",
+      "normalized_body",
+      "body_sha256",
+      "open_state",
+      "ready-for-agent",
+      "native_parent",
+      "native_blockers",
+      "complete_child_list"
+    ]
+  }
+}
