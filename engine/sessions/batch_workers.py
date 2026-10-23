@@ -95,6 +95,8 @@ def run_work(work):
         else:
             baseline, candidate = [restore_participant(work[side]) for side in ("baseline", "candidate")]
             for offset, (white, black) in enumerate(((baseline, candidate), (candidate, baseline))):
+                if offset in work.get("skip_offsets", ()):
+                    continue
                 if not worker_control():
                     break
                 game_number = (number - 1) * 2 + offset + 1

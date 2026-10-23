@@ -234,6 +234,7 @@ def run_evaluation_comparison(
     progress: Callable[[dict], None] | None = None,
     workers: int = 1,
     experiment_definition: dict | None = None,
+    resume_path: Path | None = None,
     _bind_process_control: Callable | None = None,
 ) -> ComparisonResult:
     """交換黑白比較，支援進度通知、合作式停止與逐局保存。"""
@@ -334,7 +335,8 @@ def run_evaluation_comparison(
     last_replay = None
     work_progress = dict(waiting_work=work_count, running_work=0, finished_work=0, finished_games=0,
                          requested_workers=requested_workers, actual_workers=workers)
-    writer = BatchWriter(Path(batch_root), name=name, tags=tagged, settings=settings)
+    writer = (BatchWriter.reopen(resume_path) if resume_path is not None else
+              BatchWriter(Path(batch_root), name=name, tags=tagged, settings=settings))
 
     def stats_for(index):
         outcomes = [game["candidate_outcome"] for pair in pair_records
@@ -386,7 +388,7 @@ def run_evaluation_comparison(
             if multi_candidate:
                 pair.update(candidate_index=candidate_index, candidate_label=candidates[candidate_index].label)
         game = replace(game, game_id=writer.manifest["counts"]["saved_games"] + 1)
-        execution = dict(work_number=number, game_number=logical_number)
+        execution = dict(work_number=number, game_number=logical_number, elapsed_seconds=elapsed_seconds)
         if experiment_definition is not None:
             from engine.sessions.experiment import work_id
             execution.update(work_id=work_id(experiment_definition, candidate_index, pair_number, candidate_is_white),
@@ -396,6 +398,7 @@ def run_evaluation_comparison(
             pair_records.append(pair)
         pair_records.sort(key=lambda p: (p.get("candidate_index", 0), p["pair_number"]))
         outcome = _game_outcome_for_candidate(game, candidate_is_white)
+        pair["games"][:] = [g for g in pair["games"] if g["task_game_number"] != logical_number]
         pair["games"].append(dict(
             game_number=game.game_id, task_game_number=logical_number, game_id=stored_game_id,
             baseline_color="black" if candidate_is_white else "white",
@@ -414,27 +417,42 @@ def run_evaluation_comparison(
         work_progress.update(state)
         notify()
 
+    def saved_color(number, candidate_is_white):
+        index = (number - 1) // pair_count
+        pair = (number - 1) % pair_count + 1
+        return any(p.get("candidate_index", 0) == index and p["pair_number"] == pair
+                   and any(g["candidate_color"] == ("white" if candidate_is_white else "black")
+                           and g["termination"] != "user_stop" for g in p["games"]) for p in pair_records)
+
     def make_work(number):
         candidate_index = (number - 1) // pair_count
         pair_number = (number - 1) % pair_count + 1
-        return dict(number=number, kind="evaluation", seed=base_seed + pair_number - 1,
+        return dict(number=number, skip_offsets=[offset for offset in (0, 1) if saved_color(number, bool(offset))], kind="evaluation", seed=base_seed + pair_number - 1,
                     initial_fen=positions[(pair_number - 1) // repetitions], claim_draw=claim_draw, max_plies=max_plies,
                     baseline=participant_payload(baseline), candidate=participant_payload(candidates[candidate_index]),
                     candidate_index=candidate_index,
                     participant_settings={"baseline": participant_settings["baseline"],
                                           "candidate": candidate_settings[candidate_index]})
 
-    with writer:
+    from engine.sessions.experiment_resume import experiment_lock, recover_pairs
+    with ExitStack() as execution_stack:
+        execution_stack.enter_context(experiment_lock(writer.path))
+        if resume_path is not None:
+            pair_records = recover_pairs(writer, experiment_definition)
+        execution_stack.enter_context(writer)
         try:
             publish()
             notify()
-            if workers > 1:
-                stopped = run_parallel(work_count=work_count, workers=workers, make_work=make_work,
+            pending_numbers = [number for number in range(1, work_count + 1)
+                               if not (saved_color(number, False) and saved_color(number, True))]
+            if workers > 1 and pending_numbers:
+                stopped = run_parallel(work_count=len(pending_numbers), workers=workers,
+                                       make_work=make_work, work_numbers=pending_numbers,
                                        on_game=lambda number, game, seed, elapsed: save(
                                            number, (number - 1) // pair_count, game, seed, elapsed),
                                        progress=parallel_progress, control=control,
                                        bind_control=_bind_process_control)
-            else:
+            elif workers == 1:
                 for candidate_index, candidate_participant in enumerate(candidates):
                     pair_number = 0
                     for position_index, initial_fen in enumerate(positions, 1):
@@ -452,7 +470,9 @@ def run_evaluation_comparison(
                                 if control is not None and not control():
                                     stopped = True
                                     break
-                                current_game += 1
+                                current_game = (task_number - 1) * 2 + int(candidate_is_white) + 1
+                                if saved_color(task_number, candidate_is_white):
+                                    continue
                                 notify()
                                 with ExitStack() as cleanup:
                                     rng = random.Random(pair_seed)
