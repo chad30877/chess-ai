@@ -1,0 +1,74 @@
+[
+  {
+    "key": "A",
+    "title": "規格 A：全評分設定下保持搜尋語意的效能改善",
+    "url": "https://github.com/chad30877/chess-ai/issues/18",
+    "number": 18,
+    "parent": null,
+    "blocker": null,
+    "source": "specs/01-search-performance.md"
+  },
+  {
+    "key": "B",
+    "title": "規格 B：可續跑的評分權重比較介面",
+    "url": "https://github.com/chad30877/chess-ai/issues/19",
+    "number": 19,
+    "parent": null,
+    "blocker": null,
+    "source": "specs/02-evaluation-experiments.md"
+  },
+  {
+    "key": "T01",
+    "title": "T01：全評分設定的可重跑效能剖析",
+    "url": "https://github.com/chad30877/chess-ai/issues/20",
+    "number": 20,
+    "parent": "A",
+    "blocker": null,
+    "source": "issues/01-performance-baseline.md"
+  },
+  {
+    "key": "T02",
+    "title": "T02：減少搜尋評分成本並驗證語意與耗時",
+    "url": "https://github.com/chad30877/chess-ai/issues/21",
+    "number": 21,
+    "parent": "A",
+    "blocker": "T01",
+    "source": "issues/02-numeric-evaluation.md"
+  },
+  {
+    "key": "T03",
+    "title": "T03：單一權重候選從介面建立到成對比較",
+    "url": "https://github.com/chad30877/chess-ai/issues/22",
+    "number": 22,
+    "parent": "B",
+    "blocker": null,
+    "source": "issues/03-single-parameter-experiment.md"
+  },
+  {
+    "key": "T04",
+    "title": "T04：多參數組合與相對基準百分比",
+    "url": "https://github.com/chad30877/chess-ai/issues/23",
+    "number": 23,
+    "parent": "B",
+    "blocker": "T03",
+    "source": "issues/04-grid-and-percentages.md"
+  },
+  {
+    "key": "T05",
+    "title": "T05：比較結果排序、回放與另存設定",
+    "url": "https://github.com/chad30877/chess-ai/issues/24",
+    "number": 24,
+    "parent": "B",
+    "blocker": "T03",
+    "source": "issues/05-results-and-export.md"
+  },
+  {
+    "key": "T06",
+    "title": "T06：停止及重啟後續跑評分實驗",
+    "url": "https://github.com/chad30877/chess-ai/issues/25",
+    "number": 25,
+    "parent": "B",
+    "blocker": "T03",
+    "source": "issues/06-resume-experiment.md"
+  }
+]

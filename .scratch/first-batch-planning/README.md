@@ -1,39 +1,35 @@
-# 第一批規格與工作票審核稿
+# 第一批規格與工作票索引
 
-狀態：待確認測試入口與切票；尚未發布 GitHub。這是發布前的審核稿，不是另建本機 issue tracker。核准後依專案規範用 `gh` 發布，標籤使用 `ready-for-agent`。
+狀態：測試入口與六張工作票切分已核准，兩份規格及六張工作票均已發布 GitHub，標籤為 `ready-for-agent`。後續規格與工作進度以 GitHub 為準；本目錄保留發布時的內容快照及編號對照，不是另一套 issue tracker。
 
 ## 規格
 
-- [規格 A：全評分設定的搜尋效能](specs/01-search-performance.md)
-- [規格 B：可續跑的評分權重比較介面](specs/02-evaluation-experiments.md)
+- [規格 A #18：全評分設定的搜尋效能](https://github.com/chad30877/chess-ai/issues/18)（[本機快照](specs/01-search-performance.md)）
+- [規格 B #19：可續跑的評分權重比較介面](https://github.com/chad30877/chess-ai/issues/19)（[本機快照](specs/02-evaluation-experiments.md)）
 
 ## 工作票與依賴
 
 | 代號 | 工作票 | 所屬規格 | 被哪些票阻擋 |
 | --- | --- | --- | --- |
-| T01 | [全評分設定的可重跑效能剖析](issues/01-performance-baseline.md) | A | 無 |
-| T02 | [減少搜尋評分成本並驗證語意與耗時](issues/02-numeric-evaluation.md) | A | T01 |
-| T03 | [單一權重候選從介面建立到成對比較](issues/03-single-parameter-experiment.md) | B | 無 |
-| T04 | [多參數組合與相對基準百分比](issues/04-grid-and-percentages.md) | B | T03 |
-| T05 | [比較結果排序、回放與另存設定](issues/05-results-and-export.md) | B | T03 |
-| T06 | [停止及重啟後續跑評分實驗](issues/06-resume-experiment.md) | B | T03 |
+| T01 | [#20 全評分設定的可重跑效能剖析](https://github.com/chad30877/chess-ai/issues/20) | #18 | 無 |
+| T02 | [#21 減少搜尋評分成本並驗證語意與耗時](https://github.com/chad30877/chess-ai/issues/21) | #18 | #20 |
+| T03 | [#22 單一權重候選從介面建立到成對比較](https://github.com/chad30877/chess-ai/issues/22) | #19 | 無 |
+| T04 | [#23 多參數組合與相對基準百分比](https://github.com/chad30877/chess-ai/issues/23) | #19 | #22 |
+| T05 | [#24 比較結果排序、回放與另存設定](https://github.com/chad30877/chess-ai/issues/24) | #19 | #22 |
+| T06 | [#25 停止及重啟後續跑評分實驗](https://github.com/chad30877/chess-ai/issues/25) | #19 | #22 |
 
 T04、T05、T06 依賴 T03 提供的完整且不可變實驗快照、穩定候選與棋局工作識別，不互相阻擋。搜尋效能與 UI 沒有技術上的相互阻擋；執行優先度仍以效能為先。
 
 不另外開橫跨全專案的重構票。必要的介面整理併入能展示完整行為的第一張相關票；既有比較與保存流程繼續可用。
 
-## 審核重點
+## 已確認測試入口
 
 - 效能：以搜尋公開入口驗證分數、合法選步、棋盤歷史、取消與程序清理；完整量測走獨立效能工具，不用 CI 秒數門檻。
 - UI：以應用程式事件／比較執行入口串到實際保存與重新讀取，驗證預覽等於實際設定、配對統計與續跑。候選數值規則用少量行為測試補足。
-- 是否接受六張票的粒度與上述依賴；如需合併或再拆，先修稿再發布。
+- 六張票的粒度與依賴已核准；目前可開始的工作為 #20 與 #22，效能優先。
 
-## 發布程序
+## 發布驗證
 
-1. 確認測試入口與工作票切分。
-2. 確認 GitHub CLI 已登入，檢查既有 issues 避免重複及確認標籤。
-3. 先發布兩份規格，再依依賴順序發布六張工作票。
-4. 工作票掛到各自的規格父 issue；用 GitHub 原生 blocking 關係記錄依賴，僅在平台沒有該能力時用內文連結。
-5. 不關閉或改寫父規格內文；回填所有 URL 到本索引及開發計畫，標記已發布。正式後續維護以 GitHub 為準。
+已經由 GitHub CLI 讀回並核對八個 issue 的內文、標題、開啟狀態與標籤，六個父子關係及四條原生阻擋關係皆符合表格。父規格內文未因拆票而改寫，未關閉任何 issue。[發布編號對照](publication.json)可供下次接續核對，勿重複建立。
 
-目前已取得官方 `gh` 可執行檔，但尚未登入；未建立任何遠端 issue。
+人工驗證：開啟兩份父規格核對子票；開啟 #21 與 #23–#25 核對 blocking 關係。實作與完成驗收後，依 GitHub 狀態更新開發計畫。
