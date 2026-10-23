@@ -1,0 +1,4943 @@
+{
+  "description": "中局深度 5／q4，兩設定、前後三輪串行交錯；單次 120 秒，逾時不延長。",
+  "runs": [
+    {
+      "round": 1,
+      "config": "all",
+      "version": "before",
+      "started_at": "2026-10-23T10:14:48.787005+00:00",
+      "finished_at": "2026-10-23T10:16:24.323678+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-all.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-all-1.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": true,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": true,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": true,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": true,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "685fbdf88a4fe8cde72023af66263945f0f2daab",
+        "dirty": false,
+        "all_terms_enabled": true,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "samples": 1,
+            "seconds_median": 93.68287470005453,
+            "seconds_min": 93.68287470005453,
+            "seconds_max": 93.68287470005453,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-all.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-all-1.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": true,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": true,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": true,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": true,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 93.68287470005453,
+                "nodes": 247330,
+                "hits": 4563,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "f1e1",
+                "score": 3.6654166666666668,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "f1e1",
+                  "score": 3.6654166666666668,
+                  "depth_reached": 10,
+                  "nodes_searched": 247330,
+                  "cutoff_count": 186484,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 4563,
+                  "transposition_stores": 71522,
+                  "pvs_scouts": 132914,
+                  "pvs_researches": 88,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "config": "all",
+      "version": "after",
+      "started_at": "2026-10-23T10:16:24.324782+00:00",
+      "finished_at": "2026-10-23T10:17:22.707386+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-all.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-all-1.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": true,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": true,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": true,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": true,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb",
+        "dirty": false,
+        "all_terms_enabled": true,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "age_weight": 2,
+            "samples": 1,
+            "seconds_median": 57.55929260002449,
+            "seconds_min": 57.55929260002449,
+            "seconds_max": 57.55929260002449,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-all.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-all-1.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": true,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": true,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": true,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": true,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 57.55929260002449,
+                "nodes": 247330,
+                "hits": 4563,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "f1e1",
+                "score": 3.6654166666666668,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "f1e1",
+                  "score": 3.6654166666666668,
+                  "depth_reached": 10,
+                  "nodes_searched": 247330,
+                  "cutoff_count": 186484,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 4563,
+                  "transposition_stores": 71522,
+                  "pvs_scouts": 132914,
+                  "pvs_researches": 88,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "config": "default",
+      "version": "before",
+      "started_at": "2026-10-23T10:17:22.709710+00:00",
+      "finished_at": "2026-10-23T10:18:45.782727+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-default.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-default-1.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": false,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": false,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": false,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": false,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "685fbdf88a4fe8cde72023af66263945f0f2daab",
+        "dirty": false,
+        "all_terms_enabled": false,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "samples": 1,
+            "seconds_median": 82.30137760005891,
+            "seconds_min": 82.30137760005891,
+            "seconds_max": 82.30137760005891,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-default.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-default-1.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": false,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": false,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": false,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": false,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 82.30137760005891,
+                "nodes": 363809,
+                "hits": 1929,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "c1f4",
+                "score": 3.04,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "c1f4",
+                  "score": 3.04,
+                  "depth_reached": 10,
+                  "nodes_searched": 363809,
+                  "cutoff_count": 283843,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 1929,
+                  "transposition_stores": 82404,
+                  "pvs_scouts": 217755,
+                  "pvs_researches": 45,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "config": "default",
+      "version": "after",
+      "started_at": "2026-10-23T10:18:45.785025+00:00",
+      "finished_at": "2026-10-23T10:19:26.742710+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-default.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-default-1.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": false,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": false,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": false,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": false,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb",
+        "dirty": false,
+        "all_terms_enabled": false,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "age_weight": 2,
+            "samples": 1,
+            "seconds_median": 40.13747079996392,
+            "seconds_min": 40.13747079996392,
+            "seconds_max": 40.13747079996392,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-default.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-default-1.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": false,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": false,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": false,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": false,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 40.13747079996392,
+                "nodes": 363809,
+                "hits": 1929,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "c1f4",
+                "score": 3.04,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "c1f4",
+                  "score": 3.04,
+                  "depth_reached": 10,
+                  "nodes_searched": 363809,
+                  "cutoff_count": 283843,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 1929,
+                  "transposition_stores": 82404,
+                  "pvs_scouts": 217755,
+                  "pvs_researches": 45,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "config": "all",
+      "version": "before",
+      "started_at": "2026-10-23T10:19:26.745714+00:00",
+      "finished_at": "2026-10-23T10:20:37.903698+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-all.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-all-2.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": true,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": true,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": true,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": true,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "685fbdf88a4fe8cde72023af66263945f0f2daab",
+        "dirty": false,
+        "all_terms_enabled": true,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "samples": 1,
+            "seconds_median": 70.39213399996515,
+            "seconds_min": 70.39213399996515,
+            "seconds_max": 70.39213399996515,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-all.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-all-2.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": true,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": true,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": true,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": true,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 70.39213399996515,
+                "nodes": 247330,
+                "hits": 4563,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "f1e1",
+                "score": 3.6654166666666668,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "f1e1",
+                  "score": 3.6654166666666668,
+                  "depth_reached": 10,
+                  "nodes_searched": 247330,
+                  "cutoff_count": 186484,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 4563,
+                  "transposition_stores": 71522,
+                  "pvs_scouts": 132914,
+                  "pvs_researches": 88,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "config": "all",
+      "version": "after",
+      "started_at": "2026-10-23T10:20:37.907123+00:00",
+      "finished_at": "2026-10-23T10:21:40.582433+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-all.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-all-2.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": true,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": true,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": true,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": true,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb",
+        "dirty": false,
+        "all_terms_enabled": true,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "age_weight": 2,
+            "samples": 1,
+            "seconds_median": 61.837206199998036,
+            "seconds_min": 61.837206199998036,
+            "seconds_max": 61.837206199998036,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-all.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-all-2.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": true,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": true,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": true,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": true,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 61.837206199998036,
+                "nodes": 247330,
+                "hits": 4563,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "f1e1",
+                "score": 3.6654166666666668,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "f1e1",
+                  "score": 3.6654166666666668,
+                  "depth_reached": 10,
+                  "nodes_searched": 247330,
+                  "cutoff_count": 186484,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 4563,
+                  "transposition_stores": 71522,
+                  "pvs_scouts": 132914,
+                  "pvs_researches": 88,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "config": "default",
+      "version": "before",
+      "started_at": "2026-10-23T10:21:40.586964+00:00",
+      "finished_at": "2026-10-23T10:23:04.111785+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-default.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-default-2.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": false,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": false,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": false,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": false,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "685fbdf88a4fe8cde72023af66263945f0f2daab",
+        "dirty": false,
+        "all_terms_enabled": false,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "samples": 1,
+            "seconds_median": 82.67414290003944,
+            "seconds_min": 82.67414290003944,
+            "seconds_max": 82.67414290003944,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-default.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-default-2.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": false,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": false,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": false,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": false,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 82.67414290003944,
+                "nodes": 363809,
+                "hits": 1929,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "c1f4",
+                "score": 3.04,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "c1f4",
+                  "score": 3.04,
+                  "depth_reached": 10,
+                  "nodes_searched": 363809,
+                  "cutoff_count": 283843,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 1929,
+                  "transposition_stores": 82404,
+                  "pvs_scouts": 217755,
+                  "pvs_researches": 45,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "config": "default",
+      "version": "after",
+      "started_at": "2026-10-23T10:23:04.120325+00:00",
+      "finished_at": "2026-10-23T10:23:44.582713+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-default.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-default-2.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": false,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": false,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": false,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": false,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb",
+        "dirty": false,
+        "all_terms_enabled": false,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "age_weight": 2,
+            "samples": 1,
+            "seconds_median": 39.69813050003722,
+            "seconds_min": 39.69813050003722,
+            "seconds_max": 39.69813050003722,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-default.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-default-2.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": false,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": false,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": false,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": false,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 39.69813050003722,
+                "nodes": 363809,
+                "hits": 1929,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "c1f4",
+                "score": 3.04,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "c1f4",
+                  "score": 3.04,
+                  "depth_reached": 10,
+                  "nodes_searched": 363809,
+                  "cutoff_count": 283843,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 1929,
+                  "transposition_stores": 82404,
+                  "pvs_scouts": 217755,
+                  "pvs_researches": 45,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "config": "all",
+      "version": "before",
+      "started_at": "2026-10-23T10:23:44.586297+00:00",
+      "finished_at": "2026-10-23T10:24:56.982968+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-all.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-all-3.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": true,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": true,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": true,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": true,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "685fbdf88a4fe8cde72023af66263945f0f2daab",
+        "dirty": false,
+        "all_terms_enabled": true,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "samples": 1,
+            "seconds_median": 71.60848989989609,
+            "seconds_min": 71.60848989989609,
+            "seconds_max": 71.60848989989609,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-all.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-all-3.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": true,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": true,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": true,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": true,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 71.60848989989609,
+                "nodes": 247330,
+                "hits": 4563,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "f1e1",
+                "score": 3.6654166666666668,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "f1e1",
+                  "score": 3.6654166666666668,
+                  "depth_reached": 10,
+                  "nodes_searched": 247330,
+                  "cutoff_count": 186484,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 4563,
+                  "transposition_stores": 71522,
+                  "pvs_scouts": 132914,
+                  "pvs_researches": 88,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "config": "all",
+      "version": "after",
+      "started_at": "2026-10-23T10:24:56.987272+00:00",
+      "finished_at": "2026-10-23T10:25:54.327969+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-all.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-all-3.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": true,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": true,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": true,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": true,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": true,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": true,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": true,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": true,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": true,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb",
+        "dirty": false,
+        "all_terms_enabled": true,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "age_weight": 2,
+            "samples": 1,
+            "seconds_median": 56.463523100013845,
+            "seconds_min": 56.463523100013845,
+            "seconds_max": 56.463523100013845,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-all.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-all-3.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": true,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": true,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": true,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": true,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": true,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": true,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": true,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": true,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": true,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 56.463523100013845,
+                "nodes": 247330,
+                "hits": 4563,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "f1e1",
+                "score": 3.6654166666666668,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "f1e1",
+                  "score": 3.6654166666666668,
+                  "depth_reached": 10,
+                  "nodes_searched": 247330,
+                  "cutoff_count": 186484,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 4563,
+                  "transposition_stores": 71522,
+                  "pvs_scouts": 132914,
+                  "pvs_researches": 88,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "config": "default",
+      "version": "before",
+      "started_at": "2026-10-23T10:25:54.331974+00:00",
+      "finished_at": "2026-10-23T10:27:18.732264+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-default.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-default-3.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": false,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": false,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": false,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": false,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "685fbdf88a4fe8cde72023af66263945f0f2daab",
+        "dirty": false,
+        "all_terms_enabled": false,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "samples": 1,
+            "seconds_median": 83.57760769990273,
+            "seconds_min": 83.57760769990273,
+            "seconds_max": 83.57760769990273,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-default.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\before-default-3.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": false,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": false,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": false,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": false,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 83.57760769990273,
+                "nodes": 363809,
+                "hits": 1929,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "c1f4",
+                "score": 3.04,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "c1f4",
+                  "score": 3.04,
+                  "depth_reached": 10,
+                  "nodes_searched": 363809,
+                  "cutoff_count": 283843,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 1929,
+                  "transposition_stores": 82404,
+                  "pvs_scouts": 217755,
+                  "pvs_researches": 45,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "config": "default",
+      "version": "after",
+      "started_at": "2026-10-23T10:27:18.736286+00:00",
+      "finished_at": "2026-10-23T10:28:00.550827+00:00",
+      "command": [
+        "D:\\Python\\chess-ai\\.venv\\Scripts\\python.exe",
+        "tools/benchmark_search.py",
+        "--evaluation",
+        "configs/evaluation/benchmark-default.json",
+        "--cases",
+        "middlegame",
+        "--workers",
+        "1",
+        "--depth",
+        "5",
+        "--quiescence-depth",
+        "4",
+        "--steps",
+        "0",
+        "--repeats",
+        "1",
+        "--timeout-ms",
+        "120000",
+        "--no-memory-sampling",
+        "--output",
+        "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-default-3.json"
+      ],
+      "report": {
+        "platform": "Windows-11-10.0.26200-SP0",
+        "python": "3.12.13",
+        "logical_cpus": 16,
+        "psutil": "7.2.2",
+        "chess": "1.11.2",
+        "evaluation": {
+          "version": 6,
+          "phase": {
+            "enabled": false,
+            "model_version": 1
+          },
+          "perspective": "white",
+          "score_unit": "pawn",
+          "terms": {
+            "material": {
+              "enabled": true,
+              "weight": 1.0,
+              "piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              },
+              "endgame_piece_values": {
+                "P": 1.0,
+                "N": 3.0,
+                "B": 3.0,
+                "R": 5.0,
+                "Q": 9.0
+              }
+            },
+            "piece_square": {
+              "enabled": true,
+              "weight": 1.0,
+              "table_version": 1,
+              "endgame_weight": 1.0,
+              "endgame_table_version": 1
+            },
+            "isolated_pawns": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "doubled_pawns": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            },
+            "passed_pawns": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.1,
+              "feature_version": 1
+            },
+            "pawn_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.01,
+              "feature_version": 1
+            },
+            "knight_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "bishop_mobility": {
+              "enabled": false,
+              "weight": 0.03,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "rook_mobility": {
+              "enabled": false,
+              "weight": 0.02,
+              "endgame_weight": 0.03,
+              "feature_version": 1
+            },
+            "queen_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_mobility": {
+              "enabled": false,
+              "weight": 0.01,
+              "endgame_weight": 0.02,
+              "feature_version": 1
+            },
+            "king_pawn_shield": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_zone_attacks": {
+              "enabled": false,
+              "weight": 0.05,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "king_file_exposure": {
+              "enabled": false,
+              "weight": 0.08,
+              "endgame_weight": 0.0,
+              "feature_version": 1
+            },
+            "bishop_pair": {
+              "enabled": false,
+              "weight": 0.3,
+              "endgame_weight": 0.4,
+              "feature_version": 1
+            },
+            "rook_open_file": {
+              "enabled": false,
+              "weight": 0.15,
+              "endgame_weight": 0.2,
+              "feature_version": 1
+            },
+            "rook_half_open_file": {
+              "enabled": false,
+              "weight": 0.1,
+              "endgame_weight": 0.15,
+              "feature_version": 1
+            }
+          }
+        },
+        "revision": "b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb",
+        "dirty": false,
+        "all_terms_enabled": false,
+        "profiling_scope": "parent only; profile allowed only with one worker",
+        "summary": [
+          {
+            "case": "middlegame",
+            "workers": 1,
+            "capacity": 4096,
+            "step": 0,
+            "measurement": "timing",
+            "age_weight": 2,
+            "samples": 1,
+            "seconds_median": 40.954615400056355,
+            "seconds_min": 40.954615400056355,
+            "seconds_max": 40.954615400056355,
+            "all_completed": true
+          }
+        ],
+        "options": {
+          "evaluation": "configs\\evaluation\\benchmark-default.json",
+          "profile": false,
+          "reuse_position": false,
+          "suite": "search",
+          "depth": 5,
+          "quiescence_depth": 4,
+          "cases": [
+            "middlegame"
+          ],
+          "workers": [
+            1
+          ],
+          "repeats": 1,
+          "steps": 0,
+          "timeout_ms": 120000,
+          "capacities": [
+            128,
+            4096,
+            65536
+          ],
+          "age_weights": [
+            2
+          ],
+          "games": 4,
+          "plies": 2,
+          "matrix": [
+            "1x1",
+            "1x4",
+            "2x2",
+            "4x5"
+          ],
+          "output": "C:\\Users\\User\\AppData\\Local\\Temp\\chess-depth5-120s\\after-default-3.json",
+          "no_memory_sampling": true
+        },
+        "search_defaults": {
+          "move_ordering": true,
+          "use_transposition_table": true,
+          "use_pvs": true,
+          "aspiration_window": 1.0,
+          "claim_draw": false
+        },
+        "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+        "rows": [
+          {
+            "suite": "search",
+            "repeat": 0,
+            "case": "middlegame",
+            "workers": 1,
+            "depth": 5,
+            "quiescence_depth": 4,
+            "capacity": 4096,
+            "age_weight": 2,
+            "steps": 0,
+            "timeout_ms": 120000,
+            "job_timeout_s": 155.0,
+            "evaluation": {
+              "version": 6,
+              "phase": {
+                "enabled": false,
+                "model_version": 1
+              },
+              "perspective": "white",
+              "score_unit": "pawn",
+              "terms": {
+                "material": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  },
+                  "endgame_piece_values": {
+                    "P": 1.0,
+                    "N": 3.0,
+                    "B": 3.0,
+                    "R": 5.0,
+                    "Q": 9.0
+                  }
+                },
+                "piece_square": {
+                  "enabled": true,
+                  "weight": 1.0,
+                  "table_version": 1,
+                  "endgame_weight": 1.0,
+                  "endgame_table_version": 1
+                },
+                "isolated_pawns": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "doubled_pawns": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                },
+                "passed_pawns": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.1,
+                  "feature_version": 1
+                },
+                "pawn_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.01,
+                  "feature_version": 1
+                },
+                "knight_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "bishop_mobility": {
+                  "enabled": false,
+                  "weight": 0.03,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "rook_mobility": {
+                  "enabled": false,
+                  "weight": 0.02,
+                  "endgame_weight": 0.03,
+                  "feature_version": 1
+                },
+                "queen_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_mobility": {
+                  "enabled": false,
+                  "weight": 0.01,
+                  "endgame_weight": 0.02,
+                  "feature_version": 1
+                },
+                "king_pawn_shield": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_zone_attacks": {
+                  "enabled": false,
+                  "weight": 0.05,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "king_file_exposure": {
+                  "enabled": false,
+                  "weight": 0.08,
+                  "endgame_weight": 0.0,
+                  "feature_version": 1
+                },
+                "bishop_pair": {
+                  "enabled": false,
+                  "weight": 0.3,
+                  "endgame_weight": 0.4,
+                  "feature_version": 1
+                },
+                "rook_open_file": {
+                  "enabled": false,
+                  "weight": 0.15,
+                  "endgame_weight": 0.2,
+                  "feature_version": 1
+                },
+                "rook_half_open_file": {
+                  "enabled": false,
+                  "weight": 0.1,
+                  "endgame_weight": 0.15,
+                  "feature_version": 1
+                }
+              }
+            },
+            "profile": false,
+            "reuse_position": false,
+            "sample_memory": false,
+            "rows": [
+              {
+                "step": 0,
+                "mode": "cold",
+                "fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "seconds": 40.954615400056355,
+                "nodes": 363809,
+                "hits": 1929,
+                "completed_depth": 5,
+                "stop_reason": null,
+                "best_move": "c1f4",
+                "score": 3.04,
+                "initial_fen": "r2q1rk1/ppp2ppp/2n1bn2/3p4/3P4/2PB1N2/PP3PPP/RNBQ1RK1 w - - 0 1",
+                "moves": [],
+                "result": {
+                  "best_move": "c1f4",
+                  "score": 3.04,
+                  "depth_reached": 10,
+                  "nodes_searched": 363809,
+                  "cutoff_count": 283843,
+                  "completed_depth": 5,
+                  "stop_reason": null,
+                  "transposition_hits": 1929,
+                  "transposition_stores": 82404,
+                  "pvs_scouts": 217755,
+                  "pvs_researches": 45,
+                  "aspiration_searches": 4,
+                  "aspiration_researches": 0
+                },
+                "measurement": "timing",
+                "profile": [],
+                "profile_self_seconds": {
+                  "evaluation": 0,
+                  "transposition_key": 0,
+                  "search": 0,
+                  "board_history": 0,
+                  "other": 0
+                }
+              }
+            ],
+            "all_completed": true,
+            "peak_tree_rss_bytes": null,
+            "max_processes": null
+          }
+        ]
+      }
+    }
+  ]
+}
