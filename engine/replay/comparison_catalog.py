@@ -3,6 +3,7 @@
 import csv
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from math import isfinite
 from pathlib import Path
 
@@ -40,6 +41,7 @@ class ComparisonSummary:
     paired_score_rate: float | None
     candidate_summaries: tuple[dict, ...]
     error: str
+    experiment_elapsed_seconds: float | None = None
 
     @property
     def score_rate(self) -> float | None:
@@ -191,6 +193,8 @@ def load_comparison(manifest_path: Path) -> ComparisonSummary:
         candidate_progress = comparison_progress([p for p in comparison["pairs"]
                                                    if p.get("candidate_index", 0) == index])
         summaries.append({"label": participant["label"], "wins": counts["win"], "draws": counts["draw"],
+                          "elapsed_seconds": sum(game.elapsed_seconds for game in games if game.candidate_index == index),
+                          "differences": _differences(participants["baseline"].get("evaluator", {}), participant.get("evaluator", {})),
                           "losses": counts["loss"], "unfinished": counts["unfinished"],
                           "completed_pairs": candidate_progress["completed_pairs"],
                           "incomplete_pairs": candidate_progress["incomplete_pairs"],
@@ -200,7 +204,29 @@ def load_comparison(manifest_path: Path) -> ComparisonSummary:
                              count_by_candidate[0]["win"], count_by_candidate[0]["draw"], count_by_candidate[0]["loss"], count_by_candidate[0]["unfinished"],
                              progress["completed_pairs"], progress["incomplete_pairs"], progress["paired_score_rate"],
                              tuple(summaries),
-                             str(manifest.get("error", "")))
+                             str(manifest.get("error", "")), _experiment_elapsed(manifest))
+
+
+def _experiment_elapsed(manifest):
+    try:
+        duration = (datetime.fromisoformat(manifest["finished_at"]) - datetime.fromisoformat(manifest["created_at"])).total_seconds()
+        return duration if duration >= 0 else None
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _differences(baseline, candidate, prefix=""):
+    result = []
+    for key, value in candidate.items():
+        path = f"{prefix}.{key}" if prefix else key
+        previous = baseline.get(key)
+        if isinstance(value, dict) and isinstance(previous, dict):
+            nested = _differences(previous, value, path)
+            if nested:
+                result.append(nested)
+        elif value != previous:
+            result.append(f"{path}: {previous} → {value}")
+    return "; ".join(result)
 
 
 class ComparisonCatalog:
