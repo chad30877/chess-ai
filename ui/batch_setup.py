@@ -21,6 +21,11 @@ class EvaluationFields:
         self.values = dict(openings="", depth="2", repetitions="1", seed="10000", max_plies="",
                            name="", tags="", search_workers="1",
                            transposition_capacity=str(DEFAULT_TRANSPOSITION_CAPACITY))
+        self.generated = False
+        self.preview = None
+        self.preview_key = None
+        self.weight_field = "piece_square.weight"
+        self.values["weight_values"] = "0.5, 1, 1.5"
         self.focus = None
         self.draft = ""
         self.message = ""
@@ -31,14 +36,27 @@ class EvaluationFields:
         self.focus = None
         pygame.key.stop_text_input()
 
+    def fingerprint(self):
+        return (str(self.baseline), tuple(sorted(self.values.items())), self.weight_field)
+
     def options(self):
         self.commit()
-        if self.baseline is None or not self.candidates:
+        if self.generated:
+            if self.preview is None or self.preview_key != self.fingerprint():
+                raise ValueError("請重新預覽候選")
+            if not self.preview.to_dict()['candidates']:
+                raise ValueError("沒有有效候選")
+            return self.preview.options(self.project / "data/batches")
+        return self.file_options()
+
+    def file_options(self):
+        self.commit()
+        if self.baseline is None or (not self.generated and not self.candidates):
             raise ValueError("請先選擇一份基準與至少一份候選評分設定檔")
-        if self.baseline in self.candidates:
+        if not self.generated and self.baseline in self.candidates:
             raise ValueError("同一份評分設定檔不能同時作為基準與候選")
         configs = [EvaluationConfig.from_dict(json.loads(p.read_text(encoding="utf-8")))
-                   for p in self.candidates]
+                   for p in ([] if self.generated else self.candidates)]
         baseline_config = EvaluationConfig.from_dict(json.loads(self.baseline.read_text(encoding="utf-8")))
         depth, repetitions, seed = [int(self.values[key]) for key in ("depth", "repetitions", "seed")]
         if repetitions < 1 or seed < 0:
@@ -65,7 +83,28 @@ class EvaluationFields:
                     max_plies=maximum, claim_draw=False)
 
     def action(self, action, app):
-        if action.startswith("comparison_file:"):
+        if action == "comparison_generated":
+            self.commit()
+            self.generated = not self.generated
+            self.preview = None
+        elif action == "comparison_weight":
+            from engine.sessions.experiment import enabled_weight_fields
+            self.commit()
+            config = EvaluationConfig.from_dict(json.loads(self.baseline.read_text(encoding="utf-8")))
+            fields = enabled_weight_fields(config)
+            self.weight_field = fields[(fields.index(self.weight_field) + 1) % len(fields)] if self.weight_field in fields else (fields[0] if fields else "")
+        elif action == "comparison_preview":
+            from engine.sessions.experiment import build_experiment
+            self.preview = None
+            try:
+                options = self.file_options()
+                self.preview = build_experiment(options, self.weight_field, self.values['weight_values'])
+                self.preview_key = self.fingerprint()
+                data = self.preview.to_dict()
+                self.message = f"候選 {len(data['candidates'])}／對局 {data['planned_games']}／重複 {data['duplicate_count']}／同基準 {data['baseline_count']}"
+            except (ValueError, OSError) as exc:
+                self.message = str(exc)
+        elif action.startswith("comparison_file:"):
             self.commit()
             side = action.split(":")[1]
             if self.files:
@@ -112,15 +151,26 @@ class EvaluationFields:
                 value = (self.draft + " |") if self.focus == key else (self.values[key] or "（留白）")
                 action = f"comparison_field:{key}"
             app.button(action, value, (x + 128, y, 248, 38), primary=self.focus == key)
-        app.draw_label(app.small_font, "候選評分設定檔（各自與基準交換黑白比較）", (460, 199), width=376)
-        for index, path in enumerate(self.candidates[:7]):
-            y = 226 + index * 38
-            app.button(f"comparison_candidate_select:{index}", path.name, (460, y, 315, 32))
-            app.button(f"comparison_candidate_remove:{index}", "移除", (780, y, 56, 32))
-        app.button("comparison_candidate_add", "加入下一份不同設定檔",
-                   (460, min(226 + len(self.candidates[:7]) * 38, 492), 376, 32),
-                   enabled=len(self.candidates) < 7 and any(
-                       path != self.baseline and path not in self.candidates for path in self.files))
+        app.button("comparison_generated", "權重實驗" if self.generated else "設定檔比較", (460, 158, 376, 32))
+        if self.generated:
+            app.button("comparison_weight", self.weight_field or "無已啟用權重", (460, 205, 376, 36))
+            value = self.draft + " |" if self.focus == "weight_values" else self.values['weight_values']
+            app.button("comparison_field:weight_values", value, (460, 247, 376, 36))
+            app.button("comparison_preview", "預覽候選", (460, 289, 376, 36))
+            if self.preview and self.preview_key == self.fingerprint():
+                candidates = self.preview.to_dict()['candidates']
+                for index, candidate in enumerate(candidates[:7]):
+                    app.text(candidate['label'], 460, 335 + index * 30, width=376)
+        else:
+            app.draw_label(app.small_font, "候選評分設定檔（各自與基準交換黑白比較）", (460, 199), width=376)
+            for index, path in enumerate(self.candidates[:7]):
+                y = 226 + index * 38
+                app.button(f"comparison_candidate_select:{index}", path.name, (460, y, 315, 32))
+                app.button(f"comparison_candidate_remove:{index}", "移除", (780, y, 56, 32))
+            app.button("comparison_candidate_add", "加入下一份不同設定檔",
+                       (460, min(226 + len(self.candidates[:7]) * 38, 492), 376, 32),
+                       enabled=len(self.candidates) < 7 and any(
+                           path != self.baseline and path not in self.candidates for path in self.files))
         if self.message:
             app.text(self.message, 64, 642, muted=True, width=772)
         app.button("start", "開始生成", (460, 672, 376, 40), primary=True)
