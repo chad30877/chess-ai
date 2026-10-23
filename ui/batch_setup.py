@@ -21,6 +21,10 @@ class EvaluationFields:
         self.values = dict(openings="", depth="2", repetitions="1", seed="10000", max_plies="",
                            name="", tags="", search_workers="1",
                            transposition_capacity=str(DEFAULT_TRANSPOSITION_CAPACITY))
+        self.converted = None
+        self.rules = []
+        self.weight_mode = "actual"
+        self.preview_page = 0
         self.generated = False
         self.preview = None
         self.preview_key = None
@@ -36,8 +40,14 @@ class EvaluationFields:
         self.focus = None
         pygame.key.stop_text_input()
 
+    def current_rule(self):
+        rule = dict(field=self.weight_field, mode=self.weight_mode, values=self.values['weight_values'])
+        if self.converted and self.converted[0] == (str(self.baseline), self.weight_field, self.weight_mode, self.values['weight_values']):
+            rule['actual_values'] = self.converted[1]
+        return rule
+
     def fingerprint(self):
-        return (str(self.baseline), tuple(sorted(self.values.items())), self.weight_field)
+        return (str(self.baseline), tuple(sorted(self.values.items())), self.weight_field, self.weight_mode, json.dumps(self.rules, sort_keys=True))
 
     def options(self):
         self.commit()
@@ -87,6 +97,31 @@ class EvaluationFields:
             self.commit()
             self.generated = not self.generated
             self.preview = None
+        elif action == "comparison_rule_add":
+            self.commit()
+            self.rules = [r for r in self.rules if r['field'] != self.weight_field]
+            self.rules.append(self.current_rule())
+        elif action == "comparison_rule_clear":
+            self.rules = []
+        elif action == "comparison_preview_next":
+            if self.preview:
+                pages = max(1, (len(self.preview.to_dict()['candidates']) + 6) // 7)
+                self.preview_page = (self.preview_page + 1) % pages
+        elif action == "comparison_weight_mode":
+            from engine.sessions.experiment import rule_values
+            self.commit()
+            try:
+                config = EvaluationConfig.from_dict(json.loads(self.baseline.read_text(encoding="utf-8")))
+                values = rule_values(config, self.current_rule())
+                term, weight = self.weight_field.split('.')
+                base = config.to_dict()['terms'][term][weight]
+                if self.weight_mode == 'actual' and base == 0:
+                    raise ValueError('零基準請使用實際值')
+                self.weight_mode = 'percent' if self.weight_mode == 'actual' else 'actual'
+                self.values['weight_values'] = ', '.join(repr(value * 100 / base if self.weight_mode == 'percent' else value) for value in values)
+                self.converted = ((str(self.baseline), self.weight_field, self.weight_mode, self.values['weight_values']), values)
+            except (ValueError, OSError) as exc:
+                self.message = str(exc)
         elif action == "comparison_weight":
             from engine.sessions.experiment import enabled_weight_fields
             self.commit()
@@ -98,7 +133,10 @@ class EvaluationFields:
             self.preview = None
             try:
                 options = self.file_options()
-                self.preview = build_experiment(options, self.weight_field, self.values['weight_values'])
+                rules = [r for r in self.rules if r['field'] != self.weight_field]
+                rules.append(self.current_rule())
+                self.preview = build_experiment(options, rules=rules)
+                self.preview_page = 0
                 self.preview_key = self.fingerprint()
                 data = self.preview.to_dict()
                 self.message = f"候選 {len(data['candidates'])}／對局 {data['planned_games']}／重複 {data['duplicate_count']}／同基準 {data['baseline_count']}"
@@ -113,7 +151,7 @@ class EvaluationFields:
         elif action == "comparison_candidate_add":
             self.commit()
             available = [path for path in self.files if path != self.baseline and path not in self.candidates]
-            if available and len(self.candidates) < 7:
+            if available:
                 self.candidates.append(available[0])
         elif action.startswith("comparison_candidate_select:"):
             index = int(action.split(":")[1])
@@ -135,7 +173,7 @@ class EvaluationFields:
             pygame.key.start_text_input()
 
     def render(self, app):
-        app.text("點選候選設定檔切換；文字欄位 Ctrl+A 清空，Enter 確認。", 64, 158, muted=True)
+        app.text("Ctrl+A 清空，Enter 確認。", 64, 158, muted=True)
         fields = [("baseline", "基準"), ("openings", "開局集路徑"), ("depth", "搜尋深度（ply）"),
                   ("search_workers", "搜尋 worker"), ("transposition_capacity", "表項上限"),
                   ("repetitions", "每局面配對數"), ("seed", "種子"), ("max_plies", "手數上限"),
@@ -156,11 +194,16 @@ class EvaluationFields:
             app.button("comparison_weight", self.weight_field or "無已啟用權重", (460, 205, 376, 36))
             value = self.draft + " |" if self.focus == "weight_values" else self.values['weight_values']
             app.button("comparison_field:weight_values", value, (460, 247, 376, 36))
-            app.button("comparison_preview", "預覽候選", (460, 289, 376, 36))
+            app.button("comparison_weight_mode", "實際值" if self.weight_mode == 'actual' else "基準百分比", (460, 289, 120, 32))
+            app.button("comparison_rule_add", f"加入權重（{len(self.rules)}）", (586, 289, 150, 32))
+            app.button("comparison_rule_clear", "清除", (742, 289, 94, 32))
+            app.text("清單：1,2,3　範圍：起點:終點:間隔", 460, 325, width=376, muted=True)
+            app.button("comparison_preview", "預覽候選", (460, 355, 240, 32))
+            app.button("comparison_preview_next", "下一頁", (710, 355, 126, 32))
             if self.preview and self.preview_key == self.fingerprint():
                 candidates = self.preview.to_dict()['candidates']
-                for index, candidate in enumerate(candidates[:7]):
-                    app.text(candidate['label'], 460, 335 + index * 30, width=376)
+                for index, candidate in enumerate(candidates[self.preview_page * 7:(self.preview_page + 1) * 7]):
+                    app.text(candidate['label'], 460, 396 + index * 30, width=376)
         else:
             app.draw_label(app.small_font, "候選評分設定檔（各自與基準交換黑白比較）", (460, 199), width=376)
             for index, path in enumerate(self.candidates[:7]):
@@ -169,7 +212,7 @@ class EvaluationFields:
                 app.button(f"comparison_candidate_remove:{index}", "移除", (780, y, 56, 32))
             app.button("comparison_candidate_add", "加入下一份不同設定檔",
                        (460, min(226 + len(self.candidates[:7]) * 38, 492), 376, 32),
-                       enabled=len(self.candidates) < 7 and any(
+                       enabled=any(
                            path != self.baseline and path not in self.candidates for path in self.files))
         if self.message:
             app.text(self.message, 64, 642, muted=True, width=772)

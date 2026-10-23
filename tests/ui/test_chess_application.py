@@ -645,6 +645,32 @@ class ChessApplicationTest(unittest.TestCase):
         original = json.loads((self.project / "configs/evaluation/stable.json").read_text(encoding="utf-8"))
         self.assertEqual(original["terms"]["piece_square"]["weight"], 1)
 
+    def test_nine_weight_combinations_preview_and_execute_all_pages(self):
+        folder = self.project / "configs/evaluation"
+        (folder / "stable.json").write_text(json.dumps(EvaluationConfig(phase_enabled=True).to_dict()), encoding="utf-8")
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        self.click("comparison_generated")
+        self.enter_comparison_field("weight_values", "1.5,2,2.5")
+        self.click("comparison_weight_mode")
+        self.click("comparison_rule_add")
+        self.click("comparison_weight")
+        self.enter_comparison_field("weight_values", "200:400:100")
+        self.enter_comparison_field("max_plies", "0")
+        self.enter_comparison_field("depth", "1")
+        self.click("comparison_preview")
+        self.click("comparison_preview_next")
+        self.click("start")
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["saved_games"], 18)
+        self.click("batch_results")
+        summary = self.app.records_view.summary
+        definition = summary.settings['experiment']
+        self.assertEqual(len(definition['candidates']), 9)
+        self.assertEqual(len(summary.games), 18)
+        weights = {(item['config']['terms']['piece_square']['weight'], item['config']['terms']['piece_square']['endgame_weight']) for item in definition['candidates']}
+        self.assertEqual(weights, {(mg, eg) for mg in (1.5, 2, 2.5) for eg in (2, 3, 4)})
+
     def test_comparison_search_worker_fields_run_multicandidate_games_and_save_snapshots(self):
         self.prepare_comparison_configs()
         profile = self.project / "configs/evaluation/third.json"
