@@ -865,5 +865,31 @@ class ChessApplicationTest(unittest.TestCase):
         self.assertEqual(summary.games, ())
 
 
+    def test_saved_experiment_can_resume_from_records_with_original_snapshot(self):
+        self.click("mode:records")
+        self.click("comparison_new")
+        fields = self.app.evaluation_fields
+        fields.action("comparison_generated", self.app)
+        fields.values.update(weight_values="2", max_plies="0", depth="1")
+        fields.action("comparison_preview", self.app)
+        self.click("start")
+        progress = ComparisonRun._progress
+        def stop_after_first(run, state):
+            progress(run, state)
+            if state["saved_games"] == 1:
+                run.stop()
+        with patch.object(ComparisonRun, "_progress", stop_after_first):
+            self.executor.finish()
+        path = Path(self.app.batch.snapshot()["path"])
+        original = next((path / "replays").glob("*.json")).read_bytes()
+        self.click("batch_results")
+        self.click("records_resume")
+        self.assertEqual(self.app.mode, "auto")
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["status"], "completed")
+        self.assertEqual(len(list((path / "replays").glob("*.json"))), 2)
+        self.assertIn(original, [p.read_bytes() for p in (path / "replays").glob("*.json")])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -59,6 +59,20 @@ class BatchWriter:
         self._streams = ExitStack()
         self._save_manifest()
 
+    @classmethod
+    def reopen(cls, path):
+        writer = cls.__new__(cls)
+        writer.path = Path(path)
+        writer.data_root = writer.path.parent.parent
+        writer.manifest = json.loads((writer.path / "manifest.json").read_text(encoding="utf-8"))
+        writer.batch_id = writer.manifest["batch_id"]
+        writer.output_format = "jsonl" if writer.manifest["files"]["positions"].endswith("jsonl") else "csv"
+        writer._streams = ExitStack()
+        writer._reopening = True
+        writer.manifest["status"] = "generating"
+        writer.manifest.pop("error", None)
+        return writer
+
     def _save_manifest(self) -> None:
         self.manifest["updated_at"] = now_iso()
         write_json_atomic(self.path / "manifest.json", self.manifest)
@@ -91,6 +105,12 @@ class BatchWriter:
 
     def __enter__(self):
         try:
+            if getattr(self, "_reopening", False):
+                self.games_file = self._streams.enter_context((self.path / "games.csv").open("a", newline="", encoding="utf-8"))
+                self.positions_file = self._streams.enter_context((self.path / self.manifest["files"]["positions"]).open("a", newline="", encoding="utf-8"))
+                self.games_writer = csv.DictWriter(self.games_file, fieldnames=GAME_FIELDS)
+                self.positions_writer = csv.DictWriter(self.positions_file, fieldnames=POSITION_FIELDS)
+                return self
             (self.path / "replays").mkdir()
             self.games_file = self._streams.enter_context(
                 (self.path / "games.csv").open("x", newline="", encoding="utf-8"))
@@ -111,7 +131,7 @@ class BatchWriter:
 
     def add_game(self, game: PlayedGame, seed: int, *, execution: dict | None = None) -> str:
         expected_id = self.manifest["counts"]["saved_games"] + 1
-        if game.game_id != expected_id or expected_id > self.manifest["counts"]["requested_games"]:
+        if game.game_id != expected_id or expected_id > self.manifest["counts"]["requested_games"] and "experiment" not in self.manifest["settings"]:
             raise ValueError(f"Expected game_id {expected_id} within requested game count")
         rules = self.manifest["settings"]["rules"]
         started_at = game.started_at or now_iso()
@@ -130,7 +150,7 @@ class BatchWriter:
             "metadata": {key: summary[key] for key in (
                 "game_id", "started_at", "finished_at", "white_player", "black_player", "status", "termination")},
         }
-        replay["metadata"].update(batch_id=self.batch_id, rules=rules)
+        replay["metadata"].update(batch_id=self.batch_id, rules=rules, summary=summary)
         if execution is not None:
             # 發布序號連續；固定工作編號獨立於並行完成順序。
             replay["metadata"]["execution"] = execution
@@ -141,10 +161,8 @@ class BatchWriter:
         replay_path = self.path / relative_replay
         replay_created = False
         try:
-            with replay_path.open("x", encoding="utf-8") as stream:
-                replay_created = True
-                json.dump(replay, stream, ensure_ascii=False, indent=2)
-                stream.write("\n")
+            replay_created = True
+            write_json_atomic(replay_path, replay)
             for row in game.positions:
                 position = {**row, "game_id": game_id, "batch_id": self.batch_id, "status": game.status,
                             "termination": game.termination,
@@ -176,7 +194,7 @@ class BatchWriter:
 
     def __exit__(self, exc_type, exc, traceback) -> None:
         self._streams.close()
-        complete = self.manifest["counts"]["saved_games"] == self.manifest["counts"]["requested_games"]
+        complete = getattr(self, "_logical_complete", self.manifest["counts"]["saved_games"] == self.manifest["counts"]["requested_games"])
         stopped = self.manifest["status"] == "stopped"
         self.manifest["status"] = "failed" if exc else "stopped" if stopped else "completed" if complete else "failed"
         self.manifest["finished_at"] = now_iso()

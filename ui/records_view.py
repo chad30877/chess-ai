@@ -133,6 +133,19 @@ class RecordsView:
                 return
             app.new_setup("auto")
             app.batch_mode = "evaluation"
+        elif action == "records_resume" and self.summary:
+            if app.batch and not app.batch.future.done():
+                self.message = "請先停止目前對戰"
+                return
+            try:
+                from engine.sessions.experiment_resume import resume_options
+                from engine.sessions.comparison_run import ComparisonRun
+                options = resume_options(self.catalog.root / "batches" / self.summary.batch_id)
+                app.batch = ComparisonRun(options, app.executor)
+                app.batch_mode = "evaluation"
+                app.mode = "auto"
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                self.message = f"無法續跑：{exc}"
         elif action == "records_refresh":
             self.catalog.refresh()
             if self.selected and self.summary is None:
@@ -263,6 +276,9 @@ class RecordsView:
         hint = "得分率僅計各候選的完整配對；結果不作最佳設定排名。點選棋局回放。" if comparison else "點選棋局回放；設定與統計均來自保存資料。"
         app.draw_label(app.small_font, self.message or summary.error or hint, (64, 625), MUTED, 772)
         app.button("records_back", "返回紀錄清單", (64, 672, 200, 40))
+        if (summary.settings or {}).get("experiment"):
+            app.button("records_resume", "續跑實驗", (280, 672, 180, 40),
+                       enabled=app.batch is None or app.batch.future.done())
 
     def _game_row(self, app, game, index, y, comparison):
         detail = (f"{game.candidate_label}執{'白' if game.candidate_color == 'white' else '黑'}　{OUTCOMES[game.outcome]}" if comparison

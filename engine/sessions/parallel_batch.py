@@ -16,7 +16,7 @@ def actual_workers(requested, work_count):
 
 
 def run_parallel(*, work_count, workers, make_work, on_game, progress, control=None,
-                 paused=None, bind_control=None, interval=0):
+                 paused=None, bind_control=None, interval=0, work_numbers=None):
     """最多派發 workers 個工作，回報佇列最多容納 workers × 2 筆。"""
     context = multiprocessing.get_context("spawn")
     stop, resume = context.Event(), context.Event()
@@ -80,7 +80,8 @@ def run_parallel(*, work_count, workers, make_work, on_game, progress, control=N
                     if pool is None:
                         pool = ProcessPoolExecutor(max_workers=workers, mp_context=context,
                                                    initializer=initialize_worker, initargs=(stop, resume, results))
-                    pending[next_number] = pool.submit(run_work, make_work(next_number))
+                    number = work_numbers[next_number - 1] if work_numbers is not None else next_number
+                    pending[number] = pool.submit(run_work, make_work(number))
                     next_number += 1
             try:
                 receive(results.get(timeout=0.05))
