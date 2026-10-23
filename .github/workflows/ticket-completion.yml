@@ -5,7 +5,9 @@ on:
     paths:
       - '.scratch/ml-small-trial/**'
       - 'scripts/check_ticket_completion.py'
+      - 'scripts/complete_ticket.py'
       - 'tests/test_ticket_completion.py'
+      - 'tests/test_complete_ticket.py'
       - '.github/workflows/ticket-completion.yml'
   workflow_dispatch:
 
@@ -22,7 +24,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: 驗證結案檢查行為
-        run: python -m unittest tests.test_ticket_completion
+        run: python -m unittest tests.test_ticket_completion tests.test_complete_ticket
       - name: 核對已關閉工作票的驗收與本機內容
         env:
           GH_TOKEN: ${{ github.token }}

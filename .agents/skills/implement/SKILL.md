@@ -18,4 +18,4 @@ Once done, call the Skill tool with "code-review" to review the work.
 
 Commit your work to the current branch.
 
-接著依專案 tracker 文件完成驗收核對、狀態同步、結案與讀回檢查，再回覆完成。必要人工驗收尚未執行時，回報實作完成及具體待驗收項，保留該票開啟。最終回覆應包含正式 issue 狀態與未完成項；提交成功不等於工作票已結案。
+依專案 tracker 文件完成必要驗證、GitHub／本機同步、結案與讀回檢查，再回覆完成。此專案提供結案命令，正常情況直接執行收尾，不另等使用者逐票人工展示或再次授權關票。只有明訂且確實無法由 Agent 完成的必要驗收，或修復後仍存在的實際錯誤，才保留開啟並說明阻礙。最終回覆須包含正式 issue 狀態；提交成功不等於工作票已結案。

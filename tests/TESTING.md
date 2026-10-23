@@ -28,6 +28,7 @@
 | `ui/test_chess_application.py` | UI 事件、搜尋設定生效、保存、回放、縮放、進行中棋局手數與分頁，以及九候選排序另存與半組配對 |
 | `test_discovery.py`、`test_engine_imports.py` | 測試發現及獨立程序載入 |
 | `test_ticket_completion.py` | 未驗收就關票、漏關票、GitHub／本機驗收不同步與發布索引定位 |
+| `test_complete_ticket.py` | 驗收完成才同步關票、讀回失敗中止、需求變更拒絕覆寫，以及重試不重複更新 |
 | `helpers/executors.py` | 供流程測試手動完成背景工作 |
 
 UI 測試使用 dummy 顯示驅動。含程序觀測的測試與獨立效能工具使用選用套件 `psutil`；效能量測見[搜尋與評分](../docs/搜尋與評分.md)，不在例行測試斷言深度 5 秒數。

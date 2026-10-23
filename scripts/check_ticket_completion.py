@@ -63,6 +63,14 @@ def inspect_tickets(manifest_path, issue, phase, fetch):
     return errors
 
 
+def find_gh():
+    gh = shutil.which("gh")
+    if gh is None and os.name == "nt":
+        installed = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "GitHub CLI/gh.exe"
+        gh = str(installed) if installed.is_file() else None
+    return gh
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True, help="包含 repository 與 tickets 的發布索引")
@@ -71,10 +79,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.phase != "audit" and args.issue is None:
         parser.error("結案前／後檢查需指定 --issue")
-    gh = shutil.which("gh")
-    if gh is None and os.name == "nt":
-        installed = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "GitHub CLI/gh.exe"
-        gh = str(installed) if installed.is_file() else None
+    gh = find_gh()
     if gh is None:
         print("無法核對：找不到 GitHub CLI", file=sys.stderr)
         return 2
