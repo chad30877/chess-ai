@@ -10,6 +10,7 @@
 | --- | --- |
 | `rules/test_game_rules.py` | 共用棋規、特殊走法、重複歷史與終局 |
 | `evaluation/test_evaluation_config.py`、`test_evaluator_semantics.py` | 設定驗證、舊版本讀取、保存、總分與白方視角 |
+| `evaluation/test_numeric_evaluation.py`、`search/test_numeric_search.py` | 全項／混合／零權重與特殊走法的舊版數值、分項一致性、單／多程序搜尋選步及原棋盤歷史 |
 | `evaluation/test_piece_square_tables.py`、`test_tapered_evaluation.py` | 棋子位置表、鏡射與中殘局混合 |
 | `evaluation/test_pawn_structure.py`、`test_mobility.py`、`test_king_safety.py`、`test_coordination.py` | 兵形、活動力、國王安全與棋子協調評分 |
 | `search/test_alphabeta_searcher.py`、`test_alphabeta_player.py`、`test_search_types.py` | Minimax 比對、搜尋契約、玩家與參數 |

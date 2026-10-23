@@ -100,9 +100,50 @@ class HandcraftedEvaluator(Evaluator):
             piece_values=_symbol_weights(_normalize_weights(weights)),
         )
         self.material_evaluator = MaterialEvaluator(weights=self.config.piece_values)
+        self._endgame_weights = {
+            PIECE_KEY_MAP[key]: value for key, value in self.config.endgame_piece_values.items()
+        }
+        # 保持分項順序；設定不可變，只需在建立評分器時整理一次。
+        self._score_groups = tuple(
+            (balance, tuple(settings.items()))
+            for balance, settings in (
+                (pawn_structure_balance, self.config.pawn_terms),
+                (mobility_balance, self.config.mobility_terms),
+                (king_safety_balance, self.config.king_safety_terms),
+                (coordination_balance, self.config.coordination_terms),
+            )
+        )
 
     def evaluate(self, board: chess.Board) -> float:
-        return self.evaluate_breakdown(board).total_score
+        config = self.config
+        phase = middlegame_phase(board) if config.phase_enabled else None
+        contributions = []
+        if config.material_enabled:
+            mg = _evaluate_material_balance(board, self.material_evaluator.weights)
+            contributions.append(mg if phase is None else _blend(
+                phase, mg, _evaluate_material_balance(board, self._endgame_weights)))
+        else:
+            contributions.append(0.0)
+        if config.pst_enabled and (config.pst_weight or (
+            phase is not None and config.endgame_pst_weight
+        )):
+            mg = evaluate_piece_square_tables(board) * config.pst_weight
+            contributions.append(mg if phase is None else _blend(
+                phase, mg, evaluate_endgame_piece_square_tables(board) * config.endgame_pst_weight))
+        else:
+            contributions.append(0.0)
+        for balance, settings in self._score_groups:
+            active = any(term.enabled and (term.weight or (
+                phase is not None and term.endgame_weight
+            )) for _, term in settings)
+            raw = balance(board) if active else None
+            for name, term in settings:
+                value = raw[name] if raw is not None else 0.0
+                mg = _contribution(value, term.weight, term.enabled)
+                contributions.append(mg if phase is None else _blend(
+                    phase, mg, _contribution(value, term.endgame_weight, term.enabled)))
+        # 與分項入口相同的逐項加總，避免浮點順序改變同分選步。
+        return sum(contributions)
 
     def evaluate_breakdown(self, board: chess.Board) -> EvaluationBreakdown:
         return _evaluate_breakdown(board, self.config, self.material_evaluator.weights)
@@ -215,7 +256,7 @@ def _evaluate_tapered_breakdown(
     terms = {}
     for name in stage_terms["middlegame"]:
         mg, eg = stage_terms["middlegame"][name], stage_terms["endgame"][name]
-        contribution = phase * mg.contribution + (1 - phase) * eg.contribution
+        contribution = _blend(phase, mg.contribution, eg.contribution)
         terms[name] = EvaluationTerm(
             phase * mg.raw_value * mg.weight + (1 - phase) * eg.raw_value * eg.weight,
             1.0, contribution, mg.enabled,
@@ -249,7 +290,7 @@ def _pawn_terms(
         unit, overlap = metadata[name]
         terms[name] = EvaluationTerm(
             raw_value=raw[name], weight=weight,
-            contribution=raw[name] * weight if settings.enabled else 0.0,
+            contribution=_contribution(raw[name], weight, settings.enabled),
             enabled=settings.enabled, unit=unit, direction="positive favors White",
             stage=stage if config.phase_enabled else "all", overlap_risk=overlap,
         )
@@ -264,7 +305,7 @@ def _mobility_terms(
         weight = settings.endgame_weight if stage == "endgame" else settings.weight
         terms[name] = EvaluationTerm(
             raw_value=raw[name], weight=weight,
-            contribution=raw[name] * weight if settings.enabled else 0.0,
+            contribution=_contribution(raw[name], weight, settings.enabled),
             enabled=settings.enabled, unit="geometric attack destination balance (White minus Black)",
             direction="positive favors White", stage=stage if config.phase_enabled else "all",
             overlap_risk="overlaps PST centralization, pawn attacks and future king-safety features",
@@ -285,7 +326,7 @@ def _king_safety_terms(
         weight = settings.endgame_weight if stage == "endgame" else settings.weight
         terms[name] = EvaluationTerm(
             raw_value=raw[name], weight=weight,
-            contribution=raw[name] * weight if settings.enabled else 0.0,
+            contribution=_contribution(raw[name], weight, settings.enabled),
             enabled=settings.enabled, unit=units[name], direction="positive favors White",
             stage=stage if config.phase_enabled else "all",
             overlap_risk="overlaps king/pawn PST, pawn structure and geometric mobility",
@@ -306,9 +347,17 @@ def _coordination_terms(
         weight = settings.endgame_weight if stage == "endgame" else settings.weight
         terms[name] = EvaluationTerm(
             raw_value=raw[name], weight=weight,
-            contribution=raw[name] * weight if settings.enabled else 0.0,
+            contribution=_contribution(raw[name], weight, settings.enabled),
             enabled=settings.enabled, unit=units[name], direction="positive favors White",
             stage=stage if config.phase_enabled else "all",
             overlap_risk="overlaps bishop/rook PST, geometric mobility, pawn structure and king-file exposure",
         )
     return terms
+
+
+def _contribution(raw: float, weight: float, enabled: bool) -> float:
+    return raw * weight if enabled else 0.0
+
+
+def _blend(phase: float, middlegame: float, endgame: float) -> float:
+    return phase * middlegame + (1 - phase) * endgame
