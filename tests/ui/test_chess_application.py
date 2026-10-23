@@ -576,6 +576,28 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=value))
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
 
+    def test_weight_preview_runs_from_ui_events_and_reloads_results(self):
+        self.prepare_comparison_configs()
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        self.click("comparison_generated")
+        self.enter_comparison_field("weight_values", "1, 2, 2")
+        self.enter_comparison_field("max_plies", "0")
+        self.enter_comparison_field("depth", "1")
+        self.click("comparison_preview")
+        self.click("start")
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["saved_games"], 2)
+        self.click("batch_results")
+        summary = self.app.records_view.summary
+        definition = summary.settings["experiment"]
+        self.assertEqual(definition["planned_games"], 2)
+        self.assertEqual(definition["baseline"]["config"]["terms"]["piece_square"]["weight"], 1)
+        self.assertEqual(definition["candidates"][0]["config"]["terms"]["piece_square"]["weight"], 2)
+        self.assertEqual(len(summary.games), 2)
+        original = json.loads((self.project / "configs/evaluation/stable.json").read_text(encoding="utf-8"))
+        self.assertEqual(original["terms"]["piece_square"]["weight"], 1)
+
     def test_comparison_search_worker_fields_run_multicandidate_games_and_save_snapshots(self):
         self.prepare_comparison_configs()
         profile = self.project / "configs/evaluation/third.json"

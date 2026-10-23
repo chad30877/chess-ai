@@ -233,6 +233,7 @@ def run_evaluation_comparison(
     control: Callable[[], bool] | None = None,
     progress: Callable[[dict], None] | None = None,
     workers: int = 1,
+    experiment_definition: dict | None = None,
     _bind_process_control: Callable | None = None,
 ) -> ComparisonResult:
     """交換黑白比較，支援進度通知、合作式停止與逐局保存。"""
@@ -246,6 +247,15 @@ def run_evaluation_comparison(
     candidates = tuple(candidates)
     if not candidates or any(not isinstance(side, ComparisonParticipant) for side in candidates):
         raise ValueError("At least one candidate ComparisonParticipant is required")
+    if experiment_definition is not None:
+        import json
+        from engine.sessions.experiment import ExperimentDefinition
+        experiment_definition = json.loads(json.dumps(experiment_definition))
+        frozen = ExperimentDefinition(json.dumps(experiment_definition)).options(batch_root)
+        actual = dict(baseline=baseline, candidates=list(candidates), initial_fens=tuple(initial_fens),
+                      repetitions=repetitions, base_seed=base_seed, max_plies=max_plies, claim_draw=claim_draw)
+        if any(actual[key] != frozen[key] for key in actual):
+            raise ValueError("實際比較條件與預覽不一致")
     labels = [baseline.label, *(side.label for side in candidates)]
     if len(set(labels)) != len(labels):
         raise ValueError("Baseline and candidate labels must be different")
@@ -314,6 +324,9 @@ def run_evaluation_comparison(
     if max_plies is not None:
         settings["max_plies"] = max_plies
 
+    if experiment_definition is not None:
+        settings["experiment"] = experiment_definition
+
     pair_records = []
     tagged = list(dict.fromkeys(["evaluation-comparison", *(tags or [])]))
     stopped = False
@@ -373,8 +386,12 @@ def run_evaluation_comparison(
             if multi_candidate:
                 pair.update(candidate_index=candidate_index, candidate_label=candidates[candidate_index].label)
         game = replace(game, game_id=writer.manifest["counts"]["saved_games"] + 1)
-        stored_game_id = writer.add_game(game, seed=seed,
-                                        execution=dict(work_number=number, game_number=logical_number))
+        execution = dict(work_number=number, game_number=logical_number)
+        if experiment_definition is not None:
+            from engine.sessions.experiment import work_id
+            execution.update(work_id=work_id(experiment_definition, candidate_index, pair_number, candidate_is_white),
+                             candidate_id=experiment_definition['candidates'][candidate_index]['id'])
+        stored_game_id = writer.add_game(game, seed=seed, execution=execution)
         if pair not in pair_records:
             pair_records.append(pair)
         pair_records.sort(key=lambda p: (p.get("candidate_index", 0), p["pair_number"]))
@@ -385,6 +402,7 @@ def run_evaluation_comparison(
             candidate_color="white" if candidate_is_white else "black",
             result=game.result, status=game.status, termination=game.termination,
             candidate_outcome=outcome, elapsed_seconds=elapsed_seconds,
+            **({"work_id": execution["work_id"], "candidate_id": execution["candidate_id"]} if experiment_definition is not None else {}),
         ))
         last_replay = str(writer.path / "replays" / f"{stored_game_id}.json")
         publish()
