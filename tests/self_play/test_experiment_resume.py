@@ -84,3 +84,12 @@ class ExperimentResumeTest(unittest.TestCase):
             data = json.loads((result.path/'comparison.json').read_text(encoding='utf-8'))
             self.assertEqual(len(data['pairs'][0]['games']), 2)
             self.assertTrue(all(game['termination']=='max_plies' for game in data['pairs'][0]['games']))
+
+            from engine.replay.comparison_catalog import load_comparison
+            from engine.replay.replay_loader import load_replay_json
+            summary = load_comparison(result.path / 'manifest.json')
+            self.assertEqual(len(summary.games), 3)
+            self.assertEqual(sum(game.historical for game in summary.games), 1)
+            self.assertEqual(summary.candidate_summaries[0]['unfinished'], 2)
+            for game in summary.games:
+                self.assertIsNotNone(load_replay_json(str(game.path)))

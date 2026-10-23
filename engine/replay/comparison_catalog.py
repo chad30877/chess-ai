@@ -22,6 +22,7 @@ class ComparisonGame:
     termination: str
     elapsed_seconds: float
     path: Path | None
+    historical: bool = False
 
 
 @dataclass(frozen=True)
@@ -113,7 +114,10 @@ def load_comparison(manifest_path: Path) -> ComparisonSummary:
     seen = set()
     count_by_candidate = [{"win": 0, "draw": 0, "loss": 0, "unfinished": 0}
                           for _ in range(len(participants.get("candidates", [None])))]
-    for pair in comparison["pairs"]:
+    effective_pairs = comparison["pairs"]
+    effective_pair_ids = {id(pair) for pair in effective_pairs}
+    for pair in [*effective_pairs, *comparison.get("historical_attempts", [])]:
+        historical = id(pair) not in effective_pair_ids
         candidate_index = pair.get("candidate_index", 0)
         if type(candidate_index) is not int or not 0 <= candidate_index < len(count_by_candidate):
             raise ValueError("無效的候選編號")
@@ -153,8 +157,12 @@ def load_comparison(manifest_path: Path) -> ComparisonSummary:
                 raise ValueError("無效的對局耗時")
             path = _inside(batch, row["replay_path"])
             games.append(ComparisonGame(game_id, color, candidate_index, candidate_participant["label"], outcome, result, game["termination"], elapsed,
-                                        path if path.is_file() else None))
-            count_by_candidate[candidate_index][outcome] += 1
+                                        path if path.is_file() else None, historical))
+            if historical:
+                if game["termination"] != "user_stop":
+                    raise ValueError("歷史嘗試必須為中斷棋局")
+            else:
+                count_by_candidate[candidate_index][outcome] += 1
     if seen != set(indexed):
         raise ValueError("比較摘要未涵蓋所有已發布棋局")
     expected_all = []

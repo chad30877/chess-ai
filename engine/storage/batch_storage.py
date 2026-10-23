@@ -73,6 +73,52 @@ class BatchWriter:
         writer.manifest.pop("error", None)
         return writer
 
+    def recover_committed_games(self):
+        """由已提交棋譜重建索引，並回傳依發布順序排列的棋譜。"""
+        replays = []
+        for path in (self.path/'replays').glob('*.json'):
+            replay = json.loads(path.read_text(encoding='utf-8'))
+            metadata = replay['metadata']
+            if 'summary' not in metadata:
+                raise ValueError('棋譜缺少可恢復的提交資料')
+            replays.append((metadata['summary']['game_number'], replay))
+        replays.sort(key=lambda item: item[0])
+        summaries = [replay['metadata']['summary'] for _, replay in replays]
+        with (self.path/'games.csv').open('w', newline='', encoding='utf-8') as stream:
+            rows = csv.DictWriter(stream, fieldnames=GAME_FIELDS)
+            rows.writeheader()
+            rows.writerows(summaries)
+        import chess
+        with (self.path/self.manifest['files']['positions']).open('w', newline='', encoding='utf-8') as stream:
+            rows = csv.DictWriter(stream, fieldnames=POSITION_FIELDS)
+            if self.output_format == 'csv':
+                rows.writeheader()
+            for _, replay in replays:
+                metadata = replay['metadata']
+                summary = metadata['summary']
+                board = chess.Board(replay['initial_fen'])
+                for ply, move in enumerate(replay['moves_uci'], 1):
+                    position = dict(game_id=metadata['game_id'], ply=ply, fen=board.fen(),
+                        side_to_move='white' if board.turn else 'black', selected_move=move,
+                        result=summary['result'], white_player=summary['white_player'], black_player=summary['black_player'],
+                        batch_id=self.batch_id, status=summary['status'], termination=summary['termination'],
+                        claim_draw=self.manifest['settings']['rules']['claim_draw'])
+                    if self.output_format == 'csv':
+                        rows.writerow(position)
+                    else:
+                        stream.write(json.dumps(position, ensure_ascii=False)+'\n')
+                    board.push_uci(move)
+        counts = self.manifest['counts']
+        counts.update(saved_games=len(summaries), completed_games=sum(s['status']=='completed' for s in summaries),
+                      truncated_games=sum(s['status']=='truncated' for s in summaries), positions=sum(s['move_count'] for s in summaries))
+        self.manifest['results'] = {result: sum(s['result']==result for s in summaries) for result in ('1-0','0-1','1/2-1/2','*')}
+        self._save_manifest()
+        return replays
+
+    def set_work_complete(self, complete):
+        """設定邏輯工作是否已全數完成，歷史中斷嘗試不增加工作數。"""
+        self._logical_complete = bool(complete)
+
     def _save_manifest(self) -> None:
         self.manifest["updated_at"] = now_iso()
         write_json_atomic(self.path / "manifest.json", self.manifest)

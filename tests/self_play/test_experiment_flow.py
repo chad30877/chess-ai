@@ -100,3 +100,19 @@ class ExperimentFlowTest(unittest.TestCase):
             for values in ('2:1:1', '0:1:0', '0:1:-1', 'nan:1:1', '0:inf:1'):
                 with self.assertRaises(ValueError):
                     build_experiment(options, 'piece_square.weight', values)
+
+    def test_close_weights_keep_distinct_candidates_when_executed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder = root / 'configs/evaluation'
+            folder.mkdir(parents=True)
+            (folder / 'stable.json').write_text(json.dumps(EvaluationConfig().to_dict()), encoding='utf-8')
+            fields = EvaluationFields(root)
+            fields.action('comparison_generated', None)
+            fields.values.update(weight_values='1.000001,1.000002', max_plies='0', depth='1')
+            fields.action('comparison_preview', None)
+            result = run_evaluation_comparison(**fields.options())
+            from engine.replay.comparison_catalog import load_comparison
+            summary = load_comparison(result.path / 'manifest.json')
+            self.assertEqual(len(summary.games), 4)
+            self.assertEqual(len(summary.candidate_summaries), 2)

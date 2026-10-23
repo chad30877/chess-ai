@@ -24,6 +24,7 @@ class EvaluationFields:
         self.converted = None
         self.rules = []
         self.weight_mode = "actual"
+        self.file_page = 0
         self.preview_page = 0
         self.generated = False
         self.preview = None
@@ -148,11 +149,16 @@ class EvaluationFields:
             if self.files:
                 current = getattr(self, side)
                 setattr(self, side, self.files[(self.files.index(current) + 1) % len(self.files)])
+        elif action == "comparison_files_next":
+            self.file_page = (self.file_page + 1) % max(1, (len(self.candidates) + 6) // 7)
+        elif action == "comparison_files_prev":
+            self.file_page = max(0, self.file_page - 1)
         elif action == "comparison_candidate_add":
             self.commit()
             available = [path for path in self.files if path != self.baseline and path not in self.candidates]
             if available:
                 self.candidates.append(available[0])
+                self.file_page = (len(self.candidates) - 1) // 7
         elif action.startswith("comparison_candidate_select:"):
             index = int(action.split(":")[1])
             if 0 <= index < len(self.candidates):
@@ -166,6 +172,7 @@ class EvaluationFields:
             index = int(action.split(":")[1])
             if 0 <= index < len(self.candidates) and len(self.candidates) > 1:
                 self.candidates.pop(index)
+                self.file_page = min(self.file_page, (len(self.candidates) - 1) // 7)
         elif action.startswith("comparison_field:"):
             self.commit()
             self.focus = action.split(":")[1]
@@ -206,14 +213,17 @@ class EvaluationFields:
                     app.text(candidate['label'], 460, 396 + index * 30, width=376)
         else:
             app.draw_label(app.small_font, "候選評分設定檔（各自與基準交換黑白比較）", (460, 199), width=376)
-            for index, path in enumerate(self.candidates[:7]):
-                y = 226 + index * 38
+            offset = self.file_page * 7
+            for index, path in enumerate(self.candidates[offset:offset + 7], offset):
+                y = 226 + (index - offset) * 38
                 app.button(f"comparison_candidate_select:{index}", path.name, (460, y, 315, 32))
                 app.button(f"comparison_candidate_remove:{index}", "移除", (780, y, 56, 32))
             app.button("comparison_candidate_add", "加入下一份不同設定檔",
-                       (460, min(226 + len(self.candidates[:7]) * 38, 492), 376, 32),
+                       (460, 500, 376, 32),
                        enabled=any(
                            path != self.baseline and path not in self.candidates for path in self.files))
+            app.button("comparison_files_prev", "上一頁", (460, 540, 180, 32), enabled=self.file_page > 0)
+            app.button("comparison_files_next", "下一頁", (650, 540, 186, 32), enabled=(self.file_page + 1) * 7 < len(self.candidates))
         if self.message:
             app.text(self.message, 64, 642, muted=True, width=772)
         app.button("start", "開始生成", (460, 672, 376, 40), primary=True)

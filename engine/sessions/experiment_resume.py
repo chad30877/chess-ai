@@ -48,55 +48,16 @@ def resume_experiment(path, **callbacks):
 
 def recover_pairs(writer, definition):
     """棋譜是提交事實；摘要過期時由穩定工作識別重建。"""
-    import csv
     from engine.sessions.experiment import work_id
-    from engine.sessions.evaluation_comparison import _game_outcome_for_candidate
-    from types import SimpleNamespace
-    replays = []
-    for path in (writer.path/'replays').glob('*.json'):
-        replay = json.loads(path.read_text(encoding='utf-8'))
-        metadata = replay['metadata']
-        if 'summary' not in metadata:
-            raise ValueError('棋譜缺少可恢復的提交資料')
-        replays.append((metadata['summary']['game_number'], replay))
-    replays.sort(key=lambda item: item[0])
-    summaries = [replay['metadata']['summary'] for _, replay in replays]
-    from engine.storage.batch_storage import GAME_FIELDS
-    with (writer.path/'games.csv').open('w', newline='', encoding='utf-8') as stream:
-        rows = csv.DictWriter(stream, fieldnames=GAME_FIELDS)
-        rows.writeheader()
-        rows.writerows(summaries)
-    import chess
-    from engine.storage.batch_storage import POSITION_FIELDS
-    with (writer.path/writer.manifest['files']['positions']).open('w', newline='', encoding='utf-8') as stream:
-        rows = csv.DictWriter(stream, fieldnames=POSITION_FIELDS)
-        if writer.output_format == 'csv':
-            rows.writeheader()
-        for _, replay in replays:
-            metadata = replay['metadata']
-            summary = metadata['summary']
-            board = chess.Board(replay['initial_fen'])
-            for ply, move in enumerate(replay['moves_uci'], 1):
-                position = dict(game_id=metadata['game_id'], ply=ply, fen=board.fen(),
-                    side_to_move='white' if board.turn else 'black', selected_move=move,
-                    result=summary['result'], white_player=summary['white_player'], black_player=summary['black_player'],
-                    batch_id=writer.batch_id, status=summary['status'], termination=summary['termination'],
-                    claim_draw=writer.manifest['settings']['rules']['claim_draw'])
-                if writer.output_format == 'csv':
-                    rows.writerow(position)
-                else:
-                    stream.write(json.dumps(position, ensure_ascii=False)+'\n')
-                board.push_uci(move)
-    counts = writer.manifest['counts']
-    counts.update(saved_games=len(summaries), completed_games=sum(s['status']=='completed' for s in summaries),
-                  truncated_games=sum(s['status']=='truncated' for s in summaries), positions=sum(s['move_count'] for s in summaries))
-    writer.manifest['results'] = {result: sum(s['result']==result for s in summaries) for result in ('1-0','0-1','1/2-1/2','*')}
+    from engine.sessions.evaluation_comparison import comparison_game_record
+    replays = writer.recover_committed_games()
     by_id = {}
     for _, replay in replays:
         metadata = replay['metadata']
         if metadata['termination'] != 'user_stop':
             by_id[metadata['execution']['work_id']] = metadata
     pairs = []
+    attempts = []
     for index, candidate in enumerate(definition['candidates']):
         for number in range(1, len(definition['initial_fens'])*definition['repetitions']+1):
             position = (number-1)//definition['repetitions']
@@ -107,16 +68,22 @@ def recover_pairs(writer, definition):
                 if not meta:
                     continue
                 summary = meta['summary']
-                games.append(dict(game_number=summary['game_number'], task_game_number=meta['execution']['game_number'],
-                    game_id=meta['game_id'], baseline_color='black' if white else 'white', candidate_color='white' if white else 'black',
-                    result=summary['result'],status=meta['status'],termination=meta['termination'],
-                    candidate_outcome=_game_outcome_for_candidate(SimpleNamespace(**summary),white),
-                    elapsed_seconds=meta['execution'].get('elapsed_seconds',0), work_id=identity,candidate_id=candidate['id']))
+                games.append(comparison_game_record(summary, meta['execution'], white))
             if games:
                 pair=dict(pair_number=number,position_index=position+1,repetition=(number-1)%definition['repetitions']+1,
                           initial_fen=definition['initial_fens'][position],seed=definition['base_seed']+number-1,games=games)
                 if len(definition['candidates']) > 1:
                     pair.update(candidate_index=index,candidate_label=candidate['label'])
                 pairs.append(pair)
-    writer._save_manifest()
-    return pairs
+    for _, replay in replays:
+        meta = replay['metadata']
+        if meta['termination'] != 'user_stop':
+            continue
+        execution = meta['execution']
+        for index, candidate in enumerate(definition['candidates']):
+            if candidate['id'] == execution['candidate_id']:
+                white = execution['game_number'] % 2 == 0
+                summary = meta['summary']
+                attempts.append(dict(candidate_index=index, games=[comparison_game_record(summary, execution, white)]))
+                break
+    return pairs, attempts
