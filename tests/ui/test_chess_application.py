@@ -47,6 +47,53 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.batch_workers = 1
         self.addCleanup(self.app.close)
 
+    def test_sorted_candidates_replay_and_save_actual_snapshot(self):
+        from dataclasses import replace
+        configs = [replace(EvaluationConfig(), pst_weight=float(i + 2)) for i in range(9)]
+        result = run_evaluation_comparison(
+            batch_root=self.project / "data/batches", baseline=ComparisonParticipant("基準", "greedy", EvaluationConfig()),
+            candidates=[ComparisonParticipant(f"候選{i}", "greedy", config) for i, config in enumerate(configs)],
+            initial_fens=["7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"], workers=1)
+        self.click("mode:records")
+        view = self.app.records_view
+        view.select(view.catalog.entries[0].key)
+        self.assertIsNotNone(view.summary.comparison.experiment_elapsed_seconds)
+        self.click("records_sort:wins")
+        for _ in range(4):
+            self.click("records_candidates_next")
+        self.click("records_candidate:8")
+        self.assertEqual(len(view.options), 2)
+        self.assertEqual(view.options[0].candidate_label, "候選8")
+        self.click("records_game:0")
+        self.assertEqual(self.app.replay_data["metadata"]["game_id"], view.options[0].game_id)
+        self.app.mode = "records"
+        self.click("records_save_candidate")
+        paths = list((self.project / "configs/evaluation").glob("candidate-*.json"))
+        self.assertEqual(len(paths), 1)
+        self.assertEqual(EvaluationConfig.from_dict(json.loads(paths[0].read_text(encoding="utf-8"))), configs[8])
+        self.assertIn(paths[0], self.app.live_evaluation_files)
+        self.assertIn(paths[0], self.app.evaluation_fields.files)
+
+    def test_half_pair_is_replayable_without_paired_score(self):
+        state = {}
+        run_evaluation_comparison(
+            batch_root=self.project / "data/batches",
+            baseline=ComparisonParticipant.greedy("baseline", EvaluationConfig()),
+            candidate=ComparisonParticipant.greedy("candidate", EvaluationConfig(pst_weight=2)),
+            initial_fens=["7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"], workers=1,
+            progress=lambda progress: state.update(progress),
+            control=lambda: not state.get("saved_games", 0))
+        self.click("mode:records")
+        self.click("records_entry:0")
+        self.click("records_sort:paired_score_rate")
+        self.click("records_candidate:0")
+        view = self.app.records_view
+        self.assertEqual(len(view.options), 1)
+        self.assertIsNone(view.candidates[0][1]["paired_score_rate"])
+        self.assertEqual(view.candidates[0][1]["completed_pairs"], 0)
+        self.click("records_game:0")
+        self.assertEqual(self.app.replay_data["metadata"]["game_id"], view.options[0].game_id)
+
     def test_human_alpha_beta_worker_input_runs_and_saves_actual_conditions(self):
         self.click("mode:human")
         self.app.opponent = "AlphaBeta"

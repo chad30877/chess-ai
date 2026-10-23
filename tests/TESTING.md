@@ -25,7 +25,7 @@
 | `self_play/test_engine_match.py`、`test_cli_roundtrip.py` | 對戰 CLI、生成／匯出／回放往返 |
 | `replay/test_replay_session.py`、`test_records_catalog.py`、`test_comparison_catalog.py` | 回放跳步、日期查找與比較摘要 |
 | `ui/test_live_session.py` | 背景落子、真人回合、停止及舊結果隔離 |
-| `ui/test_chess_application.py` | UI 事件、搜尋設定生效、保存、回放與縮放 |
+| `ui/test_chess_application.py` | UI 事件、搜尋設定生效、保存、回放、縮放，以及九候選排序另存與半組配對 |
 | `test_discovery.py`、`test_engine_imports.py` | 測試發現及獨立程序載入 |
 | `helpers/executors.py` | 供流程測試手動完成背景工作 |
 
