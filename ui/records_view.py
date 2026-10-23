@@ -286,6 +286,8 @@ class RecordsView:
         app.button(f"records_game:{index}", "", (64, y, 772, 43), enabled=game.path is not None,
                    primary=game.game_id == self.selected_game)
         app.draw_label(app.small_font, f"{game.game_id}　{detail}", (76, y + 2), TEXT, 748)
+        if comparison and game.historical:
+            detail = "中斷嘗試｜" + detail
         reason = app.comparison_reason(game.termination) if game.termination else "未記錄"
         app.draw_label(app.small_font, f"耗時：{elapsed(game.elapsed_seconds)}　｜　結束原因：{reason}　{game.issue}",
                        (76, y + 22), MUTED, 748)

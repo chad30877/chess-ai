@@ -41,6 +41,7 @@ class RecordGame:
     candidate_color: str | None = None
     outcome: str | None = None
     candidate_label: str | None = None
+    historical: bool = False
 
     @property
     def date(self):
@@ -140,6 +141,7 @@ def load_batch_record(manifest_path):
             indexed = {game.game_id: game for game in comparison.games}
             games = [replace(game, candidate_color=indexed[game.game_id].candidate_color,
                              outcome=indexed[game.game_id].outcome,
+                             historical=indexed[game.game_id].historical,
                              candidate_label=indexed[game.game_id].candidate_label,
                              elapsed_seconds=indexed[game.game_id].elapsed_seconds) for game in games]
             kind = "comparison"

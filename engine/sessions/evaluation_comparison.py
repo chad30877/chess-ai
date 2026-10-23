@@ -195,6 +195,18 @@ def comparison_progress(pairs: list[dict]) -> dict:
                 paired_score_rate=stats.score / stats.completed_games if stats.completed_games else None)
 
 
+def comparison_game_record(summary, execution, candidate_is_white):
+    """由保存摘要建立有效棋局或歷史嘗試的共用比較紀錄。"""
+    from types import SimpleNamespace
+    return dict(game_number=summary['game_number'], task_game_number=execution['game_number'],
+                game_id=summary['game_id'], baseline_color='black' if candidate_is_white else 'white',
+                candidate_color='white' if candidate_is_white else 'black', result=summary['result'],
+                status=summary['status'], termination=summary['termination'],
+                candidate_outcome=_game_outcome_for_candidate(SimpleNamespace(**summary), candidate_is_white),
+                elapsed_seconds=execution.get('elapsed_seconds', 0),
+                **{key: execution[key] for key in ('work_id', 'candidate_id') if key in execution})
+
+
 class _ControlledPlayer:
     """取消是單次搜尋的執行訊號，不修改或隱藏固定深度設定。"""
 
@@ -329,6 +341,7 @@ def run_evaluation_comparison(
         settings["experiment"] = experiment_definition
 
     pair_records = []
+    historical_attempts = []
     tagged = list(dict.fromkeys(["evaluation-comparison", *(tags or [])]))
     stopped = False
     current_game = 0
@@ -350,7 +363,7 @@ def run_evaluation_comparison(
             "schema_version": 3 if multi_candidate else COMPARISON_SCHEMA_VERSION, "batch_id": writer.batch_id,
             "kind": "evaluation", "budget": budget,
             "participants": stored_participants,
-            "pairs": pair_records,
+            "pairs": pair_records, "historical_attempts": historical_attempts,
             "stats": ({"candidates": [stat.to_dict() for stat in all_stats],
                        "baseline": _baseline_stats(_stats([g["candidate_outcome"] for p in pair_records
                            for g in p["games"]])).to_dict()} if multi_candidate else
@@ -397,16 +410,10 @@ def run_evaluation_comparison(
         if pair not in pair_records:
             pair_records.append(pair)
         pair_records.sort(key=lambda p: (p.get("candidate_index", 0), p["pair_number"]))
-        outcome = _game_outcome_for_candidate(game, candidate_is_white)
-        pair["games"][:] = [g for g in pair["games"] if g["task_game_number"] != logical_number]
-        pair["games"].append(dict(
-            game_number=game.game_id, task_game_number=logical_number, game_id=stored_game_id,
-            baseline_color="black" if candidate_is_white else "white",
-            candidate_color="white" if candidate_is_white else "black",
-            result=game.result, status=game.status, termination=game.termination,
-            candidate_outcome=outcome, elapsed_seconds=elapsed_seconds,
-            **({"work_id": execution["work_id"], "candidate_id": execution["candidate_id"]} if experiment_definition is not None else {}),
-        ))
+        pair['games'][:] = [g for g in pair['games'] if g['task_game_number'] != logical_number]
+        summary = dict(game_number=game.game_id, game_id=stored_game_id, result=game.result,
+                       status=game.status, termination=game.termination)
+        pair['games'].append(comparison_game_record(summary, execution, candidate_is_white))
         last_replay = str(writer.path / "replays" / f"{stored_game_id}.json")
         publish()
         notify()
@@ -438,7 +445,7 @@ def run_evaluation_comparison(
     with ExitStack() as execution_stack:
         execution_stack.enter_context(experiment_lock(writer.path))
         if resume_path is not None:
-            pair_records = recover_pairs(writer, experiment_definition)
+            pair_records, historical_attempts = recover_pairs(writer, experiment_definition)
         execution_stack.enter_context(writer)
         try:
             publish()
@@ -517,8 +524,8 @@ def run_evaluation_comparison(
             # 即使當盤失敗，也發布先前成功保存的配對與棋局。
             candidate_stats = publish()
             if experiment_definition is not None:
-                writer._logical_complete = all(saved_color(number, white)
-                    for number in range(1, work_count + 1) for white in (False, True))
+                writer.set_work_complete(all(saved_color(number, white)
+                    for number in range(1, work_count + 1) for white in (False, True)))
     notify(writer.manifest["status"])
     candidate_results = tuple(stats_for(index) for index in range(len(candidates)))
     combined = _stats([g["candidate_outcome"] for pair in pair_records for g in pair["games"]])

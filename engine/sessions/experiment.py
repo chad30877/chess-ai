@@ -115,7 +115,7 @@ def build_experiment(options, field=None, values=None, *, rules=None):
         if payload == baseline:
             unchanged += 1
             continue
-        candidates.append(dict(id=identity, label='; '.join(f'{key}={value:g}' for key, value in differences.items()), config=payload, differences=differences))
+        candidates.append(dict(id=identity, label=f'候選 {len(candidates) + 1}：' + '; '.join(f'{key}={value!r}' for key, value in differences.items()), config=payload, differences=differences))
     data = dict(schema_version=1, program_version='weight-experiment-1',
                 baseline=dict(label=options['baseline'].label, config=baseline), candidates=candidates,
                 search=asdict(options['baseline'].search_config), initial_fens=list(options['initial_fens']),

@@ -671,6 +671,54 @@ class ChessApplicationTest(unittest.TestCase):
         weights = {(item['config']['terms']['piece_square']['weight'], item['config']['terms']['piece_square']['endgame_weight']) for item in definition['candidates']}
         self.assertEqual(weights, {(mg, eg) for mg in (1.5, 2, 2.5) for eg in (2, 3, 4)})
 
+    def test_resumed_interrupted_game_retains_result_table_replay_and_save(self):
+        self.click('mode:records')
+        self.click('comparison_new')
+        fields = self.app.evaluation_fields
+        fields.action('comparison_generated', self.app)
+        fields.values.update(weight_values='2', max_plies='1', depth='1')
+        fields.action('comparison_preview', self.app)
+        calls = []
+        def control():
+            calls.append(None)
+            return len(calls) < 4
+        result = run_evaluation_comparison(**fields.options(), control=control)
+        from engine.sessions.experiment_resume import resume_experiment
+        resume_experiment(result.path)
+        self.app.mode = 'home'
+        self.click('mode:records')
+        self.click('records_entry:0')
+        view = self.app.records_view
+        self.assertIsNotNone(view.summary.comparison)
+        self.assertEqual(len(view.summary.games), 3)
+        self.click('records_candidate:0')
+        self.click('records_save_candidate')
+        self.assertEqual(len(list((self.project / 'configs/evaluation').glob('candidate-*.json'))), 1)
+        self.click('records_game:0')
+        self.assertEqual(self.app.mode, 'replay')
+        self.assertEqual(self.app.replay_data['metadata']['termination'], 'user_stop')
+
+    def test_file_candidates_after_seventh_can_be_selected_removed_and_executed(self):
+        self.prepare_comparison_configs()
+        folder = self.project / 'configs/evaluation'
+        for index in range(8):
+            (folder / f'extra{index}.json').write_text(json.dumps(EvaluationConfig(pst_weight=index + 2).to_dict()), encoding='utf-8')
+        self.click('mode:auto')
+        self.click('batch_mode:evaluation')
+        for _ in range(7):
+            self.click('comparison_candidate_add')
+        self.click('comparison_files_prev')
+        self.click('comparison_files_next')
+        self.click('comparison_candidate_select:7')
+        self.click('comparison_candidate_remove:7')
+        self.assertEqual(len(self.app.evaluation_fields.candidates), 7)
+        self.click('comparison_candidate_add')
+        self.enter_comparison_field('max_plies', '0')
+        self.enter_comparison_field('depth', '1')
+        self.click('start')
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()['saved_games'], 16)
+
     def test_comparison_search_worker_fields_run_multicandidate_games_and_save_snapshots(self):
         self.prepare_comparison_configs()
         profile = self.project / "configs/evaluation/third.json"
