@@ -13,7 +13,7 @@
 
 ### Issue tracker
 
-Issues 和規格使用 GitHub Issues 管理，操作方式見 `docs/agents/issue-tracker.md`。
+實作、審查或結案工作票時，先讀 `docs/agents/issue-tracker.md` 的定位、驗收與結案規則；GitHub 為目前狀態來源。
 
 ### Domain docs
 
