@@ -1,6 +1,9 @@
 """固定工作量量測搜尋與兩層程序派工；耗時不作例行測試斷言。"""
 
 import argparse
+import cProfile
+from dataclasses import asdict
+import pstats
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 import json
@@ -32,6 +35,8 @@ CASES = {
     "rook": ("8/5pk1/6p1/8/3R4/6P1/5PK1/7r w - - 0 35", ("f2f3", "f7f6")),
     "minor": ("8/5pk1/6p1/8/3N4/6P1/5PK1/7n w - - 0 35", ("f2f3", "f7f6")),
 }
+HISTORY_MOVES = ("g1f3", "g8f6", "f3g1", "f6g8")
+CASES["history"] = chess.STARTING_FEN, ("h2h3", "h7h6")
 quiet = chess.Board()
 for move in ("e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "d2d3", "g8f6"):
     quiet.push_uci(move)
@@ -105,20 +110,41 @@ def search_job(job):
     )
     fen, moves = CASES[job["case"]]
     board = chess.Board(fen)
-    searcher = AlphaBetaSearcher(HandcraftedEvaluator(), search_workers=job["workers"],
+    if job["case"] == "history":
+        for move in HISTORY_MOVES:
+            board.push_uci(move)
+    config = EvaluationConfig.from_dict(job["evaluation"])
+    searcher = AlphaBetaSearcher(HandcraftedEvaluator(config=config), search_workers=job["workers"],
                                 quiescence_depth=job["quiescence_depth"])
     rows = []
     try:
         for step in range(job["steps"] + 1):
-            if step:
+            if step and not job.get("reuse_position"):
                 board.push_uci(moves[step - 1])
             before = board.fen(), tuple(board.move_stack)
+            profiler = cProfile.Profile() if job.get("profile") else None
             started = perf_counter()
+            if profiler:
+                profiler.enable()
             result = searcher.search(board, SearchLimits(
                 max_depth=job["depth"], time_ms=job["timeout_ms"],
                 transposition_capacity=job["capacity"],
             ))
+            if profiler:
+                profiler.disable()
             elapsed = perf_counter() - started
+            profile_rows = []
+            if profiler:
+                for (filename, line, name), (primitive, calls, own, cumulative, _) in pstats.Stats(profiler).stats.items():
+                    normalized = filename.replace("\\", "/")
+                    category = ("evaluation" if "/engine/evaluation/" in normalized else
+                                "transposition_key" if "/engine/search/transposition.py" in normalized else
+                                "search" if "/engine/search/" in normalized else
+                                "board_history" if "/chess/" in normalized else "other")
+                    profile_rows.append(dict(category=category, file=normalized, line=line,
+                                             function=name, calls=calls, self_seconds=own,
+                                             cumulative_seconds=cumulative))
+                profile_rows.sort(key=lambda row: row["self_seconds"], reverse=True)
             if before != (board.fen(), tuple(board.move_stack)):
                 raise RuntimeError("搜尋修改了輸入棋盤")
             if result.best_move not in board.legal_moves:
@@ -128,6 +154,13 @@ def search_job(job):
                 seconds=elapsed, nodes=result.nodes_searched, hits=result.transposition_hits,
                 completed_depth=result.completed_depth, stop_reason=result.stop_reason,
                 best_move=result.best_move.uci(), score=result.score,
+                initial_fen=board.root().fen(), moves=[m.uci() for m in board.move_stack],
+                result={**asdict(result), "best_move": result.best_move.uci()},
+                measurement="profile" if profiler else "timing",
+                profile=profile_rows,
+                profile_self_seconds={category: sum(r["self_seconds"] for r in profile_rows
+                    if r["category"] == category) for category in
+                    ("evaluation", "transposition_key", "search", "board_history", "other")},
             ))
             print(f"{job['case']} / {job['workers']} worker / step {step}: "
                   f"depth {result.completed_depth}, {elapsed:.3f}s", flush=True)
@@ -212,6 +245,9 @@ def isolated(job):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--evaluation", type=Path, help="完整評分設定 JSON；省略維持預設")
+    parser.add_argument("--profile", action="store_true", help="單 worker 剖析，獨立於一般計時")
+    parser.add_argument("--reuse-position", action="store_true", help="steps 重複同局面以隔離程序重用成本")
     parser.add_argument("--suite", choices=("search", "capacity", "batch"), default="search")
     parser.add_argument("--depth", type=int, default=5)
     parser.add_argument("--quiescence-depth", type=int, default=0,
@@ -248,6 +284,11 @@ def main():
             or any(value < 1 for value in args.workers + args.capacities)
             or any(value < 0 for value in args.age_weights)):
         parser.error("工作量必須為正整數，單次搜尋上限為 1..120000ms")
+    evaluation = EvaluationConfig.from_dict(json.loads(args.evaluation.read_text(encoding="utf-8"))) if args.evaluation else EvaluationConfig()
+    if args.evaluation and args.suite == "batch":
+        parser.error("完整評分設定限 search/capacity；batch 維持既有預設")
+    if args.profile and (args.suite == "batch" or any(w != 1 for w in args.workers)):
+        parser.error("剖析限單 worker；未涵蓋子程序成本")
     matrix = []
     try:
         for pair in args.matrix:
@@ -259,7 +300,12 @@ def main():
         parser.error("matrix 格式為正整數 outerxinner")
     document = dict(
         platform=platform.platform(), python=platform.python_version(), logical_cpus=os.cpu_count(),
-        psutil=psutil.__version__, evaluation=EvaluationConfig().to_dict(),
+        psutil=psutil.__version__, chess=chess.__version__, evaluation=evaluation.to_dict(),
+        revision=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, encoding="utf-8").strip(),
+        dirty=bool(subprocess.check_output(["git", "status", "--porcelain"], text=True, encoding="utf-8").strip()),
+        all_terms_enabled=all(t["enabled"] for t in evaluation.to_dict()["terms"].values()),
+        profiling_scope="parent only; profile allowed only with one worker",
+        summary=[],
         options={key: str(value) if isinstance(value, Path) else value
                  for key, value in vars(args).items() if key not in ("job", "result")},
         search_defaults=dict(move_ordering=True, use_transposition_table=True, use_pvs=True,
@@ -287,11 +333,22 @@ def main():
                             ))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     for index, job in enumerate(jobs):
+        job.update(evaluation=evaluation.to_dict(), profile=args.profile, reuse_position=args.reuse_position)
         job["sample_memory"] = not args.no_memory_sampling
         result = isolated(job)
         document["rows"].append(result)
+        groups = {}
+        for measured in document["rows"]:
+            for row in measured.get("rows", []):
+                key = (measured["case"], measured["workers"], measured["capacity"], row["step"], row["measurement"])
+                groups.setdefault(key, []).append(row)
+        document["summary"] = [dict(case=key[0], workers=key[1], capacity=key[2], step=key[3],
+            measurement=key[4], samples=len(values), seconds_median=statistics.median(r["seconds"] for r in values),
+            seconds_min=min(r["seconds"] for r in values), seconds_max=max(r["seconds"] for r in values),
+            all_completed=all(r["completed_depth"] == args.depth and r["stop_reason"] is None for r in values))
+            for key, values in groups.items()]
         args.output.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"{index + 1}/{len(jobs)}: {job}", flush=True)
+        print(f"{index + 1}/{len(jobs)}: {job['suite']} repeat {job['repeat']}", flush=True)
 
 
 if __name__ == "__main__":
