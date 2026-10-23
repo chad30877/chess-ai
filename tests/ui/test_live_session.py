@@ -17,6 +17,42 @@ class LiveSessionTest(unittest.TestCase):
     def setUp(self):
         self.executor = ManualExecutor()
 
+    def test_opening_limit_seed_and_replay(self):
+        sequences = []
+        for _ in range(2):
+            game = LiveSession(LiveSettings(white="AlphaBeta", black="AlphaBeta",
+                opening_book=True, opening_max_plies=2, interval=0, search_depth=1, max_plies=3))
+            game.start()
+            for ply in range(3):
+                game.tick(ply, self.executor)
+                if game.thinking:
+                    self.executor.finish()
+                    game.tick(ply, self.executor)
+            self.assertEqual(game.move_items[0]["uci"], "b1c3")
+            # 起始局面全部 20 種合法走法均有收錄；種子 42 在去重排序中選第四項。
+            payload = game.replay_payload()
+            opening = payload["metadata"]["opening_book"]
+            self.assertEqual(len(opening["moves_uci"]), 2)
+            self.assertEqual(opening["exit_reason"], "limit")
+            self.assertEqual(opening["exit_ply"], 2)
+            self.assertEqual(len(game.board.move_stack), 3)
+            sequences.append(payload["moves_uci"])
+            game.cancel_pending()
+        self.assertEqual(*sequences)
+
+    def test_human_deviation_is_permanent_even_after_return_to_start(self):
+        game = LiveSession(LiveSettings(white="Human", black="Human", opening_book=True))
+        game.start()
+        for uci in ("g1h3", "g8h6", "h3g1", "h6g8"):
+            game.play_human(chess.Move.from_uci(uci))
+        opening = game.replay_payload()["metadata"]["opening_book"]
+        self.assertTrue(opening["exited"])
+        self.assertEqual(opening["exit_reason"], "deviation")
+        self.assertEqual(game.board.board_fen(), chess.Board().board_fen())
+        for uci in ("e2e4", "e7e5"):
+            game.play_human(chess.Move.from_uci(uci))
+        self.assertEqual(opening, game.replay_payload()["metadata"]["opening_book"])
+
     def test_parallel_ai_stop_finishes_work_without_applying_old_move(self):
         before = {child.pid for child in multiprocessing.active_children()}
         game = LiveSession(LiveSettings(white="AlphaBeta", black="Human", interval=0,

@@ -7,6 +7,7 @@ from threading import Event
 
 import chess
 
+from engine.opening_book import OpeningPolicy, validate_opening_limit
 from engine.evaluation.config import EvaluationConfig
 from engine.evaluation.evaluator import HandcraftedEvaluator
 from engine.game import create_board, get_legal_moves, get_outcome, make_move
@@ -32,7 +33,11 @@ class LiveSettings:
     search_workers: int = 1
     transposition_capacity: int = DEFAULT_TRANSPOSITION_CAPACITY
 
+    opening_book: bool = False
+    opening_max_plies: int = 12
+
     def __post_init__(self):
+        validate_opening_limit(self.opening_max_plies)
         SearchLimits(max_depth=self.search_depth, transposition_capacity=self.transposition_capacity)
         players = ("Random", "Greedy", "AlphaBeta", "Human")
         if self.white not in players or self.black not in players:
@@ -59,8 +64,11 @@ class LiveSession:
 
     def __init__(self, settings: LiveSettings):
         self.settings = settings
+        self.opening = OpeningPolicy(settings.seed, settings.opening_max_plies) if settings.opening_book else None
         self.board = create_board(settings.initial_fen)
         self.initial_fen = self.board.fen()
+        if self.opening:
+            self.opening.candidates(self.board)
         self.status = "ready"
         self.started_at = ""
         self.finished_at = ""
@@ -197,7 +205,11 @@ class LiveSession:
         item = {"ply": len(self.move_items) + 1, "move_no": self.board.fullmove_number,
                 "side": "w" if self.board.turn else "b", "uci": move.uci(),
                 "san": self.board.san(move)}
+        if self.opening:
+            self.opening.apply(self.board, move)
         make_move(self.board, move)
+        if self.opening:
+            self.opening.candidates(self.board)
         self.move_items.append(item)
         self._next_due = now + self.settings.interval
         self._step_requested = False
@@ -223,6 +235,11 @@ class LiveSession:
             if self._pending is None:
                 if not self._step_requested and now < self._next_due:
                     return
+                if self.opening and isinstance(self.players[self.board.turn], AlphaBetaPlayer):
+                    move = self.opening.choose(self.board)
+                    if move is not None:
+                        self._apply(move, now)
+                        return
                 self._pending_position = (self.board.fen(), len(self.board.move_stack))
                 self._pending = executor.submit(self._choose_move, self.board.copy(stack=True),
                                                 self.players[self.board.turn])
@@ -250,6 +267,8 @@ class LiveSession:
             },
             "interval_seconds": self.settings.interval,
         }
+        if self.opening:
+            metadata["opening_book"] = self.opening.snapshot()
         if self.finished_at:
             metadata["finished_at"] = self.finished_at
         if self.termination:

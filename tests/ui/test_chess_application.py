@@ -23,6 +23,23 @@ from engine.sessions.comparison_run import ComparisonRun
 
 
 class ChessApplicationTest(unittest.TestCase):
+    def test_opening_settings_start_human_game_and_report_corrupt_data(self):
+        self.click("mode:human")
+        self.app.opponent = "AlphaBeta"
+        self.app.render()
+        self.click("opening_book")
+        self.click("opening_limit")
+        self.app.numeric_text = "1"
+        self.click("start")
+        self.assertTrue(self.app.live.settings.opening_book)
+        self.assertEqual(self.app.live.settings.opening_max_plies, 1)
+        self.app.live.stop()
+        self.app.live = None
+        with patch("engine.sessions.live_session.OpeningPolicy", side_effect=ValueError("開局庫資料損壞")):
+            self.app.start_game()
+        self.assertIsNone(self.app.live)
+        self.assertIn("開局庫資料損壞", self.app.message)
+
     def test_running_games_render_moves_and_page_without_losing_batch(self):
         self.click("mode:auto")
         self.click("start")

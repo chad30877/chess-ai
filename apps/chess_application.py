@@ -64,6 +64,8 @@ class ChessApplication:
             (path for path in self.live_evaluation_files if path.name == "stable.json"),
             self.live_evaluation_files[0] if self.live_evaluation_files else None,
         )
+        self.opening_book = False
+        self.opening_max_plies = 12
         self.live_search_depth = 2
         self.live_search_workers = 1
         self.live_transposition_capacity = DEFAULT_TRANSPOSITION_CAPACITY
@@ -172,7 +174,7 @@ class ChessApplication:
         self._last_ply = -1
 
     def _set_move_view_layout(self):
-        origin_y = 566 if self.mode == "replay" else (490 if self.mode == "human" and self.live is None else 392)
+        origin_y = 566 if self.mode == "replay" else (570 if self.mode == "human" and self.live is None else 392)
         self.move_view.origin_y = self.point(640, origin_y)[1]
         self.move_view.height = round((768 - origin_y) * self.scale)
         self.move_view.panel_rect = pygame.Rect(
@@ -187,7 +189,7 @@ class ChessApplication:
             if self.batch is None:
                 try:
                     settings = (self.evaluation_fields.options() if self.batch_mode == "evaluation"
-                                else BatchSettings(white=self.white, black=self.black,
+                                else BatchSettings(opening_book=self.opening_book, opening_max_plies=self.opening_max_plies, white=self.white, black=self.black,
                                                    games=self.game_count, interval=self.batch_interval, workers=self.batch_workers,
                                                    search_depth=self.batch_search_depth, search_workers=self.batch_search_workers,
                                                    transposition_capacity=self.batch_transposition_capacity,
@@ -218,7 +220,8 @@ class ChessApplication:
                 return
         white_evaluation = evaluation if white in ("Greedy", "AlphaBeta") else None
         black_evaluation = evaluation if black in ("Greedy", "AlphaBeta") else None
-        self.live = LiveSession(LiveSettings(
+        try:
+            session = LiveSession(LiveSettings(
             white=white,
             black=black,
             seed=random.SystemRandom().randrange(2**63),
@@ -228,7 +231,12 @@ class ChessApplication:
             search_depth=self.live_search_depth,
             search_workers=self.live_search_workers,
             transposition_capacity=self.live_transposition_capacity,
-        ))
+            opening_book=self.opening_book, opening_max_plies=self.opening_max_plies,
+            ))
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            self.message = f"無法開始對戰：{exc}"
+            return
+        self.live = session
         self.live.start(self.now())
         self.saved = False
         self.message = ""
@@ -513,6 +521,14 @@ class ChessApplication:
             else:
                 self.batch.pause()
             return
+        if action in ("opening_book", "opening_limit") and self.live is None and self.batch is None:
+            if action == "opening_book":
+                self.opening_book = not self.opening_book
+            elif self._commit_number():
+                self.numeric_focus = action
+                self.numeric_text = str(self.opening_max_plies)
+                pygame.key.start_text_input()
+            return
         if self.mode == "auto" and self.batch is None and action.startswith("batch_"):
             if action in ("batch_depth", "batch_search_workers", "batch_capacity"):
                 if self._commit_number():
@@ -612,11 +628,13 @@ class ChessApplication:
         if self.numeric_focus is None:
             return True
         try:
-            value = int(self.numeric_text) if self.numeric_focus in ("count", "workers", "live_workers", "live_capacity", "batch_depth", "batch_search_workers", "batch_capacity") else float(self.numeric_text)
+            value = int(self.numeric_text) if self.numeric_focus in ("opening_limit", "count", "workers", "live_workers", "live_capacity", "batch_depth", "batch_search_workers", "batch_capacity") else float(self.numeric_text)
             import math
             if not math.isfinite(value) or (value < 1 if self.numeric_focus in ("count", "workers", "live_workers", "live_capacity", "batch_depth", "batch_search_workers", "batch_capacity") else value < 0):
                 raise ValueError()
-            if self.numeric_focus in ("batch_depth", "batch_search_workers", "batch_capacity"):
+            if self.numeric_focus == "opening_limit":
+                self.opening_max_plies = value
+            elif self.numeric_focus in ("batch_depth", "batch_search_workers", "batch_capacity"):
                 attr = {"batch_depth": "batch_search_depth", "batch_search_workers": "batch_search_workers",
                         "batch_capacity": "batch_transposition_capacity"}[self.numeric_focus]
                 setattr(self, attr, value)
@@ -873,20 +891,22 @@ class ChessApplication:
                       ("live_evaluation", "評分設定", self.live_evaluation_file.name
                        if self.live_evaluation_file else "沒有設定檔")]
             if self.opponent == "AlphaBeta":
+                fields.extend([("opening_book", "開局庫", "開" if self.opening_book else "關"),
+                               ("opening_limit", "半回合", str(self.opening_max_plies))])
                 fields.append(("live_depth", "搜尋深度", str(self.live_search_depth)))
                 fields.append(("live_workers", "Workers", str(self.live_search_workers)))
                 fields.append(("live_capacity", "表項上限", str(self.live_transposition_capacity)))
             fields.append(("interval", "間隔", f"{self.interval:g} 秒"))
         for i, (action, label, value) in enumerate(fields):
-            y = 112 + i * 42 if self.mode == "human" else 119 + i * 46
+            y = 112 + i * 36 if self.mode == "human" else 119 + i * 46
             self.text(label, x, y + 7)
             if self.numeric_focus == action:
                 value = self.numeric_text + " |"
-            self.button(action, value, (x + 70, y, 162, 36) if self.mode == "human" else (x + 56, y, 176, 36))
-        start_y = 406 if self.mode == "human" else 270
+            self.button(action, value, (x + 80, y, 152, 32) if self.mode == "human" else (x + 56, y, 176, 36))
+        start_y = 490 if self.mode == "human" else 270
         self.button("start", "開始對戰", (x, start_y, 232, 42), primary=True)
         if self.mode == "human":
-            self.draw_label(self.small_font, "點選設定切換；深度選項為 1–5", (x, 457), MUTED, 232)
+            self.draw_label(self.small_font, "點選設定切換；深度選項為 1–5", (x, 541), MUTED, 232)
         else:
             self.text("點選設定可切換選項", x, start_y + 51, muted=True)
             self.draw_label(self.small_font, "和棋政策：不自動申請", (x, start_y + 79), MUTED)
@@ -1140,21 +1160,23 @@ class ChessApplication:
                           ("interval", "場間秒數", f"{self.batch_interval:g}"), ("count", "場次", str(self.game_count)),
                           ("batch_depth", "搜尋深度", str(self.batch_search_depth)),
                           ("batch_search_workers", "搜尋 worker", str(self.batch_search_workers)),
-                          ("batch_capacity", "表項上限", str(self.batch_transposition_capacity))]
+                          ("batch_capacity", "表項上限", str(self.batch_transposition_capacity)),
+                          ("opening_book", "開局庫", "開" if self.opening_book else "關"),
+                          ("opening_limit", "開局半回合上限", str(self.opening_max_plies))]
                 for index, (action, label, value) in enumerate(fields):
                     column, row = index % 2, index // 2
-                    x, y = 64 + column * 396, 185 + row * 70
+                    x, y = 64 + column * 396, 175 + row * 55
                     self.draw_label(self.small_font, label, (x, y))
                     if self.numeric_focus == action:
                         value = self.numeric_text + " |"
-                    self.button(action, value, (x, y + 23, 376, 38), primary=self.numeric_focus == action)
+                    self.button(action, value, (x, y + 23, 376, 28), primary=self.numeric_focus == action)
                 self.button("start", "開始生成", (148, 568, 600, 48), primary=True)
             if self.batch_mode == "evaluation":
                 self.draw_label(self.small_font, "同時對戰場數（每個程序執行一組配對）", (460, 570), width=376)
                 worker_rect = (460, 595, 376, 39)
             else:
-                self.draw_label(self.small_font, "同時對戰場數", (460, 465))
-                worker_rect = (460, 488, 376, 38)
+                self.draw_label(self.small_font, "同時對戰場數", (460, 512))
+                worker_rect = (460, 532, 376, 32)
             value = self.numeric_text + " |" if self.numeric_focus == "workers" else str(self.batch_workers)
             self.button("workers", value, worker_rect, primary=self.numeric_focus == "workers")
             self.text(self.message, 64, 642, width=772, muted=True)

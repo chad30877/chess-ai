@@ -21,6 +21,7 @@ class PlayedGame:
     positions: list[dict]
     started_at: str = ""
     finished_at: str = ""
+    opening_book: dict | None = None
 
 
 def play_game(
@@ -29,6 +30,7 @@ def play_game(
     max_plies: int | None = None,
     control=None,
     progress=None,
+    opening=None,
 ) -> PlayedGame:
     """Collect one game, keeping execution truncation separate from chess rules."""
     if game_id <= 0:
@@ -60,7 +62,9 @@ def play_game(
             result, status, termination = "*", "truncated", "user_stop"
             break
         player = white_player if board.turn else black_player
-        move = player.choose_move(board)
+        move = opening.choose(board) if opening and (white_name if board.turn else black_name) == "AlphaBeta" else None
+        if move is None:
+            move = player.choose_move(board)
         if control is not None and not control():
             result, status, termination = "*", "truncated", "user_stop"
             break
@@ -70,13 +74,18 @@ def play_game(
             "selected_move": move.uci(), "white_player": white_name,
             "black_player": black_name,
         }
+        if opening:
+            opening.apply(board, move)
         make_move(board, move)
+        if opening:
+            opening.candidates(board)
         positions.append(row)
         report()
     for row in positions:
         row["result"] = result
     return PlayedGame(game_id, white_name, black_name, initial_fen, board.fen(),
-                      result, status, termination, positions, started_at, now_iso())
+                      result, status, termination, positions, started_at, now_iso(),
+                      opening.snapshot() if opening else None)
 
 
 @dataclass(frozen=True)

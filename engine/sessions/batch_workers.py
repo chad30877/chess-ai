@@ -1,5 +1,6 @@
 """可由 Windows spawn 載入的對局工作；不引用 UI 或協調端鎖。"""
 
+from engine.opening_book import OpeningPolicy
 import random
 from contextlib import ExitStack
 from time import perf_counter
@@ -95,6 +96,7 @@ def run_work(work):
                 started = perf_counter()
                 game = play_game(number, *players, s["white"], s["black"], initial_fen=work["initial_fen"],
                                  claim_draw=s["claim_draw"], max_plies=s["max_plies"], control=worker_control,
+                                 opening=OpeningPolicy(work["seed"], s["opening_max_plies"]) if s.get("opening_book") else None,
                                  progress=move_progress)
             _RESULTS.put(("game", number, (game, work["seed"], perf_counter() - started)))
         else:

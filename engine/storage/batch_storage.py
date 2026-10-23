@@ -197,6 +197,8 @@ class BatchWriter:
                 "game_id", "started_at", "finished_at", "white_player", "black_player", "status", "termination")},
         }
         replay["metadata"].update(batch_id=self.batch_id, rules=rules, summary=summary)
+        if game.opening_book is not None:
+            replay["metadata"]["opening_book"] = game.opening_book
         if execution is not None:
             # 發布序號連續；固定工作編號獨立於並行完成順序。
             replay["metadata"]["execution"] = execution

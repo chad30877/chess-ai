@@ -1,5 +1,6 @@
 """一般批次的固定顏色政策與逐局保存，背景控制使用共用執行機制。"""
 
+from engine.opening_book import OpeningPolicy, OpeningBook, validate_opening_limit
 import random
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
@@ -37,7 +38,11 @@ class BatchSettings:
     search_workers: int = 1
     transposition_capacity: int = DEFAULT_TRANSPOSITION_CAPACITY
 
+    opening_book: bool = False
+    opening_max_plies: int = 12
+
     def __post_init__(self):
+        validate_opening_limit(self.opening_max_plies)
         actual_workers(self.workers, self.games)
         SearchLimits(max_depth=self.search_depth, transposition_capacity=self.transposition_capacity)
         if isinstance(self.search_workers, bool) or not isinstance(self.search_workers, int) or self.search_workers < 1:
@@ -61,6 +66,7 @@ class BatchSettings:
 
 class BatchRun(BatchExecution):
     def __init__(self, settings: BatchSettings, root: Path, executor):
+        self.opening_data = OpeningBook() if settings.opening_book else None
         self.settings = settings
         self.root = root
         super().__init__(executor, requested_games=settings.games, waiting_work=settings.games,
@@ -86,6 +92,8 @@ class BatchRun(BatchExecution):
                             color_assignment="fixed", interval_seconds=s.interval, workers=workers,
                             requested_workers=s.workers, base_seed=base_seed,
                             seed_derivation="base_seed + work_number - 1", publication_order="arrival")
+        if self.opening_data:
+            settings["opening_book"] = dict(source=self.opening_data.source, max_plies=s.opening_max_plies)
         if s.max_plies is not None:
             settings["max_plies"] = s.max_plies
         with BatchWriter(self.root, name=None, tags=[], settings={"num_games": s.games, **settings}) as writer:
@@ -102,7 +110,7 @@ class BatchRun(BatchExecution):
                                     last_replay=str(writer.path / "replays" / f"{game_id}.json")))
 
             if workers > 1:
-                player_settings = dict(search_depth=s.search_depth, search_workers=s.search_workers,
+                player_settings = dict(opening_book=s.opening_book, opening_max_plies=s.opening_max_plies, search_depth=s.search_depth, search_workers=s.search_workers,
                                        transposition_capacity=s.transposition_capacity, white=s.white, black=s.black, claim_draw=s.claim_draw, max_plies=s.max_plies,
                                        white_evaluation=s.white_evaluation.to_dict() if s.white_evaluation else None,
                                        black_evaluation=s.black_evaluation.to_dict() if s.black_evaluation else None)
@@ -135,6 +143,7 @@ class BatchRun(BatchExecution):
                     players.append(_ControlledPlayer(player, self._dispatch_control))
                 game = play_game(number, *players, s.white, s.black, initial_fen=s.initial_fen,
                                  claim_draw=s.claim_draw, max_plies=s.max_plies, control=self._control,
+                                 opening=OpeningPolicy(seed, s.opening_max_plies, self.opening_data) if s.opening_book else None,
                                  progress=lambda state: self._progress(dict(active_games={number: state})))
             self._progress(dict(active_games={}))
             save(number, game, seed, 0)

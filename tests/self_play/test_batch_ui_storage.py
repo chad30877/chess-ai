@@ -36,6 +36,28 @@ class BatchUIStorageTest(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
 
+    def test_opening_policy_survives_spawn_and_replays_match_serial(self):
+        saved = []
+        for workers in (1, 2):
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                run = BatchRun(BatchSettings(white="AlphaBeta", black="AlphaBeta", games=2,
+                    workers=workers, base_seed=42, opening_book=True, opening_max_plies=2,
+                    search_depth=1, max_plies=3), self.root / str(workers), executor)
+                path = run.future.result(timeout=60)
+            self.assertEqual(run.snapshot()["status"], "completed", run.snapshot()["error"])
+            games = [json.loads(p.read_text(encoding="utf-8")) for p in (path / "replays").glob("*.json")]
+            games.sort(key=lambda g: g["metadata"]["summary"]["seed"])
+            for game in games:
+                opening = game["metadata"]["opening_book"]
+                self.assertEqual(opening["exit_reason"], "limit")
+                self.assertEqual(opening["moves_uci"], game["moves_uci"][:2])
+                board = chess.Board(game["initial_fen"])
+                for uci in game["moves_uci"]:
+                    board.push_uci(uci)
+                self.assertEqual(len(board.move_stack), 3)
+            saved.append([g["moves_uci"] for g in games])
+        self.assertEqual(*saved)
+
     def test_serial_numbers_are_concurrent_persistent_and_shared_across_locations(self):
         timestamp = "2026-09-09T01:02:03+08:00"
         replay = self.root / "batches/existing/replays/20260909_000042.json"
