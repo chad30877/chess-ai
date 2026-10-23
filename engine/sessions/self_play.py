@@ -28,6 +28,7 @@ def play_game(
     *, initial_fen: str = chess.STARTING_FEN, claim_draw: bool = False,
     max_plies: int | None = None,
     control=None,
+    progress=None,
 ) -> PlayedGame:
     """Collect one game, keeping execution truncation separate from chess rules."""
     if game_id <= 0:
@@ -38,6 +39,14 @@ def play_game(
     board = create_board(initial_fen)
     initial_fen = board.fen()
     positions: list[dict] = []
+
+    def report():
+        if progress is not None:
+            progress(dict(game_number=game_id, plies=len(positions),
+                          fullmove_number=board.fullmove_number,
+                          turn="white" if board.turn else "black"))
+
+    report()
     while True:
         outcome = get_outcome(board, claim_draw=claim_draw)
         if outcome is not None:
@@ -63,6 +72,7 @@ def play_game(
         }
         make_move(board, move)
         positions.append(row)
+        report()
     for row in positions:
         row["result"] = result
     return PlayedGame(game_id, white_name, black_name, initial_fen, board.fen(),

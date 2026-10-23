@@ -19,13 +19,13 @@
 | `search/test_transposition.py` | 容量與替換、易位／吃過路兵、歷史／將死鍵值與搜尋隔離 |
 | `search/test_parallel_search.py` | 真實 spawn 搜尋、將死／歷史、取消、故障與程序清理 |
 | `self_play/test_batch_generation.py`、`test_batch_ui_storage.py` | 批次格式、保存失敗、流水號與日期分類 |
-| `self_play/test_batch_execution.py`、`test_parallel_batch.py` | 共用派工、逐局發布、暫停／停止與失敗清理 |
+| `self_play/test_batch_execution.py`、`test_parallel_batch.py` | 共用派工、單／多程序在保存前逐手回報、換局歸零、暫停／停止與失敗清理 |
 | `self_play/test_alphabeta_batch.py` | 一般 Alpha-Beta 批次、兩層真實 spawn、超額派工、保存失敗與後代清理 |
 | `self_play/test_evaluation_comparison.py`、`test_alphabeta_comparison.py`、`test_comparison_run.py` | 共同條件、交換黑白、多候選、逐場保存、停止與舊紀錄 |
 | `self_play/test_engine_match.py`、`test_cli_roundtrip.py` | 對戰 CLI、生成／匯出／回放往返 |
 | `replay/test_replay_session.py`、`test_records_catalog.py`、`test_comparison_catalog.py` | 回放跳步、日期查找與比較摘要 |
 | `ui/test_live_session.py` | 背景落子、真人回合、停止及舊結果隔離 |
-| `ui/test_chess_application.py` | UI 事件、搜尋設定生效、保存、回放、縮放，以及九候選排序另存與半組配對 |
+| `ui/test_chess_application.py` | UI 事件、搜尋設定生效、保存、回放、縮放、進行中棋局手數與分頁，以及九候選排序另存與半組配對 |
 | `test_discovery.py`、`test_engine_imports.py` | 測試發現及獨立程序載入 |
 | `helpers/executors.py` | 供流程測試手動完成背景工作 |
 

@@ -134,7 +134,9 @@ class BatchRun(BatchExecution):
                         s.search_workers, s.transposition_capacity))
                     players.append(_ControlledPlayer(player, self._dispatch_control))
                 game = play_game(number, *players, s.white, s.black, initial_fen=s.initial_fen,
-                                 claim_draw=s.claim_draw, max_plies=s.max_plies, control=self._control)
+                                 claim_draw=s.claim_draw, max_plies=s.max_plies, control=self._control,
+                                 progress=lambda state: self._progress(dict(active_games={number: state})))
+            self._progress(dict(active_games={}))
             save(number, game, seed, 0)
             self._progress(dict(running_work=0, finished_work=number, finished_games=number))
             if number < s.games and not self._interval():

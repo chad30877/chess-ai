@@ -76,6 +76,7 @@ class ChessApplication:
         self.batch_evaluation_files = {side: self.live_evaluation_file for side in ("white", "black")}
         self.game_count = 20
         self.batch = None
+        self.batch_games_page = 0
         self.pending_leave = None
         self.numeric_focus = None
         self.numeric_text = ""
@@ -475,6 +476,9 @@ class ChessApplication:
             return
         if action == "batch_progress" and self.batch:
             self.mode = "auto"
+            return
+        if action in ("batch_games_prev", "batch_games_next") and self.batch:
+            self.batch_games_page = max(0, self.batch_games_page + (1 if action.endswith("next") else -1))
             return
         if action == "batch_watch" and self.batch:
             path = self.batch.snapshot()["last_replay"]
@@ -1175,8 +1179,17 @@ class ChessApplication:
             self.text(f"完整配對 {state['completed_pairs']}　｜　不完整配對 {state['incomplete_pairs']}　｜　預定 {state['requested_pairs']} 對", 64, 386)
             rate = "無資料" if state["paired_score_rate"] is None else f"{state['paired_score_rate']:.1%}"
             self.text(f"候選累積得分率：{rate}（僅含兩局正常完成的配對）", 64, 424, width=772)
-        self.text("評分比較支援停止，不提供暫停；停止保留當盤已落子的走法。" if comparison else
-                  "一般對戰暫停所有席位；每席位保存後等待場間間隔再派發。", 64, 469, muted=True, width=772)
+        games = sorted(state.get("active_games", {}).values(), key=lambda game: game["game_number"])
+        pages = max(1, (len(games) + 2) // 3)
+        self.batch_games_page = min(self.batch_games_page, pages - 1)
+        for row, game in enumerate(games[self.batch_games_page * 3:(self.batch_games_page + 1) * 3]):
+            turn = "白方" if game["turn"] == "white" else "黑方"
+            self.text(f"第 {game['game_number']} 局　｜　已走 {game['plies']} 手　｜　第 {game['fullmove_number']} 回合・輪到{turn}",
+                      64, 462 + row * 28, width=772)
+        if pages > 1:
+            self.button("batch_games_prev", "上一頁", (64, 620, 130, 36), enabled=self.batch_games_page > 0)
+            self.text(f"進行中棋局 {self.batch_games_page + 1} / {pages}", 214, 625)
+            self.button("batch_games_next", "下一頁", (596, 620, 130, 36), enabled=self.batch_games_page + 1 < pages)
         self.text(state["error"], 64, 505, width=772)
         active = not self.batch.future.done()
         if active:

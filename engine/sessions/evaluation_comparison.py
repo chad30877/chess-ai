@@ -347,7 +347,7 @@ def run_evaluation_comparison(
     current_game = 0
     last_replay = None
     work_progress = dict(waiting_work=work_count, running_work=0, finished_work=0, finished_games=0,
-                         requested_workers=requested_workers, actual_workers=workers)
+                         requested_workers=requested_workers, actual_workers=workers, active_games={})
     writer = (BatchWriter.reopen(resume_path) if resume_path is not None else
               BatchWriter(Path(batch_root), name=name, tags=tagged, settings=settings))
 
@@ -424,6 +424,10 @@ def run_evaluation_comparison(
         work_progress.update(state)
         notify()
 
+    def move_progress(state):
+        work_progress["active_games"] = {state["game_number"]: state}
+        notify()
+
     def saved_color(number, candidate_is_white):
         index = (number - 1) // pair_count
         pair = (number - 1) % pair_count + 1
@@ -498,12 +502,14 @@ def run_evaluation_comparison(
                                         white_player = _ControlledPlayer(white_player, control)
                                         black_player = _ControlledPlayer(black_player, control)
                                     started = perf_counter()
-                                    game_options = dict(initial_fen=initial_fen, claim_draw=claim_draw, max_plies=max_plies)
+                                    game_options = dict(initial_fen=initial_fen, claim_draw=claim_draw,
+                                                        max_plies=max_plies, progress=move_progress)
                                     if control is not None:
                                         game_options["control"] = control
                                     game = play_game(current_game, white_player, black_player, white.label, black.label,
                                                      **game_options)
                                     elapsed_seconds = perf_counter() - started
+                                work_progress["active_games"] = {}
                                 save(task_number, candidate_index, game, pair_seed, elapsed_seconds)
                                 work_progress.update(finished_games=len([g for p in pair_records for g in p["games"]]))
                                 notify()

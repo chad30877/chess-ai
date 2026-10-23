@@ -25,6 +25,7 @@ def run_parallel(*, work_count, workers, make_work, on_game, progress, control=N
     if bind_control:
         bind_control(stop, resume)
     pending, active = {}, set()
+    active_games = {}
     next_number = 1
     finished_count = finished_games = current_game = 0
     cooldowns = []
@@ -34,7 +35,8 @@ def run_parallel(*, work_count, workers, make_work, on_game, progress, control=N
     def notify():
         progress(dict(waiting_work=work_count - len(active) - finished_count, running_work=len(active),
                       finished_work=finished_count, finished_games=finished_games,
-                      current_game=current_game))
+                      current_game=current_game,
+                      active_games={state["game_number"]: state for state in active_games.values()}))
 
     def receive(message):
         nonlocal finished_count, finished_games, current_game, error
@@ -43,10 +45,14 @@ def run_parallel(*, work_count, workers, make_work, on_game, progress, control=N
             active.add(number)
         elif kind == "game_started":
             current_game = max(current_game, payload)
+        elif kind == "move":
+            active_games[number] = payload
         elif kind == "game":
+            active_games.pop(number, None)
             finished_games += 1
             on_game(number, *payload)
         elif kind == "finished":
+            active_games.pop(number, None)
             if number in pending:
                 pending.pop(number)
                 active.discard(number)
@@ -95,6 +101,7 @@ def run_parallel(*, work_count, workers, make_work, on_game, progress, control=N
                     resume.set()
                     pending.pop(number)
                     active.discard(number)
+                    active_games.pop(number, None)
                     finished_count += 1
             notify()
         # 異常死亡時仍保存已到達協調端的其他結果。

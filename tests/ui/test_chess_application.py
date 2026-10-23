@@ -23,6 +23,26 @@ from engine.sessions.comparison_run import ComparisonRun
 
 
 class ChessApplicationTest(unittest.TestCase):
+    def test_running_games_render_moves_and_page_without_losing_batch(self):
+        self.click("mode:auto")
+        self.click("start")
+        run = self.app.batch
+        run._progress(dict(active_games={number: dict(game_number=number, plies=number * 2,
+                            fullmove_number=number + 1, turn="black") for number in range(1, 5)}))
+        with patch.object(self.app, "text", wraps=self.app.text) as text:
+            self.app.render()
+        labels = [call.args[0] for call in text.call_args_list]
+        self.assertTrue(any("第 1 局" in label and "已走 2 手" in label and "輪到黑方" in label for label in labels))
+        self.assertFalse(any("第 4 局" in label for label in labels))
+        self.click("batch_games_next")
+        with patch.object(self.app, "text", wraps=self.app.text) as text:
+            self.app.render()
+        self.assertTrue(any("第 4 局" in call.args[0] and "已走 8 手" in call.args[0] for call in text.call_args_list))
+        self.assertIs(self.app.batch, run)
+        run._progress(dict(active_games={}))
+        self.app.render()
+        self.assertEqual(self.app.batch_games_page, 0)
+
     @classmethod
     def setUpClass(cls):
         pygame.init()

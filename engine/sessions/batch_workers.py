@@ -71,6 +71,10 @@ def restore_participant(payload):
 def run_work(work):
     """一局完成立即回報；配對第二局不等待協調端保存第一局。"""
     number = work["number"]
+
+    def move_progress(state):
+        _RESULTS.put(("move", number, state))
+
     error = ""
     try:
         if not worker_control():
@@ -90,7 +94,8 @@ def run_work(work):
                 _RESULTS.put(("game_started", number, number))
                 started = perf_counter()
                 game = play_game(number, *players, s["white"], s["black"], initial_fen=work["initial_fen"],
-                                 claim_draw=s["claim_draw"], max_plies=s["max_plies"], control=worker_control)
+                                 claim_draw=s["claim_draw"], max_plies=s["max_plies"], control=worker_control,
+                                 progress=move_progress)
             _RESULTS.put(("game", number, (game, work["seed"], perf_counter() - started)))
         else:
             baseline, candidate = [restore_participant(work[side]) for side in ("baseline", "candidate")]
@@ -113,7 +118,7 @@ def run_work(work):
                     started = perf_counter()
                     game = play_game(game_number, *players, white.label, black.label,
                                      initial_fen=work["initial_fen"], claim_draw=work["claim_draw"],
-                                     max_plies=work["max_plies"], control=worker_control)
+                                     max_plies=work["max_plies"], control=worker_control, progress=move_progress)
                 _RESULTS.put(("game", number, (game, work["seed"], perf_counter() - started)))
                 if game.termination == "user_stop":
                     break
