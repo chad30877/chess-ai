@@ -161,10 +161,8 @@ class BatchWriter:
         replay_path = self.path / relative_replay
         replay_created = False
         try:
-            with replay_path.open("x", encoding="utf-8") as stream:
-                replay_created = True
-                json.dump(replay, stream, ensure_ascii=False, indent=2)
-                stream.write("\n")
+            replay_created = True
+            write_json_atomic(replay_path, replay)
             for row in game.positions:
                 position = {**row, "game_id": game_id, "batch_id": self.batch_id, "status": game.status,
                             "termination": game.termination,
@@ -196,7 +194,7 @@ class BatchWriter:
 
     def __exit__(self, exc_type, exc, traceback) -> None:
         self._streams.close()
-        complete = self.manifest["counts"]["saved_games"] == self.manifest["counts"]["requested_games"]
+        complete = getattr(self, "_logical_complete", self.manifest["counts"]["saved_games"] == self.manifest["counts"]["requested_games"])
         stopped = self.manifest["status"] == "stopped"
         self.manifest["status"] = "failed" if exc else "stopped" if stopped else "completed" if complete else "failed"
         self.manifest["finished_at"] = now_iso()

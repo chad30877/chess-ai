@@ -28,6 +28,10 @@ class ExperimentResumeTest(unittest.TestCase):
             self.assertEqual(len(before), 1)
             original = before[0].read_bytes()
             (result.path/'comparison.json').write_text('{}', encoding='utf-8')
+            manifest = json.loads((result.path/'manifest.json').read_text(encoding='utf-8'))
+            manifest['counts']['saved_games'] = 0
+            (result.path/'manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
+            (folder/'stable.json').write_text(json.dumps(EvaluationConfig(pst_weight=99).to_dict()), encoding='utf-8')
             subprocess.run([sys.executable, '-c',
                 'from engine.sessions.experiment_resume import resume_experiment; import sys; resume_experiment(sys.argv[1], workers=2)',
                 str(result.path)], check=True, timeout=30)
@@ -76,6 +80,7 @@ class ExperimentResumeTest(unittest.TestCase):
             resume_experiment(result.path)
             self.assertEqual(before[0].read_bytes(), original)
             self.assertEqual(len(list((result.path/'replays').glob('*.json'))), 3)
+            self.assertEqual(json.loads((result.path/'manifest.json').read_text(encoding='utf-8'))['status'], 'completed')
             data = json.loads((result.path/'comparison.json').read_text(encoding='utf-8'))
             self.assertEqual(len(data['pairs'][0]['games']), 2)
             self.assertTrue(all(game['termination']=='max_plies' for game in data['pairs'][0]['games']))

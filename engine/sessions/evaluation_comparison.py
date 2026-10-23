@@ -516,6 +516,9 @@ def run_evaluation_comparison(
         finally:
             # 即使當盤失敗，也發布先前成功保存的配對與棋局。
             candidate_stats = publish()
+            if experiment_definition is not None:
+                writer._logical_complete = all(saved_color(number, white)
+                    for number in range(1, work_count + 1) for white in (False, True))
     notify(writer.manifest["status"])
     candidate_results = tuple(stats_for(index) for index in range(len(candidates)))
     combined = _stats([g["candidate_outcome"] for pair in pair_records for g in pair["games"]])
