@@ -340,10 +340,10 @@ def main():
         groups = {}
         for measured in document["rows"]:
             for row in measured.get("rows", []):
-                key = (measured["case"], measured["workers"], measured["capacity"], row["step"], row["measurement"])
+                key = (measured["case"], measured["workers"], measured["capacity"], row["step"], row["measurement"], measured["age_weight"])
                 groups.setdefault(key, []).append(row)
         document["summary"] = [dict(case=key[0], workers=key[1], capacity=key[2], step=key[3],
-            measurement=key[4], samples=len(values), seconds_median=statistics.median(r["seconds"] for r in values),
+            measurement=key[4], age_weight=key[5], samples=len(values), seconds_median=statistics.median(r["seconds"] for r in values),
             seconds_min=min(r["seconds"] for r in values), seconds_max=max(r["seconds"] for r in values),
             all_completed=all(r["completed_depth"] == args.depth and r["stop_reason"] is None for r in values))
             for key, values in groups.items()]
