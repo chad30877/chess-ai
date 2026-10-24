@@ -48,6 +48,8 @@ flowchart TD
 
 目前包含一手 Greedy、可替換評分器的多步搜尋，以及先前已完成的批次保存與 UI 回放流程。評分與搜尋演算法見 [搜尋與評分](docs/搜尋與評分.md)。
 
+首頁「學習實驗」可下載 [Lichess 2013 年 1 月標準棋譜](https://database.lichess.org/)（CC0），或輸入本機 `.pgn`／`.pgn.zst`／`.gz`／`.bz2` 路徑。設定種子後建立新實驗，背景串流去重抽樣 500 盤，先分為 350／75／75 盤，再每盤最多取 12 局面；資料不足、階段分布及排除原因如實顯示。可停止、重開已保存預覽，並以棋盤查看局面及完整走棋歷史；資料存於 `data/learning/`，改來源或種子另建實驗。任意本機來源的授權標示未確認；與固定月檔官方 SHA256 相符者保存 CC0 與來源版本。教師與學習流程由後續工作票接入。
+
 - 先前里程碑 `857566d`（2026-04-14）：`優化可讀性`。
 - 先前里程碑 `e61e93a`（2026-04-13）：`有UI，generate資料後可執行play_ui來觀看`。
 
@@ -86,7 +88,7 @@ P3 將 Python 匯入路徑統一為 `engine.evaluation.*`、`engine.sessions.*`�
 
 ## 環境設定
 
-以下 PowerShell 指令都從專案根目錄執行。專案目前沒有 `requirements.txt`、`pyproject.toml` 或套件鎖定檔；依 import 可確認直接使用的第三方套件為 `chess`、`pygame`。
+以下 PowerShell 指令都從專案根目錄執行。專案目前沒有 `requirements.txt`、`pyproject.toml` 或套件鎖定檔；直接使用的第三方套件為 `chess`、`pygame`，學習資料的 `.zst` 串流使用 `zstandard`。
 
 ### 建立環境
 
@@ -97,7 +99,7 @@ P3 將 Python 匯入路徑統一為 `engine.evaluation.*`、`engine.sessions.*`�
 ```powershell
 Set-Location D:\Python\chess-ai
 uv venv .venv --python "./.uv-python/cpython-3.12.13-windows-x86_64-none/python.exe"
-uv pip install --python "./.venv/Scripts/python.exe" chess pygame
+uv pip install --python "./.venv/Scripts/python.exe" chess pygame zstandard
 ```
 
 此 Python 路徑是本機配置，其他電腦需指定可用的 Python。套件版本目前未鎖定。
@@ -199,7 +201,7 @@ P1 移除 2 個 ML 專屬案例，保留原有非 ML 覆蓋，新增 6 個對戰
 使用目前依賴的隔離環境指令：
 
 ```powershell
-uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/python.exe --with chess --with pygame python -m unittest discover -s tests -t . -v
+uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/python.exe --with chess --with pygame --with zstandard python -m unittest discover -s tests -t . -v
 ```
 
 先前功能提交另以 UI 真實背景執行緒完成 2 場正常終局，共 220 筆局面；CLI 驗證 2 場截斷 JSONL，共 24 筆。識別碼、數量、相對路徑、逐手 FEN、回放結果與依種子重跑均比對一致。畫面檢查包含設定、進度、日期回放清單、真人棋盤與高解析度渲染。

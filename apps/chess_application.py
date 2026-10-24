@@ -22,6 +22,7 @@ from engine.sessions.batch_run import BatchSettings
 from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
 from ui.evaluation_profiles import profile_name, profile_summary, config_summary
+from ui.learning_view import LearningView
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.replay.replay_loader import load_replay_json
@@ -100,6 +101,7 @@ class ChessApplication:
         self.records_return_mode = None
         self.batch_mode = "general"
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
+        self.learning = LearningView(PROJECT_ROOT)
         self.confirm_action: str | None = None
         self.confirm_was_running = False
         self.message = ""
@@ -141,6 +143,10 @@ class ChessApplication:
                   round(width * self.scale) if width else None)
 
     def close(self):
+        if self.learning.active():
+            self.learning.run.stop()
+            if self._owns_executor:
+                self.learning.run.future.result()
         if self.batch:
             self.batch.stop()
             # Never cancel a queued batch: its worker must publish the final manifest.
@@ -435,6 +441,9 @@ class ChessApplication:
         return [], 0
 
     def dispatch(self, action: str):
+        if self.mode == 'learning' and action.startswith('learning_'):
+            self.learning.action(action, self)
+            return
         if self.replay_editor is not None and action.startswith("editor_"):
             editor = self.replay_editor
             if editor.focus is not None and action not in ("editor_discard",):
@@ -689,6 +698,8 @@ class ChessApplication:
         if event.type == pygame.VIDEORESIZE:
             self.resize(pygame.display.set_mode((max(900, event.w), max(768, event.h)), pygame.RESIZABLE))
             return
+        if self.mode == 'learning' and self.learning.input(event):
+            return
         if self.replay_editor is not None:
             editor = self.replay_editor
             if editor.focus is not None and event.type == pygame.TEXTINPUT:
@@ -829,6 +840,7 @@ class ChessApplication:
                 ("auto", "批次自動對戰", "設定雙方 AI 與生成場次"),
                 ("human", "真人下棋", "選擇執白或執黑，挑戰 AI"),
                 ("records", "對局紀錄", "查找比較、一般批次與非批次棋譜"),
+                ("learning", "學習實驗", "準備棋譜資料與分組局面"),
             ]):
                 x, y = 64 + 396 * (i % 2), 260 + 184 * (i // 2)
                 self.draw_rect(PANEL, (x, y, 376, 160), border_radius=10)
@@ -839,12 +851,14 @@ class ChessApplication:
             self._render_batch()
         elif self.mode == "records":
             self.records_view.render(self)
+        elif self.mode == 'learning':
+            self.learning.render(self)
         else:
             self._render_game()
         self.draw_rect(PANEL, (0, 0, LOGICAL_SIZE[0], HEADER_HEIGHT))
         self.text("Chess AI", 18, 10, large=True)
         if self.mode != "home":
-            if self.mode not in ("auto", "records"):
+            if self.mode not in ("auto", "records", "learning"):
                 self.button("flip", "翻轉 F", (664, 10, 104, 36))
             self.button("home", "回首頁", (780, 10, 104, 36))
         if self.confirm_action:

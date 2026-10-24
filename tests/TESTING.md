@@ -26,12 +26,14 @@
 | `replay/test_replay_session.py`、`test_records_catalog.py`、`test_comparison_catalog.py` | 回放跳步、日期查找與比較摘要 |
 | `ui/test_live_session.py` | 背景落子、真人回合、停止及舊結果隔離 |
 | `ui/test_chess_application.py` | UI 事件、搜尋設定生效、保存、回放、縮放、進行中棋局手數與分頁，以及九候選排序另存與半組配對 |
+| `test_learning_dataset.py` | 串流來源、固定抽樣與整盤分組、同組／跨組去重、合法吃過路兵身份、歷史保存、損壞／停止／保存失敗與重開 |
 | `test_discovery.py`、`test_engine_imports.py` | 測試發現及獨立程序載入 |
 | `test_ticket_completion.py` | 未驗收就關票、漏關票、GitHub／本機驗收不同步與發布索引定位 |
 | `test_complete_ticket.py` | 驗收完成才同步關票、讀回失敗中止、需求變更拒絕覆寫，以及重試不重複更新 |
 | `helpers/executors.py` | 供流程測試手動完成背景工作 |
 
 UI 測試使用 dummy 顯示驅動。含程序觀測的測試與獨立效能工具使用選用套件 `psutil`；效能量測見[搜尋與評分](../docs/搜尋與評分.md)，不在例行測試斷言深度 5 秒數。
+學習資料測試使用 `zstandard` 與小型本機棋譜；UI 事件另驗證建立、停止、修改種子另建、關閉重開與完整歷史回放，不下載整月資料。
 `self_play/test_experiment_flow.py`：從權重預覽到真實逐局保存，核對不可變設定、工作識別、失效預覽與非法候選阻擋。
 權重實驗另驗證九組候選全數保存、百分比等價、零基準、範圍邊界及展開前數量限制。
 
