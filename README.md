@@ -54,7 +54,7 @@ flowchart TD
 
 選定後進入「教師標記」建立新標記，對訓練／驗證／測試組使用同一份凍結條件；只重用同一身份、同預算的先導紀錄。顯示有效分布、排除原因、來源不足、剩餘及失敗量，可停止、關閉後重開並按「續跑／重試」，只補未提交局面。每次共用八小時上限，不自動重啟；修改教師或篩選條件須建立新先導及標記。原始分數與輸出逐局面保存，將死、吃子／升變、僅上下界及殘局庫特殊分數不進入學習；所有分組完成前禁止使用部分標記。
 
-標記公開入口位於 `engine.learning.labeling`：`create_labeling(dataset_path, pilot_path)` 建立快照；`run_labeling(path)`／`load_labeling(path)` 執行及恢復進度；`load_labeled_dataset(path)` 只回傳完整快照的有效局面與白方教師分數。學習與校準接續 #31。
+標記公開入口位於 `engine.learning.labeling`：`create_labeling(dataset_path, pilot_path)` 建立快照；`run_labeling(path)`／`load_labeling(path)` 執行及恢復進度；`load_labeled_dataset(path)` 只回傳完整快照的有效局面與白方教師分數。標記完成後按「棋子位置學習」建立實驗：訓練組以固定 stable 校準教師尺度，固定棋子價值，只學中局／殘局 PST 倍率。弱／中／強三候選按逐盤驗證 MAE 選定後先凍結，再保存一次測試結果；結果包含純子力、同組原始／學習及 stable 的各階段誤差與實際權重，可另存完整設定及載入真人對戰。每次共用八小時，停止／關閉後手動續跑只補未完成候選；改條件建立新實驗，畫面標示相同測試資料的既有使用。無改善亦可保存，不宣稱棋力提升。數值套件 numpy／scipy 的實際版本、正則強度與尺度、容差、校準診斷及同分順序均在開始前凍結；版本改變須另建實驗。
 
 - 先前里程碑 `857566d`（2026-04-14）：`優化可讀性`。
 - 先前里程碑 `e61e93a`（2026-04-13）：`有UI，generate資料後可執行play_ui來觀看`。
@@ -105,7 +105,7 @@ P3 將 Python 匯入路徑統一為 `engine.evaluation.*`、`engine.sessions.*`�
 ```powershell
 Set-Location D:\Python\chess-ai
 uv venv .venv --python "./.uv-python/cpython-3.12.13-windows-x86_64-none/python.exe"
-uv pip install --python "./.venv/Scripts/python.exe" chess pygame zstandard
+uv pip install --python "./.venv/Scripts/python.exe" chess pygame zstandard numpy scipy
 ```
 
 此 Python 路徑是本機配置，其他電腦需指定可用的 Python。套件版本目前未鎖定。

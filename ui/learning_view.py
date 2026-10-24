@@ -8,6 +8,7 @@ import pygame
 from engine.learning.dataset import DatasetRun, SOURCE_URL, load_dataset
 from ui.teacher_view import TeacherView
 from ui.label_view import LabelView
+from ui.training_view import TrainingView
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
@@ -34,12 +35,13 @@ class LearningView:
         self.page = 'data'
         self.teacher = TeacherView()
         self.labels = LabelView()
+        self.training = TrainingView(root)
 
     def active(self):
-        return (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active()
+        return (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active()
 
     def close(self, wait=False):
-        for run in (self.run, self.teacher.run, self.labels.run):
+        for run in (self.run, self.teacher.run, self.labels.run, self.training.run):
             if run and not run.future.done():
                 run.stop()
                 if wait:
@@ -96,6 +98,13 @@ class LearningView:
         self.teacher.open(path)
 
     def action(self, action, app):
+        if action == 'learning_training' and not self.active() and self.labels.path:
+            try:
+                self.training.open(self.labels.path)
+                self.page = 'training'
+            except (OSError, ValueError, KeyError) as exc:
+                self.labels.message = str(exc)
+            return
         if action == 'learning_data' and not self.active():
             self.teacher.commit()
             self.page = 'data'
@@ -109,6 +118,9 @@ class LearningView:
             return
         if action == 'learning_teacher' and self.page == 'labeling' and not self.active():
             self.page = 'teacher'
+            return
+        if self.page == 'training':
+            self.training.action(action, app)
             return
         if self.page == 'labeling':
             self.labels.action(action, app)
@@ -161,6 +173,9 @@ class LearningView:
             self.message = f'無法開啟資料：{exc}'
 
     def render(self, app):
+        if self.page == 'training':
+            self.training.render(app)
+            return
         if self.page == 'labeling':
             self.labels.render(app)
             return

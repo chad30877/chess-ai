@@ -76,6 +76,7 @@ class LabelView:
         app.text('學習實驗 · 教師標記', 50, 78, large=True)
         app.button('learning_data', '資料', (50, 122, 130, 34), enabled=not active)
         app.button('learning_teacher', '教師先導', (195, 122, 190, 34), enabled=not active)
+        app.button('learning_training', '棋子位置學習', (420, 122, 230, 34), enabled=bool(state.get('ready')) and not active)
         app.button('learning_labels_new', '建立新標記', (50, 178, 230, 36), enabled=not active, primary=True)
         app.button('learning_labels_resume', '續跑／重試', (300, 178, 230, 36), enabled=bool(self.path) and not state.get('ready') and not active)
         app.button('learning_labels_stop', '停止', (550, 178, 130, 36), enabled=active)
