@@ -20,9 +20,81 @@ from tests.helpers.executors import ManualExecutor
 from engine.evaluation.config import EvaluationConfig
 from engine.sessions.evaluation_comparison import ComparisonParticipant, run_evaluation_comparison
 from engine.sessions.comparison_run import ComparisonRun
+from engine.learning.dataset import load_dataset
 
 
 class ChessApplicationTest(unittest.TestCase):
+    def test_learning_dataset_create_reopen_and_failure_through_events(self):
+        from tests.test_learning_dataset import pgn_games
+        source = self.project / 'small.pgn'
+        source.write_text(pgn_games(), encoding='utf-8')
+        self.click('mode:learning')
+        self.click('learning_source')
+        self.click('learning_field:path')
+        self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=str(source)))
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0))
+        self.click('learning_create')
+        self.assertFalse(self.app.learning.run.future.done())
+        self.executor.finish()
+        self.app.render()
+        self.assertEqual(self.app.learning.data['summary']['selected_games'], 12)
+        path = self.app.learning.run.path
+        self.click('learning_sample')
+        self.assertGreater(self.app.replay.total_ply(), 8)
+        self.click('home')
+        self.app.close()
+        self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
+        self.addCleanup(self.app.close)
+        self.click('mode:learning')
+        self.click('learning_open:0')
+        self.assertEqual(self.app.learning.data['summary']['selected_games'], 12)
+        self.assertEqual(self.app.learning.data, load_dataset(path))
+        self.app.learning.local_path = str(self.project / 'missing.pgn')
+        self.app.learning.source = 'local'
+        self.click('learning_create')
+        self.executor.finish()
+        self.app.render()
+        self.assertEqual(self.app.learning.run.snapshot()['status'], 'failed')
+        self.assertTrue(self.app.learning.run.snapshot()['error'])
+        self.assertEqual(load_dataset(path)['summary']['selected_games'], 12)
+        self.app.close()
+        self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
+        self.addCleanup(self.app.close)
+        self.click('mode:learning')
+        self.click('learning_open:0')
+        self.assertTrue(self.app.learning.message)
+        self.assertIsNone(self.app.learning.data)
+
+    def test_learning_stop_pending_work_and_edit_seed_creates_new_snapshot(self):
+        from tests.test_learning_dataset import pgn_games
+        source = self.project / 'small.pgn'
+        source.write_text(pgn_games(3), encoding='utf-8')
+        self.click('mode:learning')
+        self.app.learning.source = 'local'
+        self.app.learning.local_path = str(source)
+        self.click('learning_create')
+        stopped = self.app.learning.run.path
+        self.click('learning_stop')
+        self.executor.finish()
+        self.app.render()
+        self.assertEqual(self.app.learning.run.snapshot()['status'], 'stopped')
+        self.assertFalse((stopped / 'dataset.json').exists())
+        self.click('learning_create')
+        self.executor.finish()
+        self.app.render()
+        original = self.app.learning.path
+        content = (original / 'dataset.json').read_bytes()
+        self.click('learning_field:seed')
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
+        self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text='99'))
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0))
+        self.click('learning_create')
+        self.executor.finish()
+        self.app.render()
+        self.assertNotEqual(self.app.learning.path, original)
+        self.assertEqual(self.app.learning.data['seed'], 99)
+        self.assertEqual((original / 'dataset.json').read_bytes(), content)
+
     def test_common_openings_preview_stop_reopen_resume_and_replay(self):
         from concurrent.futures import ThreadPoolExecutor
         from time import monotonic, sleep
@@ -288,13 +360,13 @@ class ChessApplicationTest(unittest.TestCase):
         manifest = json.loads((Path(self.app.batch.snapshot()["path"]) / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["settings"]["strategies"]["white"]["search"]["search_workers"], 2)
 
-    def test_startup_has_home_and_three_modes_without_default_game(self):
+    def test_startup_has_home_and_modes_without_default_game(self):
         self.app.render()
         self.assertEqual(self.app.mode, "home")
         self.assertIsNone(self.app.replay)
         self.assertIsNone(self.app.live)
         self.assertEqual({b.action for b in self.app.buttons},
-                         {"mode:auto", "mode:human", "mode:records"})
+                         {"mode:auto", "mode:human", "mode:records", "mode:learning"})
         self.click("mode:auto")
         self.assertIsNone(self.app.live)
         self.click("white")
