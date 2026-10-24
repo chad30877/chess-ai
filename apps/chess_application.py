@@ -518,6 +518,10 @@ class ChessApplication:
         if action == "records_results" and self.records_view:
             self.mode = "records"
             return
+        if action == 'learning_comparison_return':
+            self.mode = 'learning'
+            self.learning.page = 'comparison'
+            return
         if self.mode == "records" and (action.startswith("records_") or action == "comparison_new"):
             self.records_view.action(action, self)
             return
@@ -988,6 +992,8 @@ class ChessApplication:
                 self.button("records_results", "返回紀錄", (x + 121, 526, 111, 34))
             elif self.replay_return == "batch" and self.batch:
                 self.button("batch_progress", "返回批次", (x + 121, 526, 111, 34))
+            elif self.replay_return == 'learning':
+                self.button('learning_comparison_return', '研究報告', (x + 121, 526, 111, 34))
             else:
                 self.button("sample", "範例棋譜", (x + 121, 526, 111, 34))
 

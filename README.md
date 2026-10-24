@@ -60,6 +60,8 @@ flowchart TD
 
 五組公開入口位於 `engine.learning.group_training`：`create_group_training(label_path, groups=None)`、`run_group_training(path)`、`load_group_training(path)` 建立、執行及恢復；`load_group_candidate(path, group)` 只提供已完成組別的完整設定、凍結候選／校準／資料身份及誤差報告，供後續組合與對戰沿用；`save_group_config(path, group, destination)` 另存設定。
 
+群組結果按「共同開局比較」，選原始／學習候選及額外 stable 參考，再凍結預覽。固定深度 3／q4、同時四局、每局一個搜尋 worker、TT 4,096 筆；沿用不申請和棋、無手數上限。每候選對每基準使用 32 條固定共同開局並交換黑白，共 64 局；選 stable 另增一批，各基準分開啟動及統計。可逐手查看、停止保存，從紀錄的「學習研究報告」重開後續跑，搜尋、開局、來源及四局條件不變。報告並列整體／逐開局勝和敗、配對、未完成／待執行、中斷與耗時；教師驗證／測試逐盤 MAE 另列，不代表棋力提升。點開開局查看完整前綴，或進入逐局紀錄、回放及另存完整候選。正式長比較可分次執行；中斷嘗試不算和棋。
+
 - 先前里程碑 `857566d`（2026-04-14）：`優化可讀性`。
 - 先前里程碑 `e61e93a`（2026-04-13）：`有UI，generate資料後可執行play_ui來觀看`。
 

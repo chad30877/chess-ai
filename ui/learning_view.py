@@ -10,6 +10,7 @@ from ui.teacher_view import TeacherView
 from ui.label_view import LabelView
 from ui.training_view import TrainingView
 from ui.group_training_view import GroupTrainingView
+from ui.learned_comparison_view import LearnedComparisonView
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
@@ -38,6 +39,11 @@ class LearningView:
         self.labels = LabelView()
         self.training = TrainingView(root)
         self.group_training = GroupTrainingView(root)
+        self.comparison = LearnedComparisonView(root)
+
+    def open_comparison(self, candidate):
+        self.comparison.open(candidate)
+        self.page = 'comparison'
 
     def active(self):
         return (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active()
@@ -100,6 +106,9 @@ class LearningView:
         self.teacher.open(path)
 
     def action(self, action, app):
+        if self.page == 'comparison':
+            self.comparison.action(action,app)
+            return
         if action == 'learning_groups' and not self.active() and self.labels.path:
             try:
                 self.group_training.open(self.labels.path)
@@ -184,6 +193,9 @@ class LearningView:
             self.message = f'無法開啟資料：{exc}'
 
     def render(self, app):
+        if self.page == 'comparison':
+            self.comparison.render(app)
+            return
         if self.page == 'groups':
             self.group_training.render(app)
             return

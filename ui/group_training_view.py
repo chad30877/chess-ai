@@ -4,7 +4,7 @@ from uuid import uuid4
 import json
 from engine.evaluation.config import EvaluationConfig
 from ui.replay_evaluation_editor import TERM_LABELS
-from engine.learning.group_training import GROUPS, GroupTrainingRun, load_group_training, save_group_config
+from engine.learning.group_training import GROUPS, GroupTrainingRun, load_group_training, save_group_config, load_group_candidate
 
 
 def _number(value): return f'{value:.4f}' if value is not None else '無資料'
@@ -27,6 +27,8 @@ class GroupTrainingView:
         if self.group not in self.state['groups']: self.group = next(iter(self.state['groups']))
     def action(self, action, app):
         try:
+            if action == 'learning_groups_compare' and not self.active():
+                app.learning.open_comparison(load_group_candidate(self.path,self.group)); return
             if action == 'learning_groups_stop' and self.active(): self.run.stop(); return
             if action.startswith('learning_groups_select:'):
                 self.group = action.split(':')[1]; self.saved = None; self.weight_page = 0; return
@@ -149,3 +151,4 @@ class GroupTrainingView:
         else: app.text('逐盤 MAE；原始／學習並列，負差值代表誤差較小，不代表棋力。',50,667,muted=True,width=790)
         app.button('learning_groups_save','另存選中完整設定',(50,708,290,34),enabled=bool(report) and not active)
         app.button('learning_groups_battle','載入真人對戰',(360,708,260,34),enabled=bool(report) and not active)
+        app.button('learning_groups_compare','共同開局比較',(640,708,200,34),enabled=bool(report) and not active)

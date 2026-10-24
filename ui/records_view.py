@@ -104,6 +104,13 @@ class RecordsView:
         return True
 
     def action(self, action, app):
+        if action == 'records_learning_report' and self.summary:
+            try:
+                plan_id=self.summary.settings['experiment']['learning_source']['plan_id']
+                app.learning.comparison.open_plan(self.catalog.root/'learning-comparisons'/plan_id)
+                app.learning.page='comparison'; app.mode='learning'
+            except (OSError,ValueError,KeyError,TypeError) as exc: self.message=str(exc)
+            return
         if action.startswith("records_sort:"):
             key = action.split(":")[1]
             self.sort_reverse = not self.sort_reverse if key == self.sort_key else False
@@ -279,6 +286,8 @@ class RecordsView:
         if (summary.settings or {}).get("experiment"):
             app.button("records_resume", "續跑實驗", (280, 672, 180, 40),
                        enabled=app.batch is None or app.batch.future.done())
+            if summary.settings['experiment'].get('learning_source'):
+                app.button('records_learning_report','學習研究報告',(480,672,210,40))
 
     def _game_row(self, app, game, index, y, comparison):
         detail = (f"{game.candidate_label}執{'白' if game.candidate_color == 'white' else '黑'}　{OUTCOMES[game.outcome]}" if comparison

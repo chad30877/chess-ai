@@ -36,6 +36,8 @@ class ExperimentDefinition:
                     name=data['name'], tags=data['tags'], experiment_definition=data)
         if 'opening_lines' in data:
             options['opening_lines'] = data['opening_lines']
+        if 'workers' in data:
+            options['workers'] = data['workers']
         return options
 
 
@@ -149,6 +151,8 @@ def freeze_comparison(options):
                 max_plies=options['max_plies'], claim_draw=options['claim_draw'],
                 name=options['name'], tags=options['tags'], generation=dict(mode='files'),
                 planned_games=len(options['candidates'])*len(options['opening_lines'])*options['repetitions']*2)
+    if 'workers' in options:
+        data['workers'] = options['workers']
     data['id'] = stable_id(data)
     return ExperimentDefinition(json.dumps(data, sort_keys=True))
 

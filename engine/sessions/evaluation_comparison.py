@@ -269,6 +269,8 @@ def run_evaluation_comparison(
         actual = dict(baseline=baseline, candidates=list(candidates), initial_fens=tuple(initial_fens),
                       repetitions=repetitions, base_seed=base_seed, max_plies=max_plies, claim_draw=claim_draw)
         actual["opening_lines"] = opening_lines
+        if 'workers' in experiment_definition:
+            actual['workers'] = workers
         if any(actual[key] != frozen.get(key) for key in actual):
             raise ValueError("實際比較條件與預覽不一致")
     labels = [baseline.label, *(side.label for side in candidates)]
