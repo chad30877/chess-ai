@@ -49,3 +49,5 @@ UI 測試使用 dummy 顯示驅動。含程序觀測的測試與獨立效能工�
 共同開局線：`self_play/test_common_openings.py` 驗證固定 32 線、合法前綴去重與不足來源、跨候選交換黑白、三次重複、易位／吃過路兵、保存／續跑與兩層真實 spawn 歷史及停止清理。`ui/test_chess_application.py` 另以 UI 事件選兩份既有設定、預覽、短比較、停止、重開續跑及回放。
 
 `test_weight_training.py`：以手算資料驗證逐盤校準、空分層、正式特徵一致、非負下界、零初始權重與無百分比硬上限；真實求解及保存覆蓋驗證挑選、測試凍結、取消 worker、八小時到時、重開續跑與沿用測試來源。`ui/test_weight_training.py` 以 UI 事件完成學習、重開、另存及載入真人對戰。
+
+`test_group_training.py`：五組共用校準與整次期限、32 欄正式評分一致、零初始權重、群組隔離、部分保存失敗重試與已提交結果不重算。`ui/test_group_training.py` 以 UI 事件完成兩組後停止、重開續跑其餘組，查看階段與權重，另存並載入真人對戰。
