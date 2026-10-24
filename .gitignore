@@ -49,3 +49,6 @@ data/replays/[0-9]*.json
 # Generated replay exports
 # Keep sample_replay.json if you want a tracked example replay.
 data/replays/game_*.json
+
+# 本機 Stockfish 執行檔與隨附資料
+/tools/stockfish/
