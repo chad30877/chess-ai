@@ -39,6 +39,6 @@
 - 最新實驗 `C:/Users/User/.codex/ml-small-trial-m07-acceptance/data/learning/3d3311263e41496296416c4e104db369/teacher-labels/2c4b44f4d43240ea9d0db1c5fac3ca56/combinations/22be4dbc7fd846aa98db60be42291eba`。direct驗證／測試 MAE `1.0125470634/.8541073867`；joint `1.0168893022/.8663584286`，驗證選 weak。固定四設定驗證依序 `1.1185988501/1.0545175298/1.0754363829/1.0125470634`，測試 `0.9909591619/0.8736708708/0.9876063673/0.8541073867`。兩背景的王安全 Δ驗／測分別 `-.0431624672/-.0033527946` 與 `-.0419704664/-.0195634842`；不以測試改三強度或其他規則。
 - 外部腳本 `C:/Users/User/.codex/ml-small-trial-m07-acceptance.py`；證據 `C:/Users/User/.codex/ml-small-trial-m07-acceptance/acceptance.json`；`combination-preview.png`、`combination-stopped.png`、`combination-reopened.png`、`combination-direct.png`、`combination-controls.png`、`combination-controls-opening.png`、`combination-joint.png`、`combination-weights.png`、`combination-advanced.png` 與 `battle-loaded.png`。結果、預覽、固定比較及進階畫面已檢查無重疊。重開取圖腳本另核對所有已保存JSON位元組不變。
 
-限制：訓練320局面／42盤、驗證70／9、測試66／9；測試殘局僅1局面／1盤。這是已曝光資料的軟體短流程與工程重現（最新實驗保留5份曝光來源），不是500盤正式研究、八小時實際長跑或棋力證明。兩次工程重現使用同參數，結果相同；未為追求改善調規則。共同開局比較接點使用 `load_combination_candidate(path, kind)` 的完整 config／來源／誤差契約，M10獨立實作，未把尚未整合的比較按鈕當本票對戰驗收。由主整合代理合併與同步GitHub結案，本地先保存完整驗收。
+限制：訓練320局面／42盤、驗證70／9、測試66／9；測試殘局僅1局面／1盤。這是已曝光資料的軟體短流程與工程重現（最新實驗保留5份曝光來源），不是500盤正式研究、八小時實際長跑或棋力證明。兩次工程重現使用同參數，結果相同；未為追求改善調規則。共同開局比較接點使用 `load_combination_candidate(path, kind)` 的完整 config／來源／誤差契約，M10獨立實作，未把尚未整合的比較按鈕當本票對戰驗收。已合入整合分支，GitHub #33 已關閉並讀回確認。
 
 人工重現：五個單群組完成所需群組後按「組合」→勾選並查看實際權重→新建→可停止、關閉重開續跑→切直接組合／固定四設定／聯合訓練及階段→另存或載入真人對戰。改選群組須另建；預設活動力＋王安全不依單組排名取消。
