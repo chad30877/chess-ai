@@ -35,6 +35,29 @@ def pgn_games(count=12):
 
 
 class DatasetTest(unittest.TestCase):
+    def test_transient_windows_read_lock_does_not_abort_dataset_commit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / 'source.pgn'
+            source.write_text(pgn_games(3), encoding='utf-8')
+            replace = Path.replace
+            blocked = []
+            def transient_lock(temporary, target):
+                if Path(target).name == 'dataset.json' and not blocked:
+                    blocked.append(True)
+                    error = PermissionError('狀態讀取暫時占用目標檔案')
+                    error.winerror = 32
+                    raise error
+                return replace(temporary, target)
+            with patch.object(Path, 'replace', transient_lock):
+                path = create_dataset(root / 'runs', source)
+            self.assertEqual(load_dataset(path)['summary']['selected_games'], 3)
+            denied = PermissionError('永久拒絕')
+            denied.winerror = 32
+            with patch.object(Path, 'replace', side_effect=denied):
+                with self.assertRaises(PermissionError):
+                    create_dataset(root / 'denied', source)
+
     def test_repeated_positions_within_one_group_do_not_multiply_samples(self):
         moves = '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Kh1 Ng8 7. Kg1 Nf6 8. Kh1 Ng8 *'
         with tempfile.TemporaryDirectory() as folder:

@@ -4,6 +4,7 @@ import csv
 import json
 from contextlib import ExitStack
 from pathlib import Path
+from time import sleep
 from engine.storage.data_ids import allocate_id, now_iso
 
 from engine.sessions.self_play import PlayedGame
@@ -24,7 +25,15 @@ def write_json_atomic(path: Path, payload: dict) -> None:
     with temporary.open("w", encoding="utf-8") as stream:
         json.dump(payload, stream, ensure_ascii=False, indent=2)
         stream.write("\n")
-    temporary.replace(path)
+    # Windows 讀者仍開啟舊檔時會暫時拒絕替換；只短暫重試，保持原子提交。
+    for attempt in range(6):
+        try:
+            temporary.replace(path)
+            return
+        except PermissionError as exc:
+            if getattr(exc, 'winerror', None) not in (5, 32, 33) or attempt == 5:
+                raise
+            sleep(.01)
 
 
 class BatchWriter:
