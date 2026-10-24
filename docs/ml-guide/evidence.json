@@ -1,0 +1,347 @@
+{
+  "date": "2026-10-24",
+  "source_sha256": "a1de66c0d8519e40b317f19e84a96190b7c6a38550bf5c10e77419603db3eb63",
+  "source_original_month_sha256": "aa40b3671fa3cf1072eb182892cd90b0e1e003a4a5943492f64b77e7f3fd1635",
+  "engine_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0",
+  "labels": {
+    "valid": 456,
+    "excluded": 250,
+    "reasons": {
+      "capture": 223,
+      "mate": 32,
+      "promotion": 2,
+      "bound_only": 1
+    },
+    "data_exclusions": {
+      "first_8_plies": 480,
+      "not_sampled": 2381,
+      "in_check": 306,
+      "terminal": 28
+    },
+    "reused_pilot": 100,
+    "splits": {
+      "train": {
+        "games": 42,
+        "positions": 320,
+        "stages": {
+          "opening": 176,
+          "endgame": 34,
+          "middlegame": 110
+        }
+      },
+      "validation": {
+        "games": 9,
+        "positions": 70,
+        "stages": {
+          "opening": 33,
+          "endgame": 14,
+          "middlegame": 23
+        }
+      },
+      "test": {
+        "games": 9,
+        "positions": 66,
+        "stages": {
+          "opening": 45,
+          "middlegame": 20,
+          "endgame": 1
+        }
+      }
+    },
+    "shortfall_games": 440
+  },
+  "groups": {
+    "scale": 0.006111529012068489,
+    "denominator": 212473.53797155226,
+    "games": 42,
+    "positions": 320,
+    "mae": 1.1147887625903141,
+    "rmse": 1.6989872541531326,
+    "healthy": true,
+    "relative_deviation": 0.11600935649658639,
+    "warning": "",
+    "subsets": [
+      {
+        "scale": 0.006479470185152994,
+        "denominator": 279761.50676321035,
+        "games": 21,
+        "positions": 165,
+        "mae": 1.213246612716717,
+        "rmse": 1.8450121221299274
+      },
+      {
+        "scale": 0.005402534464168205,
+        "denominator": 145185.56917989417,
+        "games": 21,
+        "positions": 155,
+        "mae": 1.008845434013731,
+        "rmse": 1.5027276644633962
+      }
+    ],
+    "snapshot_identity": "42be0ab6c467469d78c103a7a390d28b77e5dc403d246638e9cb75fe21d129d9",
+    "reference": {
+      "version": 1,
+      "perspective": "white",
+      "score_unit": "pawn",
+      "terms": {
+        "material": {
+          "enabled": true,
+          "weight": 1.0,
+          "piece_values": {
+            "P": 1.0,
+            "N": 3.0,
+            "B": 3.0,
+            "R": 5.0,
+            "Q": 9.0
+          }
+        },
+        "piece_square": {
+          "enabled": true,
+          "weight": 1.0,
+          "table_version": 1
+        }
+      }
+    },
+    "identity": "3e1e4b8971c60deadd251fb4509a77c3d59bbf6c384c4f91c77dc4ea1f208a1b"
+  },
+  "comparison": {
+    "single-comparison": {
+      "planned_games": 256,
+      "executed": true,
+      "progress": {
+        "status": "running",
+        "current_game": 7,
+        "saved_games": 0,
+        "requested_games": 128,
+        "batch_id": "20261024_0002",
+        "path": "C:\\Users\\User\\.codex\\ml-small-trial-m11-verified\\data\\batches\\20261024_0002",
+        "error": "",
+        "completed_games": 0,
+        "unfinished": 0,
+        "last_replay": null,
+        "waiting_work": 60,
+        "running_work": 4,
+        "finished_work": 0,
+        "finished_games": 0,
+        "active_games": {
+          "1": {
+            "game_number": 1,
+            "plies": 10,
+            "fullmove_number": 6,
+            "turn": "white"
+          },
+          "3": {
+            "game_number": 3,
+            "plies": 11,
+            "fullmove_number": 6,
+            "turn": "black"
+          },
+          "5": {
+            "game_number": 5,
+            "plies": 9,
+            "fullmove_number": 5,
+            "turn": "black"
+          },
+          "7": {
+            "game_number": 7,
+            "plies": 13,
+            "fullmove_number": 7,
+            "turn": "black"
+          }
+        },
+        "requested_pairs": 64,
+        "requested_workers": 4,
+        "actual_workers": 4,
+        "completed_pairs": 0,
+        "incomplete_pairs": 0,
+        "saved_pairs": 0,
+        "paired_score_rate": null
+      },
+      "snapshot_unchanged": true,
+      "pending_games": 128
+    },
+    "direct-comparison": {
+      "planned_games": 128,
+      "executed": true,
+      "progress": {
+        "status": "running",
+        "current_game": 7,
+        "saved_games": 0,
+        "requested_games": 128,
+        "batch_id": "20261024_0003",
+        "path": "C:\\Users\\User\\.codex\\ml-small-trial-m11-verified\\data\\batches\\20261024_0003",
+        "error": "",
+        "completed_games": 0,
+        "unfinished": 0,
+        "last_replay": null,
+        "waiting_work": 60,
+        "running_work": 4,
+        "finished_work": 0,
+        "finished_games": 0,
+        "active_games": {
+          "3": {
+            "game_number": 3,
+            "plies": 13,
+            "fullmove_number": 7,
+            "turn": "black"
+          },
+          "5": {
+            "game_number": 5,
+            "plies": 7,
+            "fullmove_number": 4,
+            "turn": "black"
+          },
+          "1": {
+            "game_number": 1,
+            "plies": 8,
+            "fullmove_number": 5,
+            "turn": "white"
+          },
+          "7": {
+            "game_number": 7,
+            "plies": 8,
+            "fullmove_number": 5,
+            "turn": "white"
+          }
+        },
+        "requested_pairs": 64,
+        "requested_workers": 4,
+        "actual_workers": 4,
+        "completed_pairs": 0,
+        "incomplete_pairs": 0,
+        "saved_pairs": 0,
+        "paired_score_rate": null
+      },
+      "snapshot_unchanged": true,
+      "pending_games": 128
+    },
+    "joint-comparison": {
+      "planned_games": 128,
+      "executed": true,
+      "original_snapshot_unchanged": true,
+      "unchanged_replays": 12,
+      "progress": {
+        "status": "running",
+        "current_game": 7,
+        "saved_games": 0,
+        "requested_games": 128,
+        "batch_id": "20261024_0001",
+        "path": "C:\\Users\\User\\.codex\\ml-small-trial-m11-verified\\data\\batches\\20261024_0001",
+        "error": "",
+        "completed_games": 0,
+        "unfinished": 0,
+        "last_replay": null,
+        "waiting_work": 60,
+        "running_work": 4,
+        "finished_work": 0,
+        "finished_games": 0,
+        "active_games": {
+          "1": {
+            "game_number": 1,
+            "plies": 7,
+            "fullmove_number": 4,
+            "turn": "black"
+          },
+          "3": {
+            "game_number": 3,
+            "plies": 13,
+            "fullmove_number": 7,
+            "turn": "black"
+          },
+          "5": {
+            "game_number": 5,
+            "plies": 7,
+            "fullmove_number": 4,
+            "turn": "black"
+          },
+          "7": {
+            "game_number": 7,
+            "plies": 8,
+            "fullmove_number": 5,
+            "turn": "white"
+          }
+        },
+        "requested_pairs": 64,
+        "requested_workers": 4,
+        "actual_workers": 4,
+        "completed_pairs": 0,
+        "incomplete_pairs": 0,
+        "saved_pairs": 0,
+        "paired_score_rate": null
+      },
+      "resumed_progress": {
+        "status": "running",
+        "current_game": 7,
+        "saved_games": 0,
+        "requested_games": 128,
+        "batch_id": "20261024_0001",
+        "path": "C:\\Users\\User\\.codex\\ml-small-trial-m11-verified\\data\\batches\\20261024_0001",
+        "error": "",
+        "completed_games": 0,
+        "unfinished": 0,
+        "last_replay": null,
+        "waiting_work": 60,
+        "running_work": 4,
+        "finished_work": 0,
+        "finished_games": 0,
+        "active_games": {
+          "1": {
+            "game_number": 1,
+            "plies": 8,
+            "fullmove_number": 5,
+            "turn": "white"
+          },
+          "3": {
+            "game_number": 3,
+            "plies": 13,
+            "fullmove_number": 7,
+            "turn": "black"
+          },
+          "5": {
+            "game_number": 5,
+            "plies": 7,
+            "fullmove_number": 4,
+            "turn": "black"
+          },
+          "7": {
+            "game_number": 7,
+            "plies": 8,
+            "fullmove_number": 5,
+            "turn": "white"
+          }
+        },
+        "requested_pairs": 64,
+        "requested_workers": 4,
+        "actual_workers": 4,
+        "completed_pairs": 0,
+        "incomplete_pairs": 0,
+        "saved_pairs": 0,
+        "paired_score_rate": null
+      },
+      "replay_plies": 13,
+      "replay_final_fen": "rnb3nr/ppp1pk1p/5ppb/3P4/8/7N/PPPP1PPP/RNB1KB1R b KQ - 4 7",
+      "interrupted_attempts": 16,
+      "pending_games": 128
+    }
+  },
+  "scope": "真實60盤軟體短流程，所有500盤與64局正式研究未執行；不是棋力證明",
+  "artifact_sha256": {
+    "dataset/dataset.json": "8b8066d1f2cf6611f0ac16d58db81db0dd92af38d25aa40cdfced45438f8a9e1",
+    "pilot/snapshot.json": "c2a283db4972db0012fdf2db1733645ed47e1219bc3822e07fe7adcde4fd2d3c",
+    "pilot/choice.json": "b331c70c7bd40a5abbc8a976d0a59dd1529863ec0a6edfd9f75b07c5ca0e0e83",
+    "labels/snapshot.json": "e5fe202cf49dc9b66c720112e3e9d3530db999b6c6f18c1e0b0ab17dae956cf2",
+    "labels/dataset.json": "8b8066d1f2cf6611f0ac16d58db81db0dd92af38d25aa40cdfced45438f8a9e1",
+    "groups/snapshot.json": "868948ec2a0999c18c6c5f3ff44e1339028beef7fb982ec9c94f792fdc3d813d",
+    "groups/calibration.json": "ae5887f9e8072da8ff98dc6ef0c1d149f5bc6f30567ad4d0459df32ff02614fe",
+    "single-comparison/snapshot.json": "3a8ca491bedb8902bd9b5bd48cfde55a7c12749c65df86987e61a79c4889c883",
+    "direct-comparison/snapshot.json": "bed604fd9f5e9446c3ab849d1e435f2938f405a463cf9c346afe954279f5f59b",
+    "joint-comparison/snapshot.json": "8d25560e2f2c23b68052155b40090a5e1937e6c12b5a8ab5aa63a2de57440c54",
+    "combination/snapshot.json": "0589512544ca6d38f67ecffb69eaf8bbb8fa35c7317825fbaea8057f2875d2ec"
+  },
+  "ui_surface": "SDL dummy：真實應用程式事件、SF19、求解、深度三搜尋與保存",
+  "full_regression": {
+    "tests": 397,
+    "seconds": 438.976,
+    "result": "OK"
+  }
+}

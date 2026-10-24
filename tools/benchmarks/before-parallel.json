@@ -1,0 +1,23 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.13",
+  "logical_cpus": 16,
+  "rows": [
+    {
+      "name": "rook_endgame",
+      "fen": "8/5pk1/6p1/8/3R4/6P1/5PK1/7r w - - 0 35",
+      "seconds": 2.4158233001362532,
+      "nodes": 8915,
+      "score": 5.08,
+      "completed_depth": 5
+    },
+    {
+      "name": "minor_endgame",
+      "fen": "8/5pk1/6p1/8/3N4/6P1/5PK1/7n w - - 0 35",
+      "seconds": 1.7694454998709261,
+      "nodes": 5208,
+      "score": 3.3,
+      "completed_depth": 5
+    }
+  ]
+}

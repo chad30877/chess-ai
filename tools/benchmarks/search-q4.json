@@ -1,0 +1,736 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.13",
+  "logical_cpus": 16,
+  "psutil": "7.2.2",
+  "evaluation": {
+    "version": 6,
+    "phase": {
+      "enabled": false,
+      "model_version": 1
+    },
+    "perspective": "white",
+    "score_unit": "pawn",
+    "terms": {
+      "material": {
+        "enabled": true,
+        "weight": 1.0,
+        "piece_values": {
+          "P": 1.0,
+          "N": 3.0,
+          "B": 3.0,
+          "R": 5.0,
+          "Q": 9.0
+        },
+        "endgame_piece_values": {
+          "P": 1.0,
+          "N": 3.0,
+          "B": 3.0,
+          "R": 5.0,
+          "Q": 9.0
+        }
+      },
+      "piece_square": {
+        "enabled": true,
+        "weight": 1.0,
+        "table_version": 1,
+        "endgame_weight": 1.0,
+        "endgame_table_version": 1
+      },
+      "isolated_pawns": {
+        "enabled": false,
+        "weight": 0.15,
+        "endgame_weight": 0.2,
+        "feature_version": 1
+      },
+      "doubled_pawns": {
+        "enabled": false,
+        "weight": 0.1,
+        "endgame_weight": 0.15,
+        "feature_version": 1
+      },
+      "passed_pawns": {
+        "enabled": false,
+        "weight": 0.05,
+        "endgame_weight": 0.1,
+        "feature_version": 1
+      },
+      "pawn_mobility": {
+        "enabled": false,
+        "weight": 0.01,
+        "endgame_weight": 0.01,
+        "feature_version": 1
+      },
+      "knight_mobility": {
+        "enabled": false,
+        "weight": 0.03,
+        "endgame_weight": 0.03,
+        "feature_version": 1
+      },
+      "bishop_mobility": {
+        "enabled": false,
+        "weight": 0.03,
+        "endgame_weight": 0.03,
+        "feature_version": 1
+      },
+      "rook_mobility": {
+        "enabled": false,
+        "weight": 0.02,
+        "endgame_weight": 0.03,
+        "feature_version": 1
+      },
+      "queen_mobility": {
+        "enabled": false,
+        "weight": 0.01,
+        "endgame_weight": 0.02,
+        "feature_version": 1
+      },
+      "king_mobility": {
+        "enabled": false,
+        "weight": 0.01,
+        "endgame_weight": 0.02,
+        "feature_version": 1
+      },
+      "king_pawn_shield": {
+        "enabled": false,
+        "weight": 0.1,
+        "endgame_weight": 0.0,
+        "feature_version": 1
+      },
+      "king_zone_attacks": {
+        "enabled": false,
+        "weight": 0.05,
+        "endgame_weight": 0.0,
+        "feature_version": 1
+      },
+      "king_file_exposure": {
+        "enabled": false,
+        "weight": 0.08,
+        "endgame_weight": 0.0,
+        "feature_version": 1
+      },
+      "bishop_pair": {
+        "enabled": false,
+        "weight": 0.3,
+        "endgame_weight": 0.4,
+        "feature_version": 1
+      },
+      "rook_open_file": {
+        "enabled": false,
+        "weight": 0.15,
+        "endgame_weight": 0.2,
+        "feature_version": 1
+      },
+      "rook_half_open_file": {
+        "enabled": false,
+        "weight": 0.1,
+        "endgame_weight": 0.15,
+        "feature_version": 1
+      }
+    }
+  },
+  "options": {
+    "suite": "search",
+    "depth": 5,
+    "quiescence_depth": 4,
+    "cases": [
+      "start",
+      "rook",
+      "minor"
+    ],
+    "workers": [
+      1,
+      2,
+      4
+    ],
+    "repeats": 2,
+    "steps": 0,
+    "timeout_ms": 120000,
+    "capacities": [
+      128,
+      4096,
+      65536
+    ],
+    "age_weights": [
+      2
+    ],
+    "games": 4,
+    "plies": 2,
+    "matrix": [
+      "1x1",
+      "1x4",
+      "2x2",
+      "4x5"
+    ],
+    "output": "tools\\benchmarks\\search-q4.json",
+    "no_memory_sampling": false
+  },
+  "search_defaults": {
+    "move_ordering": true,
+    "use_transposition_table": true,
+    "use_pvs": true,
+    "aspiration_window": 1.0,
+    "claim_draw": false
+  },
+  "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+  "rows": [
+    {
+      "suite": "search",
+      "repeat": 0,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 5.26454990000002,
+          "nodes": 18732,
+          "hits": 2751,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g1f3",
+          "score": 0.09999999999999998
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 37687296,
+      "max_processes": 2
+    },
+    {
+      "suite": "search",
+      "repeat": 0,
+      "case": "start",
+      "workers": 2,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 4.656791999999996,
+          "nodes": 23266,
+          "hits": 1838,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "b1c3",
+          "score": 0.09999999999999998
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 86597632,
+      "max_processes": 4
+    },
+    {
+      "suite": "search",
+      "repeat": 0,
+      "case": "start",
+      "workers": 4,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 3.6779781000000185,
+          "nodes": 23267,
+          "hits": 1839,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "b1c3",
+          "score": 0.09999999999999998
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 136118272,
+      "max_processes": 6
+    },
+    {
+      "suite": "search",
+      "repeat": 0,
+      "case": "rook",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3R4/6P1/5PK1/7r w - - 0 35",
+          "seconds": 1.972565799999984,
+          "nodes": 8945,
+          "hits": 1285,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 5.08
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 37978112,
+      "max_processes": 2
+    },
+    {
+      "suite": "search",
+      "repeat": 0,
+      "case": "rook",
+      "workers": 2,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3R4/6P1/5PK1/7r w - - 0 35",
+          "seconds": 2.016327300000057,
+          "nodes": 12537,
+          "hits": 387,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 5.08
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 83316736,
+      "max_processes": 4
+    },
+    {
+      "suite": "search",
+      "repeat": 0,
+      "case": "rook",
+      "workers": 4,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3R4/6P1/5PK1/7r w - - 0 35",
+          "seconds": 1.6302433999999266,
+          "nodes": 12537,
+          "hits": 387,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 5.08
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 132214784,
+      "max_processes": 6
+    },
+    {
+      "suite": "search",
+      "repeat": 0,
+      "case": "minor",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3N4/6P1/5PK1/7n w - - 0 35",
+          "seconds": 0.9495919999999387,
+          "nodes": 5208,
+          "hits": 1169,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 3.3
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 36171776,
+      "max_processes": 2
+    },
+    {
+      "suite": "search",
+      "repeat": 0,
+      "case": "minor",
+      "workers": 2,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3N4/6P1/5PK1/7n w - - 0 35",
+          "seconds": 1.4104412000001503,
+          "nodes": 7485,
+          "hits": 357,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 3.3
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 83283968,
+      "max_processes": 4
+    },
+    {
+      "suite": "search",
+      "repeat": 0,
+      "case": "minor",
+      "workers": 4,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3N4/6P1/5PK1/7n w - - 0 35",
+          "seconds": 1.2606390999999348,
+          "nodes": 7485,
+          "hits": 357,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 3.3
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 130793472,
+      "max_processes": 6
+    },
+    {
+      "suite": "search",
+      "repeat": 1,
+      "case": "start",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 5.45754890000012,
+          "nodes": 18732,
+          "hits": 2751,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g1f3",
+          "score": 0.09999999999999998
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 37785600,
+      "max_processes": 2
+    },
+    {
+      "suite": "search",
+      "repeat": 1,
+      "case": "start",
+      "workers": 2,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 4.49795499999982,
+          "nodes": 22582,
+          "hits": 1927,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g1f3",
+          "score": 0.09999999999999998
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 86294528,
+      "max_processes": 4
+    },
+    {
+      "suite": "search",
+      "repeat": 1,
+      "case": "start",
+      "workers": 4,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          "seconds": 3.567814799999951,
+          "nodes": 22583,
+          "hits": 1928,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g1f3",
+          "score": 0.09999999999999998
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 135606272,
+      "max_processes": 6
+    },
+    {
+      "suite": "search",
+      "repeat": 1,
+      "case": "rook",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3R4/6P1/5PK1/7r w - - 0 35",
+          "seconds": 1.9297730000000684,
+          "nodes": 8945,
+          "hits": 1285,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 5.08
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 38039552,
+      "max_processes": 2
+    },
+    {
+      "suite": "search",
+      "repeat": 1,
+      "case": "rook",
+      "workers": 2,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3R4/6P1/5PK1/7r w - - 0 35",
+          "seconds": 2.071826600000122,
+          "nodes": 12537,
+          "hits": 387,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 5.08
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 83513344,
+      "max_processes": 4
+    },
+    {
+      "suite": "search",
+      "repeat": 1,
+      "case": "rook",
+      "workers": 4,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3R4/6P1/5PK1/7r w - - 0 35",
+          "seconds": 1.6061942000001181,
+          "nodes": 12537,
+          "hits": 387,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 5.08
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 132280320,
+      "max_processes": 6
+    },
+    {
+      "suite": "search",
+      "repeat": 1,
+      "case": "minor",
+      "workers": 1,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3N4/6P1/5PK1/7n w - - 0 35",
+          "seconds": 0.9729360000001179,
+          "nodes": 5208,
+          "hits": 1169,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 3.3
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 36077568,
+      "max_processes": 2
+    },
+    {
+      "suite": "search",
+      "repeat": 1,
+      "case": "minor",
+      "workers": 2,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3N4/6P1/5PK1/7n w - - 0 35",
+          "seconds": 1.3746209999999337,
+          "nodes": 7485,
+          "hits": 357,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 3.3
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 83705856,
+      "max_processes": 4
+    },
+    {
+      "suite": "search",
+      "repeat": 1,
+      "case": "minor",
+      "workers": 4,
+      "depth": 5,
+      "quiescence_depth": 4,
+      "capacity": 4096,
+      "age_weight": 2,
+      "steps": 0,
+      "timeout_ms": 120000,
+      "job_timeout_s": 155.0,
+      "sample_memory": true,
+      "rows": [
+        {
+          "step": 0,
+          "mode": "cold",
+          "fen": "8/5pk1/6p1/8/3N4/6P1/5PK1/7n w - - 0 35",
+          "seconds": 1.2181279999999788,
+          "nodes": 7485,
+          "hits": 357,
+          "completed_depth": 5,
+          "stop_reason": null,
+          "best_move": "g2h1",
+          "score": 3.3
+        }
+      ],
+      "all_completed": true,
+      "peak_tree_rss_bytes": 130781184,
+      "max_processes": 6
+    }
+  ]
+}

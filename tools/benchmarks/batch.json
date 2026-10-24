@@ -1,0 +1,539 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.13",
+  "logical_cpus": 16,
+  "psutil": "7.2.2",
+  "evaluation": {
+    "version": 6,
+    "phase": {
+      "enabled": false,
+      "model_version": 1
+    },
+    "perspective": "white",
+    "score_unit": "pawn",
+    "terms": {
+      "material": {
+        "enabled": true,
+        "weight": 1.0,
+        "piece_values": {
+          "P": 1.0,
+          "N": 3.0,
+          "B": 3.0,
+          "R": 5.0,
+          "Q": 9.0
+        },
+        "endgame_piece_values": {
+          "P": 1.0,
+          "N": 3.0,
+          "B": 3.0,
+          "R": 5.0,
+          "Q": 9.0
+        }
+      },
+      "piece_square": {
+        "enabled": true,
+        "weight": 1.0,
+        "table_version": 1,
+        "endgame_weight": 1.0,
+        "endgame_table_version": 1
+      },
+      "isolated_pawns": {
+        "enabled": false,
+        "weight": 0.15,
+        "endgame_weight": 0.2,
+        "feature_version": 1
+      },
+      "doubled_pawns": {
+        "enabled": false,
+        "weight": 0.1,
+        "endgame_weight": 0.15,
+        "feature_version": 1
+      },
+      "passed_pawns": {
+        "enabled": false,
+        "weight": 0.05,
+        "endgame_weight": 0.1,
+        "feature_version": 1
+      },
+      "pawn_mobility": {
+        "enabled": false,
+        "weight": 0.01,
+        "endgame_weight": 0.01,
+        "feature_version": 1
+      },
+      "knight_mobility": {
+        "enabled": false,
+        "weight": 0.03,
+        "endgame_weight": 0.03,
+        "feature_version": 1
+      },
+      "bishop_mobility": {
+        "enabled": false,
+        "weight": 0.03,
+        "endgame_weight": 0.03,
+        "feature_version": 1
+      },
+      "rook_mobility": {
+        "enabled": false,
+        "weight": 0.02,
+        "endgame_weight": 0.03,
+        "feature_version": 1
+      },
+      "queen_mobility": {
+        "enabled": false,
+        "weight": 0.01,
+        "endgame_weight": 0.02,
+        "feature_version": 1
+      },
+      "king_mobility": {
+        "enabled": false,
+        "weight": 0.01,
+        "endgame_weight": 0.02,
+        "feature_version": 1
+      },
+      "king_pawn_shield": {
+        "enabled": false,
+        "weight": 0.1,
+        "endgame_weight": 0.0,
+        "feature_version": 1
+      },
+      "king_zone_attacks": {
+        "enabled": false,
+        "weight": 0.05,
+        "endgame_weight": 0.0,
+        "feature_version": 1
+      },
+      "king_file_exposure": {
+        "enabled": false,
+        "weight": 0.08,
+        "endgame_weight": 0.0,
+        "feature_version": 1
+      },
+      "bishop_pair": {
+        "enabled": false,
+        "weight": 0.3,
+        "endgame_weight": 0.4,
+        "feature_version": 1
+      },
+      "rook_open_file": {
+        "enabled": false,
+        "weight": 0.15,
+        "endgame_weight": 0.2,
+        "feature_version": 1
+      },
+      "rook_half_open_file": {
+        "enabled": false,
+        "weight": 0.1,
+        "endgame_weight": 0.15,
+        "feature_version": 1
+      }
+    }
+  },
+  "options": {
+    "suite": "batch",
+    "depth": 5,
+    "quiescence_depth": 0,
+    "cases": [
+      "start",
+      "middlegame",
+      "rook",
+      "minor"
+    ],
+    "workers": [
+      1,
+      2,
+      4
+    ],
+    "repeats": 2,
+    "steps": 2,
+    "timeout_ms": 120000,
+    "capacities": [
+      128,
+      4096,
+      65536
+    ],
+    "age_weights": [
+      2
+    ],
+    "games": 4,
+    "plies": 2,
+    "matrix": [
+      "1x1",
+      "1x4",
+      "2x2",
+      "4x5"
+    ],
+    "output": "tools\\benchmarks\\batch.json",
+    "no_memory_sampling": false
+  },
+  "search_defaults": {
+    "move_ordering": true,
+    "use_transposition_table": true,
+    "use_pvs": true,
+    "aspiration_window": 1.0,
+    "claim_draw": false
+  },
+  "memory": "external controller samples concurrent sum RSS of isolated job and all descendants every20ms; peak covers whole cold+warm job",
+  "rows": [
+    {
+      "suite": "batch",
+      "repeat": 0,
+      "outer": 1,
+      "inner": 1,
+      "games": 4,
+      "plies": 2,
+      "depth": 5,
+      "job_timeout_s": 180,
+      "sample_memory": true,
+      "seconds": 64.39166499999988,
+      "games_per_second": 0.06211984113161242,
+      "actual_outer": 1,
+      "saved_games": 4,
+      "observed_steps": 8,
+      "step_seconds_median": 7.978317899999979,
+      "step_seconds_max": 11.060647300000028,
+      "step_seconds": [
+        5.3685270999999375,
+        5.388220100000126,
+        5.500934500000085,
+        5.558203999999932,
+        10.398431800000026,
+        10.496228100000053,
+        10.510622100000091,
+        11.060647300000028
+      ],
+      "nodes": 216524,
+      "search_settings": {
+        "schema_version": 2,
+        "algorithm": "alpha_beta",
+        "search_workers": 1,
+        "max_depth": 5,
+        "transposition_capacity": 4096,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      },
+      "saved_status": "completed",
+      "peak_tree_rss_bytes": 41275392,
+      "max_processes": 2
+    },
+    {
+      "suite": "batch",
+      "repeat": 0,
+      "outer": 1,
+      "inner": 4,
+      "games": 4,
+      "plies": 2,
+      "depth": 5,
+      "job_timeout_s": 180,
+      "sample_memory": true,
+      "seconds": 36.20625560000008,
+      "games_per_second": 0.11047814621294315,
+      "actual_outer": 1,
+      "saved_games": 4,
+      "observed_steps": 8,
+      "step_seconds_median": 4.284477000000038,
+      "step_seconds_max": 6.11897440000007,
+      "step_seconds": [
+        3.6130885000000035,
+        3.627355200000011,
+        3.6520676000000094,
+        3.684375399999908,
+        4.884578600000168,
+        5.0855997000001025,
+        5.306356600000072,
+        6.11897440000007
+      ],
+      "nodes": 248995,
+      "search_settings": {
+        "schema_version": 2,
+        "algorithm": "alpha_beta",
+        "search_workers": 4,
+        "max_depth": 5,
+        "transposition_capacity": 4096,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      },
+      "saved_status": "completed",
+      "peak_tree_rss_bytes": 246046720,
+      "max_processes": 10
+    },
+    {
+      "suite": "batch",
+      "repeat": 0,
+      "outer": 2,
+      "inner": 2,
+      "games": 4,
+      "plies": 2,
+      "depth": 5,
+      "job_timeout_s": 180,
+      "sample_memory": true,
+      "seconds": 27.607598900000085,
+      "games_per_second": 0.14488764540838023,
+      "actual_outer": 2,
+      "saved_games": 4,
+      "observed_steps": 8,
+      "step_seconds_median": 6.789314249999961,
+      "step_seconds_max": 8.765929000000142,
+      "step_seconds": [
+        4.822858199999928,
+        4.877563400000099,
+        5.4541885000001,
+        5.474634700000024,
+        8.103993799999898,
+        8.146800400000075,
+        8.717321999999967,
+        8.765929000000142
+      ],
+      "nodes": 252930,
+      "search_settings": {
+        "schema_version": 2,
+        "algorithm": "alpha_beta",
+        "search_workers": 2,
+        "max_depth": 5,
+        "transposition_capacity": 4096,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      },
+      "saved_status": "completed",
+      "peak_tree_rss_bytes": 303992832,
+      "max_processes": 12
+    },
+    {
+      "suite": "batch",
+      "repeat": 0,
+      "outer": 4,
+      "inner": 5,
+      "games": 4,
+      "plies": 2,
+      "depth": 5,
+      "job_timeout_s": 180,
+      "sample_memory": true,
+      "seconds": 18.870245999999952,
+      "games_per_second": 0.2119739191529358,
+      "actual_outer": 4,
+      "saved_games": 4,
+      "observed_steps": 8,
+      "step_seconds_median": 8.815885449999996,
+      "step_seconds_max": 11.819392000000107,
+      "step_seconds": [
+        6.695093699999916,
+        6.73720759999992,
+        6.741993500000035,
+        6.7547568999998475,
+        10.877014000000145,
+        10.885277200000019,
+        10.908648800000037,
+        11.819392000000107
+      ],
+      "nodes": 254369,
+      "search_settings": {
+        "schema_version": 2,
+        "algorithm": "alpha_beta",
+        "search_workers": 5,
+        "max_depth": 5,
+        "transposition_capacity": 4096,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      },
+      "saved_status": "completed",
+      "peak_tree_rss_bytes": 1173893120,
+      "max_processes": 46
+    },
+    {
+      "suite": "batch",
+      "repeat": 1,
+      "outer": 1,
+      "inner": 1,
+      "games": 4,
+      "plies": 2,
+      "depth": 5,
+      "job_timeout_s": 180,
+      "sample_memory": true,
+      "seconds": 77.11273729999994,
+      "games_per_second": 0.05187210492137469,
+      "actual_outer": 1,
+      "saved_games": 4,
+      "observed_steps": 8,
+      "step_seconds_median": 7.955638150000027,
+      "step_seconds_max": 23.538814000000002,
+      "step_seconds": [
+        5.334693300000026,
+        5.334918499999958,
+        5.408149699999967,
+        5.472141299999976,
+        10.439135000000078,
+        10.617417299999943,
+        10.851785599999857,
+        23.538814000000002
+      ],
+      "nodes": 216524,
+      "search_settings": {
+        "schema_version": 2,
+        "algorithm": "alpha_beta",
+        "search_workers": 1,
+        "max_depth": 5,
+        "transposition_capacity": 4096,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      },
+      "saved_status": "completed",
+      "peak_tree_rss_bytes": 41885696,
+      "max_processes": 2
+    },
+    {
+      "suite": "batch",
+      "repeat": 1,
+      "outer": 1,
+      "inner": 4,
+      "games": 4,
+      "plies": 2,
+      "depth": 5,
+      "job_timeout_s": 180,
+      "sample_memory": true,
+      "seconds": 56.91421369999989,
+      "games_per_second": 0.07028121342560176,
+      "actual_outer": 1,
+      "saved_games": 4,
+      "observed_steps": 8,
+      "step_seconds_median": 6.287483650000013,
+      "step_seconds_max": 10.852480500000183,
+      "step_seconds": [
+        4.245436200000086,
+        4.684427900000173,
+        4.6899197999998705,
+        5.064187599999968,
+        7.510779700000057,
+        9.676532299999963,
+        9.792686900000035,
+        10.852480500000183
+      ],
+      "nodes": 258377,
+      "search_settings": {
+        "schema_version": 2,
+        "algorithm": "alpha_beta",
+        "search_workers": 4,
+        "max_depth": 5,
+        "transposition_capacity": 4096,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      },
+      "saved_status": "completed",
+      "peak_tree_rss_bytes": 246079488,
+      "max_processes": 10
+    },
+    {
+      "suite": "batch",
+      "repeat": 1,
+      "outer": 2,
+      "inner": 2,
+      "games": 4,
+      "plies": 2,
+      "depth": 5,
+      "job_timeout_s": 180,
+      "sample_memory": true,
+      "seconds": 40.94830550000006,
+      "games_per_second": 0.0976841398235635,
+      "actual_outer": 2,
+      "saved_games": 4,
+      "observed_steps": 8,
+      "step_seconds_median": 9.908869250000066,
+      "step_seconds_max": 13.458051599999862,
+      "step_seconds": [
+        6.062424699999838,
+        6.074523099999851,
+        8.418946499999947,
+        8.447689399999945,
+        11.370049100000188,
+        12.458896900000127,
+        13.383901899999955,
+        13.458051599999862
+      ],
+      "nodes": 259663,
+      "search_settings": {
+        "schema_version": 2,
+        "algorithm": "alpha_beta",
+        "search_workers": 2,
+        "max_depth": 5,
+        "transposition_capacity": 4096,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      },
+      "saved_status": "completed",
+      "peak_tree_rss_bytes": 300507136,
+      "max_processes": 12
+    },
+    {
+      "suite": "batch",
+      "repeat": 1,
+      "outer": 4,
+      "inner": 5,
+      "games": 4,
+      "plies": 2,
+      "depth": 5,
+      "job_timeout_s": 180,
+      "sample_memory": true,
+      "seconds": 23.9502708,
+      "games_per_second": 0.1670127253842992,
+      "actual_outer": 4,
+      "saved_games": 4,
+      "observed_steps": 8,
+      "step_seconds_median": 10.897024750000014,
+      "step_seconds_max": 13.146193699999912,
+      "step_seconds": [
+        10.220154200000025,
+        10.34178350000002,
+        10.359345800000028,
+        10.424490399999968,
+        11.36955910000006,
+        11.745269400000097,
+        13.058836000000156,
+        13.146193699999912
+      ],
+      "nodes": 257018,
+      "search_settings": {
+        "schema_version": 2,
+        "algorithm": "alpha_beta",
+        "search_workers": 5,
+        "max_depth": 5,
+        "transposition_capacity": 4096,
+        "claim_draw": false,
+        "move_ordering": true,
+        "quiescence_depth": 4,
+        "use_transposition_table": true,
+        "use_pvs": true,
+        "aspiration_window": 1.0
+      },
+      "saved_status": "completed",
+      "peak_tree_rss_bytes": 1174237184,
+      "max_processes": 46
+    }
+  ]
+}

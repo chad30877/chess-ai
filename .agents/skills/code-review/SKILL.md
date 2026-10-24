@@ -31,6 +31,8 @@ Look for the originating spec, in this order:
 3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
 
+有工作票時依專案 tracker 文件讀取最新驗收；需求審查逐條區分實作與驗證證據。必要人工驗收未完成，須列為未驗證項，不能因程式 diff 與自動測試通過便回報整票無缺漏。可機械檢查的結案／同步狀態使用專案檢查命令，不以審查文字代替。
+
 ### 3. Identify the standards sources
 
 Search the repo for every file that documents how code should be written. When `CODING_STANDARDS.md` or `CONTRIBUTING.md` exists, it must be on the list.
@@ -70,6 +72,7 @@ Issue both sub-agent calls together, in the foreground, and aggregate the report
 - The diff command and commit list.
 - The path or fetched contents of the spec.
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
+- 一併提供 tracker 驗收規則與已有驗證證據，要求列出必要但尚未驗證的條件，區分程式缺漏與驗收未完成。
 
 If the spec is missing, skip the Spec sub-agent and note this in the final report.
 

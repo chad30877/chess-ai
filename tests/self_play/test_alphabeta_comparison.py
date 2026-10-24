@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 import json
+import multiprocessing
+from threading import Event
 from pathlib import Path
 import random
 import subprocess
@@ -35,7 +37,7 @@ class AlphaBetaComparisonTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.config = EvaluationConfig.from_dict(read(ROOT / "configs/evaluation/example_coordination.json"))
-        self.search = ComparisonSearchConfig(depth_plies=2, quiescence_depth=0,
+        self.search = ComparisonSearchConfig(depth_plies=2, quiescence_depth=0, transposition_capacity=3,
                                              move_ordering=False, use_transposition_table=False,
                                              use_pvs=False, aspiration_window=None)
         self.baseline = ComparisonParticipant.alphabeta("stable", EvaluationConfig(), search=self.search)
@@ -46,6 +48,55 @@ class AlphaBetaComparisonTest(unittest.TestCase):
                        max_plies=2, base_seed=42, batch_root=self.root / "batches")
         options.update(overrides)
         return run_evaluation_comparison(**options)
+
+    def test_multiple_candidates_use_common_parallel_search_and_each_actual_snapshot(self):
+        search = replace(self.search, search_workers=2)
+        baseline = replace(self.baseline, search_config=search)
+        candidates = [replace(self.candidate, search_config=search),
+                      ComparisonParticipant.alphabeta("second", EvaluationConfig(phase_enabled=True), search=search)]
+        published = []
+        result = self.run_comparison(baseline=baseline, candidate=None, candidates=candidates,
+                                     progress=lambda state: published.append(state["saved_games"]))
+        summary = read(result.path / "comparison.json")
+        self.assertEqual(len(summary["pairs"]), 2)
+        self.assertEqual({pair["candidate_label"] for pair in summary["pairs"]}, {"candidate", "second"})
+        self.assertIn(1, published)
+        self.assertIn(3, published)
+        for replay_path in (result.path / "replays").glob("*.json"):
+            replay = read(replay_path)
+            self.assertEqual(len(replay["moves_uci"]), 2)
+        for side in [summary["participants"]["baseline"], *summary["participants"]["candidates"]]:
+            self.assertEqual(side["search"]["search_workers"], 2)
+            self.assertEqual(side["search"]["transposition_capacity"], 3)
+        from engine.replay.records_catalog import load_batch_record
+        record = load_batch_record(result.path / "manifest.json")
+        self.assertEqual({game.candidate_label for game in record.games}, {"candidate", "second"})
+
+    def test_nested_process_comparison_publishes_prefix_and_stops_with_readable_summary(self):
+        before = {child.pid for child in multiprocessing.active_children()}
+        stop = Event()
+        search = ComparisonSearchConfig(depth_plies=2, search_workers=2, transposition_capacity=3,
+                                        quiescence_depth=0)
+        baseline = replace(self.baseline, search_config=search)
+        candidate = replace(self.candidate, search_config=search)
+        published = []
+        def progress(state):
+            if state["saved_games"]:
+                from engine.replay.comparison_catalog import load_comparison
+                summary = load_comparison(Path(state["path"]) / "manifest.json")
+                self.assertEqual(len(summary.games), state["saved_games"])
+                published.append(state["saved_games"])
+                stop.set()
+        result = self.run_comparison(baseline=baseline, candidate=candidate, repetitions=2,
+                                     workers=2, max_plies=1, control=lambda: not stop.is_set(), progress=progress)
+        manifest = read(result.path / "manifest.json")
+        self.assertEqual(manifest["status"], "stopped")
+        self.assertEqual(manifest["settings"]["workers"], 2)
+        self.assertEqual(published[0], 1)
+        from engine.replay.comparison_catalog import load_comparison
+        summary = load_comparison(result.path / "manifest.json")
+        self.assertGreater(summary.incomplete_pairs, 0)
+        self.assertTrue({child.pid for child in multiprocessing.active_children()} <= before)
 
     def test_real_searches_complete_requested_depth_and_preserve_roots(self):
         original = AlphaBetaSearcher.search
@@ -121,7 +172,8 @@ class AlphaBetaComparisonTest(unittest.TestCase):
             evaluator.pop("type")
             self.assertEqual(EvaluationConfig.from_dict(evaluator), participant.evaluation_config)
             self.assertEqual(saved["search"], {
-                "schema_version": 1, "algorithm": "alpha_beta", "max_depth": 2,
+                "schema_version": 2, "algorithm": "alpha_beta", "max_depth": 2,
+                "transposition_capacity": 3, "search_workers": 1,
                 "claim_draw": True, "move_ordering": False, "quiescence_depth": 0,
                 "use_transposition_table": False, "use_pvs": False, "aspiration_window": None,
             })
@@ -169,7 +221,8 @@ class AlphaBetaComparisonTest(unittest.TestCase):
     def test_invalid_settings_and_incomparable_searches_fail_before_creating_batch(self):
         for kwargs in ({"depth_plies": 0}, {"depth_plies": True}, {"quiescence_depth": -1},
                        {"use_pvs": 1}, {"move_ordering": 1}, {"use_transposition_table": 1},
-                       {"aspiration_window": 0}, {"aspiration_window": float("inf")}):
+                       {"aspiration_window": 0}, {"aspiration_window": float("inf")},
+                       {"search_workers": 0}, {"search_workers": True}, {"transposition_capacity": 0}):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 ComparisonSearchConfig(**kwargs)
         for kwargs in ({"strategy": "alphabeta", "evaluation_config": self.config},
@@ -180,7 +233,9 @@ class AlphaBetaComparisonTest(unittest.TestCase):
                 ComparisonParticipant(label="invalid", **kwargs)
         for baseline in (ComparisonParticipant.greedy("stable", EvaluationConfig()),
                          replace(self.baseline, search_config=replace(self.search, depth_plies=3)),
-                         replace(self.baseline, search_config=replace(self.search, use_pvs=True))):
+                         replace(self.baseline, search_config=replace(self.search, use_pvs=True)),
+                         replace(self.baseline, search_config=replace(self.search, search_workers=2)),
+                         replace(self.baseline, search_config=replace(self.search, transposition_capacity=9))):
             with self.assertRaises(ValueError):
                 self.run_comparison(baseline=baseline)
         self.assertFalse((self.root / "batches").exists())
@@ -207,13 +262,19 @@ class AlphaBetaComparisonTest(unittest.TestCase):
                 "--initial-fen", FEN, "--max-plies", "2", "--batch-root", str(self.root / "cli")]
         result = subprocess.run([*base, "--strategy", "alphabeta", "--depth", "2",
                                  "--quiescence-depth", "0", "--no-move-ordering", "--no-transposition-table",
-                                 "--no-pvs", "--no-aspiration", "--claim-draw"],
+                                 "--no-pvs", "--no-aspiration", "--claim-draw",
+                                 "--search-workers", "2", "--transposition-capacity", "3",
+                                 "--workers", "2", "--repetitions", "2"],
                                 cwd=ROOT, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Budget: fixed_depth, 2 plies", result.stdout)
-        settings = read(next((self.root / "cli").iterdir()) / "manifest.json")["settings"]["comparison"]
+        manifest = read(next((self.root / "cli").iterdir()) / "manifest.json")
+        self.assertEqual(manifest["settings"]["workers"], 2)
+        settings = manifest["settings"]["comparison"]
         search = settings["participants"]["candidate"]["search"]
         self.assertEqual(search["max_depth"], 2)
+        self.assertEqual(search["search_workers"], 2)
+        self.assertEqual(search["transposition_capacity"], 3)
         self.assertFalse(search["use_pvs"])
         self.assertIsNone(search["aspiration_window"])
         self.assertEqual(search["quiescence_depth"], 0)
@@ -229,6 +290,9 @@ class AlphaBetaComparisonTest(unittest.TestCase):
         for options in (("--depth", "2"), ("--quiescence-depth", "0"),
                         ("--strategy", "alphabeta", "--depth", "0"),
                         ("--strategy", "alphabeta", "--aspiration-window", "0"),
+                        ("--search-workers", "2"), ("--transposition-capacity", "3"),
+                        ("--strategy", "alphabeta", "--search-workers", "0"),
+                        ("--strategy", "alphabeta", "--transposition-capacity", "0"),
                         ("--time-ms", "100")):
             result = subprocess.run([*base, *options], cwd=ROOT, capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 2, result.stderr)

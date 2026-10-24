@@ -20,9 +20,163 @@ from tests.helpers.executors import ManualExecutor
 from engine.evaluation.config import EvaluationConfig
 from engine.sessions.evaluation_comparison import ComparisonParticipant, run_evaluation_comparison
 from engine.sessions.comparison_run import ComparisonRun
+from engine.learning.dataset import load_dataset
 
 
 class ChessApplicationTest(unittest.TestCase):
+    def test_learning_dataset_create_reopen_and_failure_through_events(self):
+        from tests.test_learning_dataset import pgn_games
+        source = self.project / 'small.pgn'
+        source.write_text(pgn_games(), encoding='utf-8')
+        self.click('mode:learning')
+        self.click('learning_source')
+        self.click('learning_field:path')
+        self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=str(source)))
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0))
+        self.click('learning_create')
+        self.assertFalse(self.app.learning.run.future.done())
+        self.executor.finish()
+        self.app.render()
+        self.assertEqual(self.app.learning.data['summary']['selected_games'], 12)
+        path = self.app.learning.run.path
+        self.click('learning_sample')
+        self.assertGreater(self.app.replay.total_ply(), 8)
+        self.click('home')
+        self.app.close()
+        self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
+        self.addCleanup(self.app.close)
+        self.click('mode:learning')
+        self.click('learning_open:0')
+        self.assertEqual(self.app.learning.data['summary']['selected_games'], 12)
+        self.assertEqual(self.app.learning.data, load_dataset(path))
+        self.app.learning.local_path = str(self.project / 'missing.pgn')
+        self.app.learning.source = 'local'
+        self.click('learning_create')
+        self.executor.finish()
+        self.app.render()
+        self.assertEqual(self.app.learning.run.snapshot()['status'], 'failed')
+        self.assertTrue(self.app.learning.run.snapshot()['error'])
+        self.assertEqual(load_dataset(path)['summary']['selected_games'], 12)
+        self.app.close()
+        self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
+        self.addCleanup(self.app.close)
+        self.click('mode:learning')
+        self.click('learning_open:0')
+        self.assertTrue(self.app.learning.message)
+        self.assertIsNone(self.app.learning.data)
+
+    def test_learning_stop_pending_work_and_edit_seed_creates_new_snapshot(self):
+        from tests.test_learning_dataset import pgn_games
+        source = self.project / 'small.pgn'
+        source.write_text(pgn_games(3), encoding='utf-8')
+        self.click('mode:learning')
+        self.app.learning.source = 'local'
+        self.app.learning.local_path = str(source)
+        self.click('learning_create')
+        stopped = self.app.learning.run.path
+        self.click('learning_stop')
+        self.executor.finish()
+        self.app.render()
+        self.assertEqual(self.app.learning.run.snapshot()['status'], 'stopped')
+        self.assertFalse((stopped / 'dataset.json').exists())
+        self.click('learning_create')
+        self.executor.finish()
+        self.app.render()
+        original = self.app.learning.path
+        content = (original / 'dataset.json').read_bytes()
+        self.click('learning_field:seed')
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
+        self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text='99'))
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0))
+        self.click('learning_create')
+        self.executor.finish()
+        self.app.render()
+        self.assertNotEqual(self.app.learning.path, original)
+        self.assertEqual(self.app.learning.data['seed'], 99)
+        self.assertEqual((original / 'dataset.json').read_bytes(), content)
+
+    def test_common_openings_preview_stop_reopen_resume_and_replay(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from time import monotonic, sleep
+        self.prepare_comparison_configs()
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        self.enter_comparison_field("depth", "1")
+        self.enter_comparison_field("max_plies", "12")
+        self.click("comparison_openings_generate")
+        lines = self.app.evaluation_fields.opening_lines
+        self.assertEqual(len(lines), 32)
+        self.click("comparison_openings_next")
+        self.assertEqual(self.app.evaluation_fields.opening_page, 1)
+        self.click("comparison_openings_view")
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            self.app.executor = executor
+            self.click("start")
+            run = self.app.batch
+            deadline = monotonic() + 20
+            while run.snapshot()['saved_games'] < 1 and not run.future.done() and monotonic() < deadline:
+                sleep(.01)
+            self.assertGreaterEqual(run.snapshot()['saved_games'], 1)
+            self.click("stop")
+            run.future.result(timeout=20)
+        self.assertEqual(run.snapshot()['status'], 'stopped')
+        path = Path(run.snapshot()['path'])
+        saved = {p: p.read_bytes() for p in (path/'replays').glob('*.json')}
+        self.app.close()
+        self.executor = ManualExecutor()
+        self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
+        self.addCleanup(self.app.close)
+        self.click("mode:records")
+        self.click("records_entry:0")
+        self.click("records_resume")
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()['status'], 'completed')
+        self.assertTrue(all(p.read_bytes() == content for p, content in saved.items()))
+        self.click("batch_results")
+        self.assertEqual(len(self.app.records_view.summary.comparison.games), len(saved) +
+                         64 - sum(json.loads(content)['metadata']['termination'] != 'user_stop' for content in saved.values()))
+        self.click("records_game:0")
+        self.click("last")
+        self.assertGreaterEqual(self.app.replay.total_ply(), len(lines[0]['moves_uci']))
+        self.assertEqual(self.app.replay_data['moves_uci'][:len(lines[0]['moves_uci'])], lines[0]['moves_uci'])
+
+    def test_opening_settings_start_human_game_and_report_corrupt_data(self):
+        self.click("mode:human")
+        self.app.opponent = "AlphaBeta"
+        self.app.render()
+        self.click("opening_book")
+        self.click("opening_limit")
+        self.app.numeric_text = "1"
+        self.click("start")
+        self.assertTrue(self.app.live.settings.opening_book)
+        self.assertEqual(self.app.live.settings.opening_max_plies, 1)
+        self.app.live.stop()
+        self.app.live = None
+        with patch("engine.sessions.live_session.OpeningPolicy", side_effect=ValueError("開局庫資料損壞")):
+            self.app.start_game()
+        self.assertIsNone(self.app.live)
+        self.assertIn("開局庫資料損壞", self.app.message)
+
+    def test_running_games_render_moves_and_page_without_losing_batch(self):
+        self.click("mode:auto")
+        self.click("start")
+        run = self.app.batch
+        run._progress(dict(active_games={number: dict(game_number=number, plies=number * 2,
+                            fullmove_number=number + 1, turn="black") for number in range(1, 5)}))
+        with patch.object(self.app, "text", wraps=self.app.text) as text:
+            self.app.render()
+        labels = [call.args[0] for call in text.call_args_list]
+        self.assertTrue(any("第 1 局" in label and "已走 2 手" in label and "輪到黑方" in label for label in labels))
+        self.assertFalse(any("第 4 局" in label for label in labels))
+        self.click("batch_games_next")
+        with patch.object(self.app, "text", wraps=self.app.text) as text:
+            self.app.render()
+        self.assertTrue(any("第 4 局" in call.args[0] and "已走 8 手" in call.args[0] for call in text.call_args_list))
+        self.assertIs(self.app.batch, run)
+        run._progress(dict(active_games={}))
+        self.app.render()
+        self.assertEqual(self.app.batch_games_page, 0)
+
     @classmethod
     def setUpClass(cls):
         pygame.init()
@@ -36,6 +190,9 @@ class ChessApplicationTest(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.project = Path(self.temporary.name)
+        profiles = self.project / "configs/evaluation"
+        profiles.mkdir(parents=True)
+        (profiles / "stable.json").write_text(json.dumps(EvaluationConfig().to_dict()), encoding="utf-8")
         project_patch = patch("apps.chess_application.PROJECT_ROOT", self.project)
         project_patch.start()
         self.addCleanup(project_patch.stop)
@@ -43,6 +200,138 @@ class ChessApplicationTest(unittest.TestCase):
         self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
         self.app.batch_workers = 1
         self.addCleanup(self.app.close)
+
+    def test_profile_selection_isolates_groups_in_actual_evaluation_and_comparison(self):
+        import shutil
+        from engine.evaluation.evaluator import HandcraftedEvaluator
+        folder = self.project / "configs/evaluation"
+        for source in Path("configs/evaluation").glob("learning-*.json"):
+            shutil.copy(source, folder / source.name)
+        expected_groups = {
+            "coordination": {"bishop_pair", "rook_open_file", "rook_half_open_file"},
+            "king-safety": {"king_pawn_shield", "king_zone_attacks", "king_file_exposure"},
+            "material": set(),
+            "mobility": {"pawn_mobility", "knight_mobility", "bishop_mobility", "rook_mobility", "queen_mobility", "king_mobility"},
+            "pawn": {"isolated_pawns", "doubled_pawns", "passed_pawns"},
+            "piece-square": {"piece_square"},
+        }
+        self.app.open_replay(Path("data/replays/sample_replay.json"))
+        self.click("replay_edit")
+        board = chess.Board("r5k1/5ppp/8/3P4/2P5/2N5/5PPP/R1B1KB2 w Q - 0 1")
+        for group, terms in expected_groups.items():
+            with self.subTest(group=group):
+                self.click("editor_profile")
+                config = self.app.replay_editor.config
+                breakdown = HandcraftedEvaluator(config=config).evaluate_breakdown(board)
+                self.assertEqual({name for name, term in breakdown.terms.items() if term.enabled}, terms | {"material"})
+                self.assertAlmostEqual(breakdown.total_score, sum(term.contribution for term in breakdown.terms.values()))
+                self.assertTrue(config.phase_enabled)
+                self.assertEqual(dict(config.piece_values), dict(config.endgame_piece_values))
+        self.click("editor_discard")
+        self.click("home")
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        fields = self.app.evaluation_fields
+        fields.baseline = folder / "learning-material.json"
+        fields.candidates = [folder / "learning-pawn.json"]
+        options = fields.options()
+        self.assertFalse(options["baseline"].evaluation_config.pst_enabled)
+        self.assertTrue(all(term.enabled for term in options["candidates"][0].evaluation_config.pawn_terms.values()))
+
+    def test_single_group_profile_roundtrips_through_replay_and_live_game(self):
+        import shutil
+        from engine.evaluation.evaluator import HandcraftedEvaluator
+        folder = self.project / "configs/evaluation"
+        for source in Path("configs/evaluation").glob("learning-*.json"):
+            shutil.copy(source, folder / source.name)
+        self.assertTrue(self.app.open_replay(Path("data/replays/sample_replay.json")))
+        self.click("replay_edit")
+        self.assertIsNotNone(self.app.replay_editor)
+        self.click("editor_profile")
+        config = self.app.replay_editor.config
+        self.assertTrue(config.phase_enabled)
+        self.assertFalse(config.pst_enabled)
+        self.assertTrue(all(term.enabled for term in config.coordination_terms.values()))
+        board = chess.Board("6k1/8/8/8/8/8/8/2B1KB2 w - - 0 1")
+        expected = HandcraftedEvaluator(config=config).evaluate(board)
+        self.assertGreater(expected, HandcraftedEvaluator(config=EvaluationConfig.material_only()).evaluate(board))
+        self.app.replay_editor.name = "我的協調"
+        self.click("editor_save")
+        saved = folder / "我的協調.json"
+        restored = EvaluationConfig.from_dict(json.loads(saved.read_text(encoding="utf-8")))
+        self.assertEqual(restored, config)
+        self.click("home")
+        self.click("mode:human")
+        for _ in range(len(self.app.live_evaluation_files)):
+            if self.app.live_evaluation_file == saved:
+                break
+            self.click("live_evaluation")
+        self.click("start")
+        self.assertEqual(self.app.live.settings.black_evaluation, config)
+
+    def test_sorted_candidates_replay_and_save_actual_snapshot(self):
+        from dataclasses import replace
+        configs = [replace(EvaluationConfig(), pst_weight=float(i + 2)) for i in range(9)]
+        result = run_evaluation_comparison(
+            batch_root=self.project / "data/batches", baseline=ComparisonParticipant("基準", "greedy", EvaluationConfig()),
+            candidates=[ComparisonParticipant(f"候選{i}", "greedy", config) for i, config in enumerate(configs)],
+            initial_fens=["7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"], workers=1)
+        self.click("mode:records")
+        view = self.app.records_view
+        view.select(view.catalog.entries[0].key)
+        self.assertIsNotNone(view.summary.comparison.experiment_elapsed_seconds)
+        self.click("records_sort:wins")
+        for _ in range(4):
+            self.click("records_candidates_next")
+        self.click("records_candidate:8")
+        self.assertEqual(len(view.options), 2)
+        self.assertEqual(view.options[0].candidate_label, "候選8")
+        self.click("records_game:0")
+        self.assertEqual(self.app.replay_data["metadata"]["game_id"], view.options[0].game_id)
+        self.app.mode = "records"
+        self.click("records_save_candidate")
+        paths = list((self.project / "configs/evaluation").glob("candidate-*.json"))
+        self.assertEqual(len(paths), 1)
+        self.assertEqual(EvaluationConfig.from_dict(json.loads(paths[0].read_text(encoding="utf-8"))), configs[8])
+        self.assertIn(paths[0], self.app.live_evaluation_files)
+        self.assertIn(paths[0], self.app.evaluation_fields.files)
+
+    def test_half_pair_is_replayable_without_paired_score(self):
+        state = {}
+        run_evaluation_comparison(
+            batch_root=self.project / "data/batches",
+            baseline=ComparisonParticipant.greedy("baseline", EvaluationConfig()),
+            candidate=ComparisonParticipant.greedy("candidate", EvaluationConfig(pst_weight=2)),
+            initial_fens=["7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"], workers=1,
+            progress=lambda progress: state.update(progress),
+            control=lambda: not state.get("saved_games", 0))
+        self.click("mode:records")
+        self.click("records_entry:0")
+        self.click("records_sort:paired_score_rate")
+        self.click("records_candidate:0")
+        view = self.app.records_view
+        self.assertEqual(len(view.options), 1)
+        self.assertIsNone(view.candidates[0][1]["paired_score_rate"])
+        self.assertEqual(view.candidates[0][1]["completed_pairs"], 0)
+        self.click("records_game:0")
+        self.assertEqual(self.app.replay_data["metadata"]["game_id"], view.options[0].game_id)
+
+    def test_human_alpha_beta_worker_input_runs_and_saves_actual_conditions(self):
+        self.click("mode:human")
+        self.app.opponent = "AlphaBeta"
+        self.app.human_color = chess.BLACK
+        self.app.live_search_depth = 1
+        self.click("live_workers")
+        self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
+        self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text="2"))
+        self.click("start")
+        self.app.live.tick(101, self.executor)
+        self.executor.finish()
+        self.app.live.tick(101, self.executor)
+        payload = self.app.live.replay_payload()
+        self.assertEqual(len(payload["moves_uci"]), 1)
+        self.assertEqual(payload["metadata"]["strategies"]["white"]["search"]["search_workers"], 2)
+        self.assertTrue(self.app.live.human_turn)
 
     def click(self, action):
         self.app.render()
@@ -53,13 +342,31 @@ class ChessApplicationTest(unittest.TestCase):
         x, y = self.app.board_view._square_to_screen(square, self.app.flipped)
         self.app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(x + 40, y + 40)))
 
-    def test_startup_has_home_and_three_modes_without_default_game(self):
+    def test_general_batch_alphabeta_setup_runs_selected_conditions(self):
+        self.click("mode:auto")
+        self.click("white")
+        self.click("white")
+        self.click("black")
+        self.assertEqual((self.app.white, self.app.black), ("AlphaBeta", "AlphaBeta"))
+        self.app.batch_search_workers = 2
+        self.app.batch_transposition_capacity = 31
+        self.app.batch_search_depth = 1
+        self.app.game_count = 1
+        self.click("start")
+        from dataclasses import replace
+        self.app.batch.settings = replace(self.app.batch.settings, max_plies=1)
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["status"], "completed")
+        manifest = json.loads((Path(self.app.batch.snapshot()["path"]) / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["settings"]["strategies"]["white"]["search"]["search_workers"], 2)
+
+    def test_startup_has_home_and_modes_without_default_game(self):
         self.app.render()
         self.assertEqual(self.app.mode, "home")
         self.assertIsNone(self.app.replay)
         self.assertIsNone(self.app.live)
         self.assertEqual({b.action for b in self.app.buttons},
-                         {"mode:auto", "mode:human", "mode:records"})
+                         {"mode:auto", "mode:human", "mode:records", "mode:learning"})
         self.click("mode:auto")
         self.assertIsNone(self.app.live)
         self.click("white")
@@ -235,7 +542,7 @@ class ChessApplicationTest(unittest.TestCase):
 
     def test_catalog_navigation_invalid_json_and_sample_remain_usable(self):
         folder = self.project / "data/replays"
-        folder.mkdir(parents=True)
+        folder.mkdir(parents=True, exist_ok=True)
         sample = json.loads(Path("data/replays/sample_replay.json").read_text(encoding="utf-8"))
         sample["metadata"].update(started_at="2026-09-09T12:34:56+08:00", game_id="20260909_000001")
         valid = folder / "20260909_000001.json"
@@ -395,9 +702,10 @@ class ChessApplicationTest(unittest.TestCase):
         for size in ((900, 768), APP_SIZE, (1800, 1536)):
             with self.subTest(size=size):
                 self.app.resize(pygame.Surface(size))
-                with patch.object(self.app, "text", wraps=self.app.text) as labels:
-                    self.app.render()
-                self.assertTrue(any("得分率：無資料" in str(call.args[0]) for call in labels.call_args_list))
+                self.app.render()
+                candidate = self.app.records_view.summary.comparison.candidate_summaries[0]
+                self.assertIsNone(candidate["paired_score_rate"])
+                self.assertEqual(candidate["label"], "candidate")
                 for button in self.app.buttons:
                     self.assertTrue(self.app.screen.get_rect().contains(button.rect))
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
@@ -506,7 +814,7 @@ class ChessApplicationTest(unittest.TestCase):
 
     def test_missing_standalone_result_is_not_replaced_by_loader_default_in_display(self):
         folder = self.project / "data/replays"
-        folder.mkdir(parents=True)
+        folder.mkdir(parents=True, exist_ok=True)
         (folder / "missing-result.json").write_text(json.dumps({
             "initial_fen": chess.STARTING_FEN, "moves_uci": []}), encoding="utf-8")
         self.click("mode:records")
@@ -527,7 +835,7 @@ class ChessApplicationTest(unittest.TestCase):
 
     def prepare_comparison_configs(self):
         folder = self.project / "configs/evaluation"
-        folder.mkdir(parents=True)
+        folder.mkdir(parents=True, exist_ok=True)
         (folder / "stable.json").write_text(json.dumps(EvaluationConfig().to_dict()), encoding="utf-8")
         (folder / "example_tapered.json").write_text(json.dumps(EvaluationConfig(phase_enabled=True).to_dict()), encoding="utf-8")
 
@@ -536,6 +844,129 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
         self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=value))
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+
+    def test_weight_preview_runs_from_ui_events_and_reloads_results(self):
+        self.prepare_comparison_configs()
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        self.click("comparison_generated")
+        self.enter_comparison_field("weight_values", "1, 2, 2")
+        self.enter_comparison_field("max_plies", "0")
+        self.enter_comparison_field("depth", "1")
+        self.click("comparison_preview")
+        self.click("start")
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["saved_games"], 2)
+        self.click("batch_results")
+        summary = self.app.records_view.summary
+        definition = summary.settings["experiment"]
+        self.assertEqual(definition["planned_games"], 2)
+        self.assertEqual(definition["baseline"]["config"]["terms"]["piece_square"]["weight"], 1)
+        self.assertEqual(definition["candidates"][0]["config"]["terms"]["piece_square"]["weight"], 2)
+        self.assertEqual(len(summary.games), 2)
+        original = json.loads((self.project / "configs/evaluation/stable.json").read_text(encoding="utf-8"))
+        self.assertEqual(original["terms"]["piece_square"]["weight"], 1)
+
+    def test_nine_weight_combinations_preview_and_execute_all_pages(self):
+        folder = self.project / "configs/evaluation"
+        (folder / "stable.json").write_text(json.dumps(EvaluationConfig(phase_enabled=True).to_dict()), encoding="utf-8")
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        self.click("comparison_generated")
+        self.enter_comparison_field("weight_values", "1.5,2,2.5")
+        self.click("comparison_weight_mode")
+        self.click("comparison_rule_add")
+        self.click("comparison_weight")
+        self.enter_comparison_field("weight_values", "200:400:100")
+        self.enter_comparison_field("max_plies", "0")
+        self.enter_comparison_field("depth", "1")
+        self.click("comparison_preview")
+        self.click("comparison_preview_next")
+        self.click("start")
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["saved_games"], 18)
+        self.click("batch_results")
+        summary = self.app.records_view.summary
+        definition = summary.settings['experiment']
+        self.assertEqual(len(definition['candidates']), 9)
+        self.assertEqual(len(summary.games), 18)
+        weights = {(item['config']['terms']['piece_square']['weight'], item['config']['terms']['piece_square']['endgame_weight']) for item in definition['candidates']}
+        self.assertEqual(weights, {(mg, eg) for mg in (1.5, 2, 2.5) for eg in (2, 3, 4)})
+
+    def test_resumed_interrupted_game_retains_result_table_replay_and_save(self):
+        self.click('mode:records')
+        self.click('comparison_new')
+        fields = self.app.evaluation_fields
+        fields.action('comparison_generated', self.app)
+        fields.values.update(weight_values='2', max_plies='1', depth='1')
+        fields.action('comparison_preview', self.app)
+        calls = []
+        def control():
+            calls.append(None)
+            return len(calls) < 4
+        result = run_evaluation_comparison(**fields.options(), control=control)
+        from engine.sessions.experiment_resume import resume_experiment
+        resume_experiment(result.path)
+        self.app.mode = 'home'
+        self.click('mode:records')
+        self.click('records_entry:0')
+        view = self.app.records_view
+        self.assertIsNotNone(view.summary.comparison)
+        self.assertEqual(len(view.summary.games), 3)
+        self.click('records_candidate:0')
+        self.click('records_save_candidate')
+        self.assertEqual(len(list((self.project / 'configs/evaluation').glob('candidate-*.json'))), 1)
+        self.click('records_game:0')
+        self.assertEqual(self.app.mode, 'replay')
+        self.assertEqual(self.app.replay_data['metadata']['termination'], 'user_stop')
+
+    def test_file_candidates_after_seventh_can_be_selected_removed_and_executed(self):
+        self.prepare_comparison_configs()
+        folder = self.project / 'configs/evaluation'
+        for index in range(8):
+            (folder / f'extra{index}.json').write_text(json.dumps(EvaluationConfig(pst_weight=index + 2).to_dict()), encoding='utf-8')
+        self.click('mode:auto')
+        self.click('batch_mode:evaluation')
+        for _ in range(7):
+            self.click('comparison_candidate_add')
+        self.click('comparison_files_prev')
+        self.click('comparison_files_next')
+        self.click('comparison_candidate_select:7')
+        self.click('comparison_candidate_remove:7')
+        self.assertEqual(len(self.app.evaluation_fields.candidates), 7)
+        self.click('comparison_candidate_add')
+        self.enter_comparison_field('max_plies', '0')
+        self.enter_comparison_field('depth', '1')
+        self.click('start')
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()['saved_games'], 16)
+
+    def test_comparison_search_worker_fields_run_multicandidate_games_and_save_snapshots(self):
+        self.prepare_comparison_configs()
+        profile = self.project / "configs/evaluation/third.json"
+        profile.write_text(json.dumps(EvaluationConfig(pst_weight=2).to_dict()), encoding="utf8")
+        (self.project / "openings.txt").write_text("7k/7p/8/8/8/8/P7/K7 w - - 0 1", encoding="utf8")
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        self.enter_comparison_field("openings", "openings.txt")
+        self.enter_comparison_field("depth", "1")
+        self.enter_comparison_field("search_workers", "2")
+        self.enter_comparison_field("transposition_capacity", "3")
+        self.enter_comparison_field("max_plies", "1")
+        self.click("comparison_candidate_add")
+        self.click("start")
+        self.app.render()
+        self.assertNotIn("pause", {button.action for button in self.app.buttons})
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["saved_games"], 4)
+        self.click("batch_results")
+        summary = self.app.records_view.summary
+        participants = summary.comparison.participants
+        for side in [participants["baseline"], *participants["candidates"]]:
+            self.assertEqual(side["search"]["search_workers"], 2)
+            self.assertEqual(side["search"]["transposition_capacity"], 3)
+        self.assertEqual(len(summary.games), 4)
+        self.assertEqual({game.candidate_label for game in summary.games}, {"example_tapered", "third"})
 
     def test_comparison_setup_background_save_and_results(self):
         self.prepare_comparison_configs()
@@ -702,6 +1133,32 @@ class ChessApplicationTest(unittest.TestCase):
         self.assertEqual(summary.status, "failed")
         self.assertIn("測試搜尋錯誤", summary.error)
         self.assertEqual(summary.games, ())
+
+
+    def test_saved_experiment_can_resume_from_records_with_original_snapshot(self):
+        self.click("mode:records")
+        self.click("comparison_new")
+        fields = self.app.evaluation_fields
+        fields.action("comparison_generated", self.app)
+        fields.values.update(weight_values="2", max_plies="0", depth="1")
+        fields.action("comparison_preview", self.app)
+        self.click("start")
+        progress = ComparisonRun._progress
+        def stop_after_first(run, state):
+            progress(run, state)
+            if state["saved_games"] == 1:
+                run.stop()
+        with patch.object(ComparisonRun, "_progress", stop_after_first):
+            self.executor.finish()
+        path = Path(self.app.batch.snapshot()["path"])
+        original = next((path / "replays").glob("*.json")).read_bytes()
+        self.click("batch_results")
+        self.click("records_resume")
+        self.assertEqual(self.app.mode, "auto")
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()["status"], "completed")
+        self.assertEqual(len(list((path / "replays").glob("*.json"))), 2)
+        self.assertIn(original, [p.read_bytes() for p in (path / "replays").glob("*.json")])
 
 
 if __name__ == "__main__":

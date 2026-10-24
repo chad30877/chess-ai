@@ -15,7 +15,8 @@ class BatchExecution:
         self._state = dict(status="running", current_game=0, saved_games=0,
                            requested_games=requested_games, batch_id="", path="", error="",
                            completed_games=0, unfinished=0, last_replay=None,
-                           waiting_work=0, running_work=0, finished_work=0, finished_games=0)
+                           waiting_work=0, running_work=0, finished_work=0, finished_games=0,
+                           active_games={})
         self._state.update(progress)
         self.future = executor.submit(self._run)
 
@@ -99,7 +100,7 @@ class BatchExecution:
         try:
             return self._execute()
         except Exception as exc:
-            self._progress(dict(status="failed", running_work=0, error=f"{type(exc).__name__}: {exc}"))
+            self._progress(dict(status="failed", running_work=0, active_games={}, error=f"{type(exc).__name__}: {exc}"))
             return None
 
 

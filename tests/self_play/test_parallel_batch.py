@@ -40,7 +40,8 @@ def fail_second_color(work):
     from engine.sessions import batch_workers
     original = batch_workers.play_game
     def play(number, *args, **kwargs):
-        if number == 2:
+        # 每個配對的第二色都失敗，避免其他程序先完成整對而影響斷言。
+        if number % 2 == 0:
             raise RuntimeError("第二色受控失敗")
         return original(number, *args, **kwargs)
     with patch.object(batch_workers, "play_game", play):
@@ -68,6 +69,37 @@ def rows(path):
 
 
 class ParallelBatchTest(unittest.TestCase):
+    def test_spawn_publishes_each_games_moves_before_saving_and_clears_finished_games(self):
+        for mode in ("general", "evaluation"):
+            with self.subTest(mode=mode):
+                states = []
+                if mode == "general":
+                    original = BatchRun._progress
+
+                    def progress(run, state):
+                        original(run, state)
+                        states.append(run.snapshot())
+
+                    with patch.object(BatchRun, "_progress", progress), ThreadPoolExecutor(max_workers=1) as executor:
+                        run = BatchRun(BatchSettings(white="Random", black="Random", games=2,
+                                       max_plies=2, workers=2), self.root, executor)
+                        run.future.result(timeout=20)
+                    count = 2
+                else:
+                    run_evaluation_comparison(
+                        baseline=ComparisonParticipant.random_baseline(),
+                        candidate=ComparisonParticipant.greedy("candidate", EvaluationConfig()),
+                        initial_fens=(chess.STARTING_FEN,), repetitions=2, max_plies=2,
+                        workers=2, batch_root=self.root, progress=states.append)
+                    count = 4
+                for number in range(1, count + 1):
+                    seen = [state["active_games"][number]["plies"] for state in states
+                            if number in state.get("active_games", {})]
+                    self.assertEqual(set(seen), {0, 1, 2})
+                    self.assertEqual(seen, sorted(seen))
+                self.assertTrue(any(state.get("active_games") and state["saved_games"] == 0 for state in states))
+                self.assertEqual(states[-1]["active_games"], {})
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -220,6 +252,7 @@ class ParallelBatchTest(unittest.TestCase):
         self.assertIn("第二色受控失敗", state["error"])
         summary = load_comparison(Path(state["path"]) / "manifest.json")
         self.assertGreaterEqual(len(summary.games), 1)
+        self.assertTrue(all(game.candidate_color == "black" for game in summary.games))
         self.assertEqual(summary.completed_pairs, 0)
         self.assertIsNone(summary.paired_score_rate)
         self.replay_signatures(Path(state["path"]))

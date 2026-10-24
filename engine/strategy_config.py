@@ -33,9 +33,11 @@ def strategy_config(name: str, player: Player | None) -> dict:
             "strategy": name,
             "evaluator": {"type": evaluator_type, **evaluator.config.to_dict()},
             "search": {
-                "schema_version": 1,
+                "schema_version": 2,
                 "algorithm": "alpha_beta",
+                "search_workers": searcher.search_workers,
                 "max_depth": limits.max_depth,
+                "transposition_capacity": limits.transposition_capacity,
                 "claim_draw": searcher.claim_draw,
                 "move_ordering": searcher.move_ordering,
                 "quiescence_depth": searcher.quiescence_depth,

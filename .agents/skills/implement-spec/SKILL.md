@@ -37,4 +37,6 @@ Communication to and from subagents should be sparse. Communicate primarily thro
 
 8. If a draft PR exists, mark it ready for review. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch.
 
+   逐票遵循專案 tracker 文件的驗收、同步與結案讀回流程；必要驗收未完成的票維持開啟，不視為已解除後續依賴。整合審查通過不能代替未執行的驗收。
+
 9. Clean up all **implementer subagent** worktrees.

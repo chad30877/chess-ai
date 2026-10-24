@@ -2,6 +2,7 @@
 
 import json
 import random
+import re
 import sqlite3
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -12,17 +13,24 @@ import chess
 import pygame
 
 from apps.play_ui import build_move_items, create_session, get_replay_data
+from engine.evaluation.config import EvaluationConfig
 from engine.game import create_board
+from engine.evaluation.config import EvaluationConfig
+from engine.evaluation.evaluator import HandcraftedEvaluator, MaterialEvaluator
 from engine.storage.data_ids import TAIPEI, allocate_id, date_key, now_iso
 from engine.sessions.batch_run import BatchSettings
 from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
+from ui.evaluation_profiles import profile_name, profile_summary, config_summary
+from ui.learning_view import LearningView
 from engine.sessions.live_session import LiveSession, LiveSettings
+from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.replay.replay_loader import load_replay_json
 from ui.board_view import BOARD_PIXELS, WINDOW_HEIGHT, BoardView
 from ui.controls import ACCENT, BACKGROUND, BORDER, MUTED, PANEL, TEXT, Button, draw_text, ui_font
 from ui.move_list_view import MOVE_LIST_WIDTH, MoveListView
 from ui.records_view import RecordsView
+from ui.replay_evaluation_editor import GROUPS, ReplayEvaluationEditor, TERM_LABELS
 
 HEADER_HEIGHT = 56
 LOGICAL_SIZE = (900, 768)
@@ -53,11 +61,26 @@ class ChessApplication:
         self.replay_is_local_game = False
         self.white, self.black = "Random", "Greedy"
         self.human_color, self.opponent = chess.WHITE, "Greedy"
+        self.live_evaluation_files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
+        self.live_evaluation_file = next(
+            (path for path in self.live_evaluation_files if path.name == "stable.json"),
+            self.live_evaluation_files[0] if self.live_evaluation_files else None,
+        )
+        self.opening_book = False
+        self.opening_max_plies = 12
+        self.live_search_depth = 2
+        self.live_search_workers = 1
+        self.live_transposition_capacity = DEFAULT_TRANSPOSITION_CAPACITY
         self.interval = 1.0
         self.batch_interval = 0.0
         self.batch_workers = 4
+        self.batch_search_depth = 2
+        self.batch_search_workers = 1
+        self.batch_transposition_capacity = self.live_transposition_capacity
+        self.batch_evaluation_files = {side: self.live_evaluation_file for side in ("white", "black")}
         self.game_count = 20
         self.batch = None
+        self.batch_games_page = 0
         self.pending_leave = None
         self.numeric_focus = None
         self.numeric_text = ""
@@ -70,9 +93,15 @@ class ChessApplication:
         self.records_view: RecordsView | None = None
         self.replay_return = None
         self.replay_record = None
+        self.replay_evaluator = None
+        self.replay_evaluator_saved = False
+        self._replay_breakdown = None
+        self._replay_breakdown_ply = -1
+        self.replay_editor: ReplayEvaluationEditor | None = None
         self.records_return_mode = None
         self.batch_mode = "general"
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
+        self.learning = LearningView(PROJECT_ROOT)
         self.confirm_action: str | None = None
         self.confirm_was_running = False
         self.message = ""
@@ -93,7 +122,9 @@ class ChessApplication:
                                     origin_x=self.origin[0], square_size=round(80 * self.scale))
         self.move_view = MoveListView(screen, *self.point(640, 392), round(376 * self.scale), self.scale)
         self.move_view.scroll_offset = old_scroll
-        self.font, self.small_font, self.title_font = [ui_font(round(n * self.scale)) for n in (18, 15, 28)]
+        self.font, self.small_font, self.title_font, self.evaluation_font = [
+            ui_font(round(n * self.scale)) for n in (18, 15, 28, 12)
+        ]
 
     def point(self, x, y):
         return self.origin[0] + round(x * self.scale), self.origin[1] + round(y * self.scale)
@@ -112,6 +143,7 @@ class ChessApplication:
                   round(width * self.scale) if width else None)
 
     def close(self):
+        self.learning.close(wait=self._owns_executor)
         if self.batch:
             self.batch.stop()
             # Never cancel a queued batch: its worker must publish the final manifest.
@@ -145,6 +177,15 @@ class ChessApplication:
         self.move_view.scroll_offset = 0
         self._last_ply = -1
 
+    def _set_move_view_layout(self):
+        origin_y = 566 if self.mode == "replay" else (570 if self.mode == "human" and self.live is None else 392)
+        self.move_view.origin_y = self.point(640, origin_y)[1]
+        self.move_view.height = round((768 - origin_y) * self.scale)
+        self.move_view.panel_rect = pygame.Rect(
+            self.move_view.origin_x, self.move_view.origin_y,
+            round(MOVE_LIST_WIDTH * self.scale), self.move_view.height,
+        )
+
     def start_game(self):
         if not self._commit_number():
             return
@@ -152,8 +193,12 @@ class ChessApplication:
             if self.batch is None:
                 try:
                     settings = (self.evaluation_fields.options() if self.batch_mode == "evaluation"
-                                else BatchSettings(white=self.white, black=self.black,
-                                                   games=self.game_count, interval=self.batch_interval, workers=self.batch_workers))
+                                else BatchSettings(opening_book=self.opening_book, opening_max_plies=self.opening_max_plies, white=self.white, black=self.black,
+                                                   games=self.game_count, interval=self.batch_interval, workers=self.batch_workers,
+                                                   search_depth=self.batch_search_depth, search_workers=self.batch_search_workers,
+                                                   transposition_capacity=self.batch_transposition_capacity,
+                                                   **{side + "_evaluation": self._batch_evaluation(side)
+                                                      for side in ("white", "black")}))
                     if self.batch_mode == "evaluation":
                         settings["workers"] = self.batch_workers
                     self.batch = start_batch(self.batch_mode, settings, PROJECT_ROOT / "data/batches", self.executor)
@@ -166,8 +211,36 @@ class ChessApplication:
         white, black = self.white, self.black
         if self.mode == "human":
             white, black = ("Human", self.opponent) if self.human_color else (self.opponent, "Human")
-        self.live = LiveSession(LiveSettings(white=white, black=black,
-                                            seed=random.SystemRandom().randrange(2**63), interval=self.interval))
+        evaluation = None
+        if self.mode == "human" and self.opponent in ("Greedy", "AlphaBeta"):
+            try:
+                if self.live_evaluation_file is None:
+                    raise ValueError("找不到 configs/evaluation 評分設定檔")
+                evaluation = EvaluationConfig.from_dict(
+                    json.loads(self.live_evaluation_file.read_text(encoding="utf-8")),
+                )
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                self.message = f"無法載入評分設定檔：{exc}"
+                return
+        white_evaluation = evaluation if white in ("Greedy", "AlphaBeta") else None
+        black_evaluation = evaluation if black in ("Greedy", "AlphaBeta") else None
+        try:
+            session = LiveSession(LiveSettings(
+            white=white,
+            black=black,
+            seed=random.SystemRandom().randrange(2**63),
+            interval=self.interval,
+            white_evaluation=white_evaluation,
+            black_evaluation=black_evaluation,
+            search_depth=self.live_search_depth,
+            search_workers=self.live_search_workers,
+            transposition_capacity=self.live_transposition_capacity,
+            opening_book=self.opening_book, opening_max_plies=self.opening_max_plies,
+            ))
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            self.message = f"無法開始對戰：{exc}"
+            return
+        self.live = session
         self.live.start(self.now())
         self.saved = False
         self.message = ""
@@ -177,6 +250,10 @@ class ChessApplication:
         items = build_move_items(data["initial_fen"], data["moves_uci"])
         session, _ = create_session(data)
         self.replay, self.replay_data, self.replay_items = session, data, items
+        self.replay_evaluator, self.replay_evaluator_saved = self._replay_static_evaluator(data)
+        self.replay_editor = None
+        self._replay_breakdown = None
+        self._replay_breakdown_ply = -1
         self.replay_source, self.replay_is_local_game = source, local_game
         self.replay_record = None
         self.replay_return = None
@@ -185,6 +262,70 @@ class ChessApplication:
         self.move_view.scroll_offset = 0
         self.message = ""
         self._last_ply = -1
+
+    @staticmethod
+    def _replay_static_evaluator(data):
+        metadata = data.get("metadata", {})
+        strategies = metadata.get("strategies", {}) if isinstance(metadata, dict) else {}
+        if not isinstance(strategies, dict) or not strategies:
+            batch_id = metadata.get("batch_id") if isinstance(metadata, dict) else None
+            if isinstance(batch_id, str) and batch_id and Path(batch_id).name == batch_id:
+                batches = (PROJECT_ROOT / "data/batches").resolve()
+                manifest_path = (batches / batch_id / "manifest.json").resolve()
+                if manifest_path.is_relative_to(batches) and manifest_path.is_file():
+                    try:
+                        settings = json.loads(manifest_path.read_text(encoding="utf-8")).get("settings", {})
+                        strategies = settings.get("strategies", {})
+                        comparison = settings.get("comparison", {})
+                        participants = comparison.get("participants", {})
+                        if isinstance(participants, dict) and participants:
+                            white_player = metadata.get("white_player")
+                            black_player = metadata.get("black_player")
+                            strategies = {
+                                "white": next((p for p in participants.values()
+                                               if p.get("label") == white_player), {}),
+                                "black": next((p for p in participants.values()
+                                               if p.get("label") == black_player), {}),
+                            }
+                    except (OSError, ValueError, TypeError, AttributeError):
+                        strategies = {}
+        colors = ("white", "black")
+        if isinstance(metadata, dict) and metadata.get("white_player"):
+            white_name = metadata["white_player"]
+            white_strategy = strategies.get("white", {}) if isinstance(strategies, dict) else {}
+            black_strategy = strategies.get("black", {}) if isinstance(strategies, dict) else {}
+            white_strategy = white_strategy if isinstance(white_strategy, dict) else {}
+            black_strategy = black_strategy if isinstance(black_strategy, dict) else {}
+            if white_strategy.get("strategy") in (None, "Random") and black_strategy.get("evaluator"):
+                colors = ("black", "white")
+        for color in colors:
+            strategy = strategies.get(color, {}) if isinstance(strategies, dict) else {}
+            settings = strategy.get("evaluator") if isinstance(strategy, dict) else None
+            if not isinstance(settings, dict):
+                continue
+            evaluator_type = settings.get("type")
+            config_data = {key: value for key, value in settings.items() if key != "type"}
+            try:
+                config = EvaluationConfig.from_dict(config_data)
+                if evaluator_type == "material":
+                    return MaterialEvaluator(config.piece_values), True
+                if evaluator_type == "handcrafted":
+                    return HandcraftedEvaluator(config=config), True
+            except (TypeError, ValueError):
+                continue
+        return HandcraftedEvaluator(), False
+
+    def _current_replay_breakdown(self):
+        evaluator = (HandcraftedEvaluator(config=self.replay_editor.config)
+                     if self.replay_editor is not None else self.replay_evaluator)
+        if self.replay is None or evaluator is None:
+            return None
+        if self._replay_breakdown_ply != self.replay.current_ply:
+            self._replay_breakdown = evaluator.evaluate_breakdown(
+                self.replay.current_board(),
+            )
+            self._replay_breakdown_ply = self.replay.current_ply
+        return self._replay_breakdown
 
     def open_replay(self, path: str | Path, *, return_to=None, record=None) -> bool:
         try:
@@ -297,6 +438,50 @@ class ChessApplication:
         return [], 0
 
     def dispatch(self, action: str):
+        if self.mode == 'learning' and action.startswith('learning_'):
+            self.learning.action(action, self)
+            return
+        if self.replay_editor is not None and action.startswith("editor_"):
+            editor = self.replay_editor
+            if editor.focus is not None and action not in ("editor_discard",):
+                if not editor.commit_edit():
+                    return
+                self._replay_breakdown_ply = -1
+                pygame.key.stop_text_input()
+            if action == "editor_discard":
+                editor.cancel_edit()
+                self.replay_editor = None
+                self._replay_breakdown_ply = -1
+                pygame.key.stop_text_input()
+            elif action == "editor_profile":
+                files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
+                current = getattr(editor, "profile_path", None)
+                if files:
+                    path = files[(files.index(current) + 1) % len(files)] if current in files else files[0]
+                    try:
+                        config = EvaluationConfig.from_dict(json.loads(path.read_text(encoding="utf-8")))
+                        self.replay_editor = ReplayEvaluationEditor(config)
+                        self.replay_editor.profile_path = path
+                        self._replay_breakdown_ply = -1
+                    except (OSError, ValueError, TypeError, KeyError) as exc:
+                        editor.message = f"無法載入設定：{exc}"
+            elif action == "editor_save":
+                self._save_replay_evaluation()
+            elif action.startswith("editor_group:"):
+                group = action.split(":", 1)[1]
+                editor.expanded[group] = not editor.expanded[group]
+            elif action.startswith("editor_toggle:"):
+                editor.toggle(action.split(":", 1)[1])
+                self._replay_breakdown_ply = -1
+            elif action.startswith("editor_field:"):
+                editor.begin_edit(action.split(":", 1)[1])
+                pygame.key.start_text_input()
+            return
+        if action == "replay_edit" and self.mode == "replay":
+            if self.replay_evaluator is not None:
+                self.replay_editor = ReplayEvaluationEditor(self.replay_evaluator.config)
+                self._replay_breakdown_ply = -1
+            return
         if self.confirm_action:
             if action == "confirm":
                 pending = self.confirm_action
@@ -319,6 +504,9 @@ class ChessApplication:
         if action == "batch_progress" and self.batch:
             self.mode = "auto"
             return
+        if action in ("batch_games_prev", "batch_games_next") and self.batch:
+            self.batch_games_page = max(0, self.batch_games_page + (1 if action.endswith("next") else -1))
+            return
         if action == "batch_watch" and self.batch:
             path = self.batch.snapshot()["last_replay"]
             if path:
@@ -329,6 +517,10 @@ class ChessApplication:
             return
         if action == "records_results" and self.records_view:
             self.mode = "records"
+            return
+        if action == 'learning_comparison_return':
+            self.mode = 'learning'
+            self.learning.page = 'comparison'
             return
         if self.mode == "records" and (action.startswith("records_") or action == "comparison_new"):
             self.records_view.action(action, self)
@@ -352,6 +544,30 @@ class ChessApplication:
             else:
                 self.batch.pause()
             return
+        if action in ("opening_book", "opening_limit") and self.live is None and self.batch is None:
+            if action == "opening_book":
+                self.opening_book = not self.opening_book
+            elif self._commit_number():
+                self.numeric_focus = action
+                self.numeric_text = str(self.opening_max_plies)
+                pygame.key.start_text_input()
+            return
+        if self.mode == "auto" and self.batch is None and action.startswith("batch_"):
+            if action in ("batch_depth", "batch_search_workers", "batch_capacity"):
+                if self._commit_number():
+                    attr = {"batch_depth": "batch_search_depth", "batch_search_workers": "batch_search_workers",
+                            "batch_capacity": "batch_transposition_capacity"}[action]
+                    self.numeric_focus = action
+                    self.numeric_text = str(getattr(self, attr))
+                    pygame.key.start_text_input()
+                return
+            if action in ("batch_evaluation_white", "batch_evaluation_black"):
+                side = action.rsplit("_", 1)[1]
+                files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
+                if files:
+                    current = self.batch_evaluation_files[side]
+                    self.batch_evaluation_files[side] = files[(files.index(current) + 1) % len(files)] if current in files else files[0]
+                return
         if self.mode == "auto" and action in ("interval", "count", "workers") and self.batch is None:
             self.evaluation_fields.commit()
             if self._commit_number():
@@ -369,7 +585,26 @@ class ChessApplication:
         elif action == "flip":
             self.flipped = not self.flipped
         elif action in ("white", "black", "opponent") and self.live is None:
-            setattr(self, action, "Greedy" if getattr(self, action) == "Random" else "Random")
+            if action == "opponent":
+                options = ("Random", "Greedy", "AlphaBeta")
+                self.opponent = options[(options.index(self.opponent) + 1) % len(options)]
+            else:
+                options = ("Random", "Greedy", "AlphaBeta")
+                setattr(self, action, options[(options.index(getattr(self, action)) + 1) % len(options)])
+        elif action == "live_evaluation" and self.live is None:
+            self._refresh_evaluation_profiles()
+            if not self.live_evaluation_files:
+                return
+            current = self.live_evaluation_files.index(self.live_evaluation_file)
+            self.live_evaluation_file = self.live_evaluation_files[(current + 1) % len(self.live_evaluation_files)]
+        elif action == "live_depth" and self.live is None:
+            depths = (1, 2, 3, 4, 5)
+            self.live_search_depth = depths[(depths.index(self.live_search_depth) + 1) % len(depths)]
+        elif action in ("live_workers", "live_capacity") and self.live is None:
+            if self._commit_number():
+                self.numeric_focus = action
+                self.numeric_text = str(self.live_search_workers if action == "live_workers" else self.live_transposition_capacity)
+                pygame.key.start_text_input()
         elif action == "color" and self.live is None:
             self.human_color = not self.human_color
             self.flipped = not self.human_color
@@ -406,22 +641,40 @@ class ChessApplication:
         elif self.replay and action in ("first", "prev", "next", "last"):
             getattr(self.replay, action)()
 
+    def _batch_evaluation(self, side):
+        if getattr(self, side) == "Random":
+            return None
+        profile = self.batch_evaluation_files[side]
+        return EvaluationConfig.from_dict(json.loads(profile.read_text(encoding="utf-8"))) if profile else EvaluationConfig()
+
     def _commit_number(self):
         if self.numeric_focus is None:
             return True
         try:
-            value = int(self.numeric_text) if self.numeric_focus in ("count", "workers") else float(self.numeric_text)
+            value = int(self.numeric_text) if self.numeric_focus in ("opening_limit", "count", "workers", "live_workers", "live_capacity", "batch_depth", "batch_search_workers", "batch_capacity") else float(self.numeric_text)
             import math
-            if not math.isfinite(value) or (value < 1 if self.numeric_focus in ("count", "workers") else value < 0):
+            if not math.isfinite(value) or (value < 1 if self.numeric_focus in ("count", "workers", "live_workers", "live_capacity", "batch_depth", "batch_search_workers", "batch_capacity") else value < 0):
                 raise ValueError()
-            if self.numeric_focus == "workers":
+            if self.numeric_focus == "opening_limit":
+                self.opening_max_plies = value
+            elif self.numeric_focus in ("batch_depth", "batch_search_workers", "batch_capacity"):
+                attr = {"batch_depth": "batch_search_depth", "batch_search_workers": "batch_search_workers",
+                        "batch_capacity": "batch_transposition_capacity"}[self.numeric_focus]
+                setattr(self, attr, value)
+            elif self.numeric_focus == "live_workers":
+                self.live_search_workers = value
+            elif self.numeric_focus == "live_capacity":
+                self.live_transposition_capacity = value
+            elif self.numeric_focus == "workers":
                 self.batch_workers = value
             elif self.numeric_focus == "count":
                 self.game_count = value
             else:
                 self.batch_interval = value
         except (ValueError, OverflowError):
-            self.message = "場次與同時對戰場數需為正整數；場間間隔需為非負秒數。"
+            self.message = ("搜尋 worker 與表項上限需為正整數。"
+                            if self.numeric_focus in ("live_workers", "live_capacity")
+                            else "場次與同時對戰場數需為正整數；場間間隔需為非負秒數。")
             return False
         self.numeric_focus = None
         pygame.key.stop_text_input()
@@ -446,6 +699,35 @@ class ChessApplication:
         if event.type == pygame.VIDEORESIZE:
             self.resize(pygame.display.set_mode((max(900, event.w), max(768, event.h)), pygame.RESIZABLE))
             return
+        if self.mode == 'learning' and self.learning.input(event):
+            return
+        if self.replay_editor is not None:
+            editor = self.replay_editor
+            if editor.focus is not None and event.type == pygame.TEXTINPUT:
+                editor.input_draft += event.text
+                return
+            if editor.focus is not None and event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    editor.input_draft = editor.input_draft[:-1]
+                elif event.key == pygame.K_a and event.mod & pygame.KMOD_CTRL:
+                    editor.input_draft = ""
+                elif event.key == pygame.K_RETURN:
+                    if editor.commit_edit():
+                        pygame.key.stop_text_input()
+                        self._replay_breakdown_ply = -1
+                elif event.key == pygame.K_ESCAPE:
+                    editor.cancel_edit()
+                    pygame.key.stop_text_input()
+                return
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                self.dispatch("editor_discard")
+                return
+            if event.type == pygame.MOUSEWHEEL:
+                editor.scroll = max(0, min(editor.scroll + (3 if event.y < 0 else -3),
+                                           max(0, len(self._replay_editor_rows()) - 14)))
+                return
+            if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
+                return
         if self.numeric_focus and event.type in (pygame.TEXTINPUT, pygame.KEYDOWN):
             if event.type == pygame.TEXTINPUT:
                 self.numeric_text += event.text
@@ -514,6 +796,8 @@ class ChessApplication:
                 if button.enabled and button.rect.collidepoint(event.pos):
                     self.dispatch(button.action)
                     return
+            if self.replay_editor is not None:
+                return
             if self.confirm_action or self.promotions:
                 return
             if self.mode == "records":
@@ -557,6 +841,7 @@ class ChessApplication:
                 ("auto", "批次自動對戰", "設定雙方 AI 與生成場次"),
                 ("human", "真人下棋", "選擇執白或執黑，挑戰 AI"),
                 ("records", "對局紀錄", "查找比較、一般批次與非批次棋譜"),
+                ("learning", "學習實驗", "準備棋譜資料與分組局面"),
             ]):
                 x, y = 64 + 396 * (i % 2), 260 + 184 * (i // 2)
                 self.draw_rect(PANEL, (x, y, 376, 160), border_radius=10)
@@ -567,12 +852,14 @@ class ChessApplication:
             self._render_batch()
         elif self.mode == "records":
             self.records_view.render(self)
+        elif self.mode == 'learning':
+            self.learning.render(self)
         else:
             self._render_game()
         self.draw_rect(PANEL, (0, 0, LOGICAL_SIZE[0], HEADER_HEIGHT))
         self.text("Chess AI", 18, 10, large=True)
         if self.mode != "home":
-            if self.mode not in ("auto", "records"):
+            if self.mode not in ("auto", "records", "learning"):
                 self.button("flip", "翻轉 F", (664, 10, 104, 36))
             self.button("home", "回首頁", (780, 10, 104, 36))
         if self.confirm_action:
@@ -581,13 +868,15 @@ class ChessApplication:
             self._render_promotion()
 
     def _render_game(self):
+        self._set_move_view_layout()
         items, ply = self.current_moves()
         board = self.replay.current_board() if self.mode == "replay" and self.replay else (
             self.live.board if self.live and self.mode != "replay" else create_board())
         destinations = {m.to_square for m in self.live.legal_from(self.selected)} if self.live and self.selected is not None else set()
         self.board_view.render(board, ply, len(items), self.flipped,
                                selected=self.selected, destinations=destinations)
-        self.draw_rect(PANEL, (BOARD_PIXELS, HEADER_HEIGHT, MOVE_LIST_WIDTH, 336))
+        panel_height = 510 if self.mode == "replay" else (434 if self.mode == "human" and self.live is None else 336)
+        self.draw_rect(PANEL, (BOARD_PIXELS, HEADER_HEIGHT, MOVE_LIST_WIDTH, panel_height))
         x = BOARD_PIXELS + 14
         title = {"auto": "自動對戰", "human": "真人對 AI", "replay": "棋譜回放"}[self.mode]
         self.text(title, x, 70, large=True)
@@ -606,6 +895,8 @@ class ChessApplication:
         hint = "← → 前後一步　Home / End 起終點　F 翻轉" if self.mode == "replay" else (
             "點選棋子與目的格；Esc 回首頁，F 翻轉" if self.mode == "human" else "Space 暫停／繼續　F 翻轉　Esc 回首頁")
         self.draw_label(self.small_font, self.message or hint, (14, 737), MUTED, 610)
+        if self.mode == "replay" and self.replay_editor is not None:
+            self._render_replay_editor()
 
     def _status_text(self):
         if self.mode == "replay":
@@ -622,20 +913,39 @@ class ChessApplication:
         if self.mode == "auto":
             fields = [("white", "白方", self.white), ("black", "黑方", self.black)]
         else:
+            opponent_name = "Alpha-Beta" if self.opponent == "AlphaBeta" else self.opponent
             fields = [("color", "我執", "白方" if self.human_color else "黑方"),
-                      ("opponent", "對手", self.opponent)]
-        fields.append(("interval", "間隔", f"{self.interval:g} 秒"))
+                      ("opponent", "對手", opponent_name),
+                      ("live_evaluation", "評分設定", profile_name(self.live_evaluation_file))]
+            if self.opponent == "AlphaBeta":
+                fields.extend([("opening_book", "開局庫", "開" if self.opening_book else "關"),
+                               ("opening_limit", "半回合", str(self.opening_max_plies))])
+                fields.append(("live_depth", "搜尋深度", str(self.live_search_depth)))
+                fields.append(("live_workers", "Workers", str(self.live_search_workers)))
+                fields.append(("live_capacity", "表項上限", str(self.live_transposition_capacity)))
+            fields.append(("interval", "間隔", f"{self.interval:g} 秒"))
         for i, (action, label, value) in enumerate(fields):
-            y = 119 + i * 46
+            y = 112 + i * 36 if self.mode == "human" else 119 + i * 46
             self.text(label, x, y + 7)
-            self.button(action, value, (x + 56, y, 176, 36))
-        self.button("start", "開始對戰", (x, 270, 232, 42), primary=True)
-        self.text("點選設定可切換選項", x, 324, muted=True)
-        self.draw_label(self.small_font, "和棋政策：不自動申請", (x, 352), MUTED)
+            if self.numeric_focus == action:
+                value = self.numeric_text + " |"
+            self.button(action, value, (x + 80, y, 152, 32) if self.mode == "human" else (x + 56, y, 176, 36))
+        if self.mode == "human":
+            summary = profile_summary(self.live_evaluation_file)
+            groups, _, phase = summary.partition("｜")
+            self.draw_label(self.small_font, groups, (x, 578), MUTED, 232)
+            self.draw_label(self.small_font, phase, (x, 602), MUTED, 232)
+        start_y = 490 if self.mode == "human" else 270
+        self.button("start", "開始對戰", (x, start_y, 232, 42), primary=True)
+        if self.mode == "human":
+            self.draw_label(self.small_font, "點選設定切換；深度選項為 1–5", (x, 541), MUTED, 232)
+        else:
+            self.text("點選設定可切換選項", x, start_y + 51, muted=True)
+            self.draw_label(self.small_font, "和棋政策：不自動申請", (x, start_y + 79), MUTED)
 
     def _render_live_panel(self, x):
         session = self.live
-        player_name = lambda name: "真人" if name == "Human" else name
+        player_name = lambda name: {"Human": "真人", "AlphaBeta": "Alpha-Beta"}.get(name, name)
         self.text("白方：" + player_name(session.settings.white), x, 114)
         self.text("黑方：" + player_name(session.settings.black), x, 144)
         self.text(self._status_text(), x, 178, width=232)
@@ -659,28 +969,190 @@ class ChessApplication:
         label = datetime.fromisoformat(timestamp).astimezone(TAIPEI).strftime("%Y-%m-%d %H:%M:%S") if date_key(timestamp) != "日期不詳" else "日期時間不詳"
         self.draw_label(self.small_font, label if self.replay_data else "尚未選擇對局", (x, 113), MUTED, 230)
         if self.replay_data:
+            self.button("replay_edit", "調整評分", (x + 118, 68, 114, 32),
+                        enabled=self.replay_evaluator is not None)
             metadata = self.replay_data.get("metadata", {})
             info = {key: metadata.get(key) or "未記錄" for key in ("white_player", "black_player", "game_id")}
             result = self.replay_record.result if self.replay_record is not None else self.replay_data.get("result")
             info["result"] = result or "未記錄"
             for i, (label, key) in enumerate([("白方", "white_player"), ("黑方", "black_player"),
                                               ("結果", "result"), ("編號", "game_id")]):
-                self.draw_label(self.small_font, f"{label}：{info[key]}", (x, 141 + i * 24), TEXT, 230)
+                self.draw_label(self.small_font, f"{label}：{info[key]}", (x, 137 + i * 19), TEXT, 230)
             reason = self.replay_data.get("metadata", {}).get("termination", "")
-            self.draw_label(self.small_font, REASONS.get(reason, reason), (x, 238), MUTED, 230)
+            self.draw_label(self.small_font, REASONS.get(reason, reason), (x, 215), MUTED, 230)
+            self._render_replay_evaluation(x)
         for i, (action, label) in enumerate([("first", "起點"), ("prev", "上步"), ("next", "下步"), ("last", "終點")]):
             enabled = self.replay is not None and (self.replay.current_ply > 0 if i < 2 else self.replay.current_ply < self.replay.total_ply())
-            self.button(action, label, (x + i * 59, 270, 55, 36), enabled=enabled)
-        self.button("open", "選擇對局", (x, 320, 111, 38), primary=self.replay is None)
+            self.button(action, label, (x + i * 59, 480, 55, 34), enabled=enabled)
+        self.button("open", "選擇對局", (x, 526, 111, 34), primary=self.replay is None)
         if self.replay_is_local_game:
-            self.button("export", "匯出本局", (x + 121, 320, 111, 38))
+            self.button("export", "匯出本局", (x + 121, 526, 111, 34))
         else:
             if self.replay_return == "records" and self.records_view:
-                self.button("records_results", "返回紀錄", (x + 121, 320, 111, 38))
+                self.button("records_results", "返回紀錄", (x + 121, 526, 111, 34))
             elif self.replay_return == "batch" and self.batch:
-                self.button("batch_progress", "返回批次", (x + 121, 320, 111, 38))
+                self.button("batch_progress", "返回批次", (x + 121, 526, 111, 34))
+            elif self.replay_return == 'learning':
+                self.button('learning_comparison_return', '研究報告', (x + 121, 526, 111, 34))
             else:
-                self.button("sample", "範例棋譜", (x + 121, 320, 111, 38))
+                self.button("sample", "範例棋譜", (x + 121, 526, 111, 34))
+
+    def _replay_editor_rows(self):
+        editor = self.replay_editor
+        if editor is None:
+            return []
+        rows = []
+        fields = editor.fields()
+        for key, label, terms in GROUPS:
+            rows.append(("group", key, label, None, None))
+            if editor.expanded[key]:
+                rows.extend(("field", field[2], field[1], field[3], field[4])
+                            for field in fields if field[0] == key)
+        return rows
+
+    def _refresh_evaluation_profiles(self):
+        current = self.live_evaluation_file
+        files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
+        self.live_evaluation_files = files
+        if current in files:
+            self.live_evaluation_file = current
+        else:
+            self.live_evaluation_file = next(
+                (path for path in files if path.name == "stable.json"), files[0] if files else None,
+            )
+        self.evaluation_fields.files = files
+
+    def _save_replay_evaluation(self):
+        editor = self.replay_editor
+        if editor is None:
+            return
+        if not editor.commit_edit():
+            return
+        name = editor.name.strip()
+        if name.lower().endswith(".json"):
+            name = name[:-5]
+        if not name or not re.fullmatch(r"[\w.-]+", name, flags=re.UNICODE) or name in (".", ".."):
+            editor.message = "請輸入不含路徑的設定檔名稱。"
+            return
+        path = PROJECT_ROOT / "configs/evaluation" / f"{name}.json"
+        try:
+            with path.open("x", encoding="utf-8") as stream:
+                json.dump(editor.config.to_dict(), stream, ensure_ascii=False, indent=2)
+                stream.write("\n")
+        except FileExistsError:
+            editor.message = "同名設定檔已存在，請更換名稱。"
+            return
+        except OSError as exc:
+            editor.message = f"無法保存設定檔：{exc}"
+            return
+        self.replay_editor = None
+        self.replay_evaluator = HandcraftedEvaluator(config=editor.config)
+        self._refresh_evaluation_profiles()
+        self._replay_breakdown_ply = -1
+        self.message = f"已另存評分設定：{name}.json"
+
+    def _render_replay_editor(self):
+        editor = self.replay_editor
+        if editor is None:
+            return
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 175))
+        self.screen.blit(overlay, (0, 0))
+        self.draw_rect(PANEL, (24, 64, 852, 640), border_radius=10)
+        self.draw_rect(BORDER, (24, 64, 852, 640), 1, border_radius=10)
+        self.buttons = []
+        self.text("調整回放評分", 48, 79, large=True)
+        self.button("editor_profile", profile_name(getattr(editor, "profile_path", None)), (300, 78, 180, 32))
+        self.draw_label(self.small_font, config_summary(editor.config), (490, 79), TEXT, 350)
+        self.draw_label(self.small_font, "分階段：" + ("開" if editor.config.phase_enabled else "關"), (490, 101), MUTED, 350)
+        self.draw_label(self.small_font, "設定名稱", (48, 125), MUTED)
+        name_value = (editor.input_draft + " |" if editor.focus == "name" else editor.name or "點此輸入新設定檔名稱")
+        self.button("editor_field:name", name_value, (48, 148, 360, 38), primary=editor.focus == "name")
+        self.draw_label(self.small_font, "即時局面靜態評分（白方／兵）", (48, 202), MUTED, 370)
+        breakdown = self._current_replay_breakdown()
+        if breakdown is not None:
+            self.draw_label(self.title_font, f"總分：{breakdown.total_score!r}", (48, 230), TEXT, 360)
+            terms = [(key, term) for key, term in breakdown.terms.items() if term.enabled]
+            maximum = max((abs(term.contribution) for _, term in terms), default=1.0) or 1.0
+            center_x = self.point(246, 0)[0]
+            half = round(54 * self.scale)
+            for index, (key, term) in enumerate(terms):
+                y = 278 + index * 21
+                self.draw_label(self.evaluation_font, TERM_LABELS.get(key, key), (48, y), TEXT, 82)
+                row_y = self.point(246, y + 7)[1]
+                pygame.draw.line(self.screen, BORDER, (center_x, row_y - 5), (center_x, row_y + 5), 1)
+                width = round(half * min(1.0, abs(term.contribution) / maximum))
+                if width:
+                    color = (110, 203, 146) if term.contribution > 0 else (231, 119, 119)
+                    left = center_x if term.contribution > 0 else center_x - width
+                    pygame.draw.rect(self.screen, color, pygame.Rect(left, row_y - 2, width, 5))
+                self.draw_label(self.evaluation_font, f"{term.contribution:+}" if term.contribution else "0.0",
+                                (310, y), TEXT, 88)
+
+        self.draw_label(self.small_font, "現有評分項；點選數值修改，滾輪瀏覽。", (455, 122), MUTED, 398)
+        rows = self._replay_editor_rows()
+        start, visible = 158, 15
+        for row_index, row in enumerate(rows[editor.scroll:editor.scroll + visible]):
+            kind, key, label, value, field_kind = row
+            y = start + row_index * 30
+            if kind == "group":
+                marker = "▼" if editor.expanded[key] else "▶"
+                self.button(f"editor_group:{key}", f"{marker} {label}", (455, y, 398, 27))
+            else:
+                self.draw_label(self.small_font, label, (468, y + 5), TEXT, 182)
+                if field_kind == "toggle":
+                    display = "開啟" if value else "關閉"
+                    action = f"editor_toggle:{key}"
+                else:
+                    display = editor.input_draft + " |" if editor.focus == key else repr(value)
+                    action = f"editor_field:{key}"
+                self.button(action, display, (654, y, 199, 27), primary=editor.focus == key)
+        if editor.message:
+            self.draw_label(self.small_font, editor.message, (48, 650), (239, 184, 89), 390)
+        self.button("editor_discard", "放棄草稿", (568, 650, 136, 36))
+        self.button("editor_save", "另存設定檔", (716, 650, 137, 36), primary=True)
+
+    def _render_replay_evaluation(self, x):
+        breakdown = self._current_replay_breakdown()
+        self.draw_label(self.small_font, "局面靜態評分（白方／兵）", (x, 237), MUTED, 232)
+        if breakdown is None:
+            self.draw_label(self.small_font, "無法計算評分拆解", (x, 255), MUTED, 232)
+            return
+
+        total_text = f"總分：{breakdown.total_score!r}"
+        self.draw_label(self.font, total_text, (x, 256), TEXT, 232)
+        self.draw_label(self.small_font, "已啟用評分項　｜　貢獻值", (x, 279), MUTED, 232)
+        labels = {
+            "material": "子力", "piece_square": "位置",
+            "isolated_pawns": "孤兵", "doubled_pawns": "疊兵", "passed_pawns": "通路兵",
+            "pawn_mobility": "兵活動", "knight_mobility": "馬活動", "bishop_mobility": "象活動",
+            "rook_mobility": "車活動", "queen_mobility": "后活動", "king_mobility": "王活動",
+            "king_pawn_shield": "王盾", "king_zone_attacks": "王區攻擊",
+            "king_file_exposure": "王線暴露", "bishop_pair": "雙象",
+            "rook_open_file": "車開放線", "rook_half_open_file": "車半開放線",
+        }
+        terms = [(name, term) for name, term in breakdown.terms.items() if term.enabled]
+        if not terms:
+            self.draw_label(self.small_font, "目前沒有啟用的評分項", (x, 300), MUTED, 232)
+            return
+
+        max_contribution = max(abs(term.contribution) for _, term in terms) or 1.0
+        center_x = self.point(x + 121, 0)[0]
+        bar_half_width = round(41 * self.scale)
+        row_height = 10
+        for index, (name, term) in enumerate(terms):
+            y = 294 + index * row_height
+            self.draw_label(self.evaluation_font, labels.get(name, name), (x, y), TEXT, 65)
+            row_y = self.point(x, y + 5)[1]
+            pygame.draw.line(self.screen, BORDER, (center_x, row_y - 3), (center_x, row_y + 4), 1)
+            length = round(bar_half_width * min(1.0, abs(term.contribution) / max_contribution))
+            if length:
+                color = (110, 203, 146) if term.contribution > 0 else (231, 119, 119)
+                rect = pygame.Rect(center_x if term.contribution > 0 else center_x - length,
+                                   row_y - 2, length, max(2, round(5 * self.scale)))
+                pygame.draw.rect(self.screen, color, rect)
+            value = f"{term.contribution:+}" if term.contribution else "0.0"
+            self.draw_label(self.evaluation_font, value, (x + 167, y), TEXT, 64)
 
     @staticmethod
     def comparison_reason(reason):
@@ -719,24 +1191,29 @@ class ChessApplication:
             if self.batch_mode == "evaluation":
                 self.evaluation_fields.render(self)
             else:
-                self.text("固定白黑方配置；間隔是兩場之間的等待秒數。", 100, 166, muted=True)
                 fields = [("white", "白方", self.white), ("black", "黑方", self.black),
-                          ("interval", "場間間隔（秒）", f"{self.batch_interval:g}"),
-                          ("count", "場次", str(self.game_count))]
+                          ("batch_evaluation_white", "白方評分", profile_summary(self.batch_evaluation_files["white"])),
+                          ("batch_evaluation_black", "黑方評分", profile_summary(self.batch_evaluation_files["black"])),
+                          ("interval", "場間秒數", f"{self.batch_interval:g}"), ("count", "場次", str(self.game_count)),
+                          ("batch_depth", "搜尋深度", str(self.batch_search_depth)),
+                          ("batch_search_workers", "搜尋 worker", str(self.batch_search_workers)),
+                          ("batch_capacity", "表項上限", str(self.batch_transposition_capacity)),
+                          ("opening_book", "開局庫", "開" if self.opening_book else "關"),
+                          ("opening_limit", "開局半回合上限", str(self.opening_max_plies))]
                 for index, (action, label, value) in enumerate(fields):
-                    y = 225 + index * 64
-                    self.text(label, 100, y + 9)
+                    column, row = index % 2, index // 2
+                    x, y = 64 + column * 396, 175 + row * 55
+                    self.draw_label(self.small_font, label, (x, y))
                     if self.numeric_focus == action:
                         value = self.numeric_text + " |"
-                    self.button(action, value, (340, y, 360, 44), primary=self.numeric_focus == action)
-                self.text("數字欄位可輸入，Ctrl+A 清空，Enter 確認。", 100, 532, muted=True)
-                self.button("start", "開始生成", (100, 564, 600, 48), primary=True)
+                    self.button(action, value, (x, y + 23, 376, 28), primary=self.numeric_focus == action)
+                self.button("start", "開始生成", (148, 568, 600, 48), primary=True)
             if self.batch_mode == "evaluation":
-                self.draw_label(self.small_font, "同時對戰場數（每個程序執行一組配對）", (460, 515), width=376)
-                worker_rect = (460, 540, 376, 39)
+                self.draw_label(self.small_font, "同時對戰場數（每個程序執行一組配對）", (460, 570), width=376)
+                worker_rect = (460, 595, 376, 39)
             else:
-                self.text("同時對戰場數", 100, 490)
-                worker_rect = (340, 481, 360, 44)
+                self.draw_label(self.small_font, "同時對戰場數", (460, 512))
+                worker_rect = (460, 532, 376, 32)
             value = self.numeric_text + " |" if self.numeric_focus == "workers" else str(self.batch_workers)
             self.button("workers", value, worker_rect, primary=self.numeric_focus == "workers")
             self.text(self.message, 64, 642, width=772, muted=True)
@@ -761,8 +1238,17 @@ class ChessApplication:
             self.text(f"完整配對 {state['completed_pairs']}　｜　不完整配對 {state['incomplete_pairs']}　｜　預定 {state['requested_pairs']} 對", 64, 386)
             rate = "無資料" if state["paired_score_rate"] is None else f"{state['paired_score_rate']:.1%}"
             self.text(f"候選累積得分率：{rate}（僅含兩局正常完成的配對）", 64, 424, width=772)
-        self.text("評分比較支援停止，不提供暫停；停止保留當盤已落子的走法。" if comparison else
-                  "一般對戰暫停所有席位；每席位保存後等待場間間隔再派發。", 64, 469, muted=True, width=772)
+        games = sorted(state.get("active_games", {}).values(), key=lambda game: game["game_number"])
+        pages = max(1, (len(games) + 2) // 3)
+        self.batch_games_page = min(self.batch_games_page, pages - 1)
+        for row, game in enumerate(games[self.batch_games_page * 3:(self.batch_games_page + 1) * 3]):
+            turn = "白方" if game["turn"] == "white" else "黑方"
+            self.text(f"第 {game['game_number']} 局　｜　已走 {game['plies']} 手　｜　第 {game['fullmove_number']} 回合・輪到{turn}",
+                      64, 462 + row * 28, width=772)
+        if pages > 1:
+            self.button("batch_games_prev", "上一頁", (64, 620, 130, 36), enabled=self.batch_games_page > 0)
+            self.text(f"進行中棋局 {self.batch_games_page + 1} / {pages}", 214, 625)
+            self.button("batch_games_next", "下一頁", (596, 620, 130, 36), enabled=self.batch_games_page + 1 < pages)
         self.text(state["error"], 64, 505, width=772)
         active = not self.batch.future.done()
         if active:

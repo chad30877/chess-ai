@@ -2,11 +2,14 @@
 
 from dataclasses import dataclass
 from enum import Enum
+from heapq import heapify, heappop, heappush
+
+DEFAULT_TRANSPOSITION_CAPACITY = 4_096
 
 import chess
 
 
-PositionIdentity = tuple[str, str, str, str]
+PositionIdentity = tuple[int, int, int, int, int, int, int, int, bool, int, int | None]
 
 
 class BoundType(str, Enum):
@@ -56,8 +59,14 @@ def classify_bound(score: float, alpha: float, beta: float) -> BoundType:
 
 
 def _position_identity(board: chess.Board) -> PositionIdentity:
-    fields = board.fen(en_passant="legal").split()
-    return fields[0], fields[1], fields[2], fields[3]
+    # 直接保留完整局面資料，避免逐格產生 FEN，也不引入固定長度雜湊碰撞。
+    return (
+        board.pawns, board.knights, board.bishops, board.rooks,
+        board.queens, board.kings,
+        board.occupied_co[chess.WHITE], board.occupied_co[chess.BLACK],
+        board.turn, board.clean_castling_rights(),
+        board.ep_square if board.has_legal_en_passant() else None,
+    )
 
 
 def _reversible_history(board: chess.Board) -> tuple[PositionIdentity, ...]:
@@ -87,37 +96,66 @@ def make_transposition_key(
         or ply_from_root < 0
     ):
         raise ValueError("ply_from_root must be a non-negative integer.")
+    history = _reversible_history(board)
     return TranspositionKey(
-        position=_position_identity(board),
+        position=history[-1],
         halfmove_clock=board.halfmove_clock,
-        reversible_history=_reversible_history(board),
+        reversible_history=history,
         ply_from_root=ply_from_root,
     )
 
 
 class TranspositionTable:
-    """In-memory table with depth-preferred, exact-aware replacement."""
+    """有界搜尋快取；每代抵銷兩層深度，等深度優先保留 EXACT。"""
 
-    def __init__(self) -> None:
-        self._entries: dict[TranspositionKey, TranspositionEntry] = {}
+    def __init__(self, capacity: int = DEFAULT_TRANSPOSITION_CAPACITY) -> None:
+        if isinstance(capacity, bool) or not isinstance(capacity, int) or capacity <= 0:
+            raise ValueError("capacity must be a positive integer.")
+        self.capacity = capacity
+        self._generation = 0
+        self._serial = 0
+        self._entries: dict[TranspositionKey, tuple[TranspositionEntry, int, int]] = {}
+        self._heap: list[tuple[tuple[int, int], int, TranspositionKey]] = []
+
+    def advance_generation(self) -> None:
+        """開始同次搜尋的下一輪迭代，舊結果逐漸失去保留優先權。"""
+        self._generation += 1
+
+    @staticmethod
+    def _priority(entry: TranspositionEntry, generation: int) -> tuple[int, int]:
+        return entry.depth + 2 * generation, int(entry.bound is BoundType.EXACT)
 
     def probe(self, key: TranspositionKey) -> TranspositionEntry | None:
-        return self._entries.get(key)
+        stored = self._entries.get(key)
+        return stored[0] if stored is not None else None
 
     def store(self, key: TranspositionKey, entry: TranspositionEntry) -> bool:
-        """Store an entry when it is at least as useful as the old value."""
-
+        """接受較有價值的結果；滿額時只淘汰最低價值的一項。"""
+        priority = self._priority(entry, self._generation)
         previous = self._entries.get(key)
         if previous is not None:
-            if entry.depth < previous.depth:
+            if priority < self._priority(previous[0], previous[1]):
                 return False
-            if (
-                entry.depth == previous.depth
-                and previous.bound is BoundType.EXACT
-                and entry.bound is not BoundType.EXACT
-            ):
+        elif len(self._entries) >= self.capacity:
+            while self._heap:
+                victim_priority, serial, victim_key = self._heap[0]
+                if victim_key in self._entries and self._entries[victim_key][2] == serial:
+                    break
+                heappop(self._heap)
+            if priority < victim_priority:
                 return False
-        self._entries[key] = entry
+            heappop(self._heap)
+            del self._entries[victim_key]
+        self._serial += 1
+        self._entries[key] = entry, self._generation, self._serial
+        heappush(self._heap, (priority, self._serial, key))
+        # 同鍵更新的舊索引也維持有界；重建成本攤提至多次寫入。
+        if len(self._heap) > 2 * self.capacity:
+            self._heap = [
+                (self._priority(value, generation), serial, stored_key)
+                for stored_key, (value, generation, serial) in self._entries.items()
+            ]
+            heapify(self._heap)
         return True
 
     def __len__(self) -> int:

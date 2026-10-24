@@ -1,0 +1,3 @@
+# 固定開局來源的原始位元組，確保跨平台雜湊一致。
+data/openings/*.tsv -text
+data/openings/COPYING.txt -text

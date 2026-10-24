@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import chess
+
 from engine.evaluation.config import EvaluationConfig
 from engine.replay.comparison_catalog import ComparisonCatalog
 from engine.replay.replay_loader import load_replay_json
@@ -16,6 +18,34 @@ from tests.helpers.executors import ManualExecutor
 
 
 class BatchExecutionTest(unittest.TestCase):
+    def test_move_progress_is_visible_before_game_is_saved(self):
+        board = chess.Board()
+        board.turn, board.fullmove_number = chess.BLACK, 17
+        for mode in ("general", "evaluation"):
+            with self.subTest(mode=mode):
+                settings = (BatchSettings(white="Random", black="Random", games=2,
+                            initial_fen=board.fen(), max_plies=2) if mode == "general" else
+                            dict(baseline=ComparisonParticipant.random_baseline(),
+                                 candidate=ComparisonParticipant.greedy("candidate", EvaluationConfig()),
+                                 initial_fens=(board.fen(),), repetitions=1, max_plies=2))
+                run = start_batch(mode, settings, self.root, self.executor)
+                observed = []
+
+                def choose(player, position):
+                    observed.append(run.snapshot())
+                    return next(iter(position.legal_moves))
+
+                with patch("engine.players.RandomPlayer.choose_move", choose), \
+                        patch("engine.players.GreedyPlayer.choose_move", choose):
+                    self.executor.finish()
+                self.assertEqual(len(observed), 4)
+                self.assertEqual(observed[1]["saved_games"], 0)
+                self.assertEqual(observed[1].get("active_games"),
+                                 {1: dict(game_number=1, plies=1, fullmove_number=18, turn="white")})
+                self.assertEqual(observed[2]["active_games"],
+                                 {2: dict(game_number=2, plies=0, fullmove_number=17, turn="black")})
+                self.assertEqual(run.snapshot()["active_games"], {})
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

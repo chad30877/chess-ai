@@ -21,6 +21,8 @@ class PlayedGame:
     positions: list[dict]
     started_at: str = ""
     finished_at: str = ""
+    opening_book: dict | None = None
+    opening_line: dict | None = None
 
 
 def play_game(
@@ -28,6 +30,9 @@ def play_game(
     *, initial_fen: str = chess.STARTING_FEN, claim_draw: bool = False,
     max_plies: int | None = None,
     control=None,
+    progress=None,
+    opening=None,
+    opening_line=None,
 ) -> PlayedGame:
     """Collect one game, keeping execution truncation separate from chess rules."""
     if game_id <= 0:
@@ -38,6 +43,25 @@ def play_game(
     board = create_board(initial_fen)
     initial_fen = board.fen()
     positions: list[dict] = []
+    if opening_line is not None:
+        from engine.opening_lines import replay_opening
+        replay_opening(opening_line, claim_draw=claim_draw)
+        if board.fen() != chess.Board(opening_line["initial_fen"]).fen():
+            raise ValueError("開局線起始局面不一致")
+
+    def report():
+        if progress is not None:
+            progress(dict(game_number=game_id, plies=len(positions),
+                          fullmove_number=board.fullmove_number,
+                          turn="white" if board.turn else "black"))
+
+    for uci in opening_line['moves_uci'] if opening_line else ():
+        move = chess.Move.from_uci(uci)
+        positions.append(dict(game_id=game_id, ply=len(positions) + 1, fen=board.fen(),
+                              side_to_move="white" if board.turn else "black", selected_move=uci,
+                              white_player=white_name, black_player=black_name))
+        make_move(board, move)
+    report()
     while True:
         outcome = get_outcome(board, claim_draw=claim_draw)
         if outcome is not None:
@@ -51,7 +75,9 @@ def play_game(
             result, status, termination = "*", "truncated", "user_stop"
             break
         player = white_player if board.turn else black_player
-        move = player.choose_move(board)
+        move = opening.choose(board) if opening and (white_name if board.turn else black_name) == "AlphaBeta" else None
+        if move is None:
+            move = player.choose_move(board)
         if control is not None and not control():
             result, status, termination = "*", "truncated", "user_stop"
             break
@@ -61,12 +87,18 @@ def play_game(
             "selected_move": move.uci(), "white_player": white_name,
             "black_player": black_name,
         }
+        if opening:
+            opening.apply(board, move)
         make_move(board, move)
+        if opening:
+            opening.candidates(board)
         positions.append(row)
+        report()
     for row in positions:
         row["result"] = result
     return PlayedGame(game_id, white_name, black_name, initial_fen, board.fen(),
-                      result, status, termination, positions, started_at, now_iso())
+                      result, status, termination, positions, started_at, now_iso(),
+                      opening.snapshot() if opening else None, opening_line)
 
 
 @dataclass(frozen=True)

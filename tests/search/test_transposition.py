@@ -29,6 +29,71 @@ class MutableEvaluator:
 
 
 class TranspositionKeyTest(unittest.TestCase):
+    def test_position_identity_preserves_move_rights_and_counters(self) -> None:
+        cases = (
+            # 無效易位權與無合法吃過路兵的目標格不應分開快取。
+            ("4k3/8/8/8/8/8/8/4K3 w KQ - 0 1",
+             "4k3/8/8/8/8/8/8/4K3 w - - 0 1", True),
+            ("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+             "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", True),
+            # 被釘住的兵不能合法吃過路兵。
+            ("k3r3/8/8/3pP3/8/8/8/4K3 w - d6 0 1",
+             "k3r3/8/8/3pP3/8/8/8/4K3 w - - 0 1", True),
+            ("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1",
+             "4k3/8/8/3pP3/8/8/8/4K3 w - - 0 1", False),
+            ("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+             "r3k2r/8/8/8/8/8/8/R3K2R w Qkq - 0 1", False),
+            ("4k3/8/8/8/8/8/8/4K3 w - - 0 1",
+             "4k3/8/8/8/8/8/8/4K3 b - - 0 1", False),
+            ("4k3/8/8/8/8/8/8/4K3 w - - 99 1",
+             "4k3/8/8/8/8/8/8/4K3 w - - 100 1", False),
+            ("4k3/8/8/8/8/8/8/4K3 w - - 0 1",
+             "4k3/8/8/8/8/8/8/4K3 w - - 0 42", True),
+        )
+        for first, second, equal in cases:
+            with self.subTest(first=first, second=second):
+                self.assertEqual(
+                    make_transposition_key(chess.Board(first), ply_from_root=0)
+                    == make_transposition_key(chess.Board(second), ply_from_root=0),
+                    equal,
+                )
+
+    def test_history_matches_fen_reference_across_irreversible_boundaries(self) -> None:
+        def fen_identity(board):
+            return tuple(board.fen(en_passant="legal").split()[:4])
+
+        # 用獨立的 FEN 表示驗證歷史內容與順序，涵蓋兵步、吃子、易位權及吃過路兵失效。
+        cases = (
+            (chess.STARTING_FEN,
+             ("g1f3", "g8f6", "f3g1", "f6g8", "e2e4", "d7d5", "e4d5", "g8f6")),
+            ("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 7 1", ("e1f1", "e8f8", "f1e1")),
+            ("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1", ("e1f1", "e8f8", "f1e1")),
+            ("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1", ("e5d6", "e8f8")),
+        )
+        identities = {}
+        reverse_identities = {}
+        for fen, moves in cases:
+            board = chess.Board(fen)
+            for move in (None, *moves):
+                if move is not None:
+                    board.push_uci(move)
+                before = board.fen(), tuple(board.move_stack)
+                key = make_transposition_key(board, ply_from_root=0)
+                rewind = board.copy(stack=True)
+                expected = [fen_identity(rewind)]
+                while rewind.move_stack:
+                    last = rewind.pop()
+                    if rewind.is_irreversible(last):
+                        break
+                    expected.append(fen_identity(rewind))
+                expected.reverse()
+                self.assertEqual(len(key.reversible_history), len(expected))
+                for old, new in zip(expected, key.reversible_history):
+                    self.assertEqual(identities.setdefault(old, new), new)
+                    self.assertEqual(reverse_identities.setdefault(new, old), old)
+                self.assertEqual(key.position, key.reversible_history[-1])
+                self.assertEqual(before, (board.fen(), tuple(board.move_stack)))
+
     def test_same_fen_with_different_reversible_history_has_different_key(self) -> None:
         board = chess.Board()
         for move in ("g1f3", "g8f6", "f3g1", "f6g8"):
@@ -105,6 +170,28 @@ class TranspositionTableTest(unittest.TestCase):
         self.assertTrue(table.store(self.key, deeper))
         self.assertIs(table.probe(self.key), deeper)
         self.assertEqual(len(table), 1)
+
+    def test_capacity_preserves_deep_exact_entries_and_ages_old_results(self) -> None:
+        table = TranspositionTable(capacity=2)
+        keys = [make_transposition_key(chess.Board(), ply_from_root=i) for i in range(5)]
+        deep = TranspositionEntry(4, 4.0, BoundType.LOWER, None)
+        exact = TranspositionEntry(4, 3.0, BoundType.EXACT, None)
+        shallow = TranspositionEntry(1, 1.0, BoundType.UPPER, None)
+        table.store(keys[0], deep)
+        table.store(keys[1], exact)
+        self.assertFalse(table.store(keys[2], shallow))
+        self.assertTrue(table.store(keys[2], deep))
+        self.assertIs(table.probe(keys[1]), exact)
+        table.advance_generation()
+        table.advance_generation()
+        self.assertTrue(table.store(keys[3], shallow))
+        self.assertIsNone(table.probe(keys[0]))
+        self.assertIs(table.probe(keys[1]), exact)
+        self.assertTrue(table.store(keys[1], shallow))
+        self.assertIs(table.probe(keys[1]), shallow)
+        for i in range(100):
+            table.store(keys[i % 5], exact)
+            self.assertLessEqual(len(table), 2)
 
     def test_rejects_negative_entry_depth(self) -> None:
         for invalid in (-1, True, 1.5):
@@ -198,6 +285,18 @@ class AlphaBetaTranspositionIntegrationTest(unittest.TestCase):
         self.assertGreater(cached.transposition_stores, 0)
         self.assertEqual(uncached.transposition_hits, 0)
         self.assertEqual(uncached.transposition_stores, 0)
+
+    def test_tiny_table_completes_mate_search_without_mutating_history(self) -> None:
+        board = chess.Board("7k/8/5KQ1/8/8/8/8/8 w - - 0 1")
+        original = board.copy(stack=True)
+        result = AlphaBetaSearcher(MaterialEvaluator(), quiescence_depth=0).search(
+            board, SearchLimits(max_depth=3, transposition_capacity=1),
+        )
+        self.assertEqual(result.completed_depth, 3)
+        self.assertEqual(result.score, 999999.0)
+        self.assertIn(result.best_move, board.legal_moves)
+        self.assertEqual(board.fen(), original.fen())
+        self.assertEqual(board.move_stack, original.move_stack)
 
     def test_each_search_uses_a_fresh_table_after_evaluator_change(self) -> None:
         evaluator = MutableEvaluator(1.0)

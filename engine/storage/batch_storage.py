@@ -4,6 +4,7 @@ import csv
 import json
 from contextlib import ExitStack
 from pathlib import Path
+from time import sleep
 from engine.storage.data_ids import allocate_id, now_iso
 
 from engine.sessions.self_play import PlayedGame
@@ -24,7 +25,15 @@ def write_json_atomic(path: Path, payload: dict) -> None:
     with temporary.open("w", encoding="utf-8") as stream:
         json.dump(payload, stream, ensure_ascii=False, indent=2)
         stream.write("\n")
-    temporary.replace(path)
+    # Windows 讀者仍開啟舊檔時會暫時拒絕替換；只短暫重試，保持原子提交。
+    for attempt in range(6):
+        try:
+            temporary.replace(path)
+            return
+        except PermissionError as exc:
+            if getattr(exc, 'winerror', None) not in (5, 32, 33) or attempt == 5:
+                raise
+            sleep(.01)
 
 
 class BatchWriter:
@@ -59,6 +68,66 @@ class BatchWriter:
         self._streams = ExitStack()
         self._save_manifest()
 
+    @classmethod
+    def reopen(cls, path):
+        writer = cls.__new__(cls)
+        writer.path = Path(path)
+        writer.data_root = writer.path.parent.parent
+        writer.manifest = json.loads((writer.path / "manifest.json").read_text(encoding="utf-8"))
+        writer.batch_id = writer.manifest["batch_id"]
+        writer.output_format = "jsonl" if writer.manifest["files"]["positions"].endswith("jsonl") else "csv"
+        writer._streams = ExitStack()
+        writer._reopening = True
+        writer.manifest["status"] = "generating"
+        writer.manifest.pop("error", None)
+        return writer
+
+    def recover_committed_games(self):
+        """由已提交棋譜重建索引，並回傳依發布順序排列的棋譜。"""
+        replays = []
+        for path in (self.path/'replays').glob('*.json'):
+            replay = json.loads(path.read_text(encoding='utf-8'))
+            metadata = replay['metadata']
+            if 'summary' not in metadata:
+                raise ValueError('棋譜缺少可恢復的提交資料')
+            replays.append((metadata['summary']['game_number'], replay))
+        replays.sort(key=lambda item: item[0])
+        summaries = [replay['metadata']['summary'] for _, replay in replays]
+        with (self.path/'games.csv').open('w', newline='', encoding='utf-8') as stream:
+            rows = csv.DictWriter(stream, fieldnames=GAME_FIELDS)
+            rows.writeheader()
+            rows.writerows(summaries)
+        import chess
+        with (self.path/self.manifest['files']['positions']).open('w', newline='', encoding='utf-8') as stream:
+            rows = csv.DictWriter(stream, fieldnames=POSITION_FIELDS)
+            if self.output_format == 'csv':
+                rows.writeheader()
+            for _, replay in replays:
+                metadata = replay['metadata']
+                summary = metadata['summary']
+                board = chess.Board(replay['initial_fen'])
+                for ply, move in enumerate(replay['moves_uci'], 1):
+                    position = dict(game_id=metadata['game_id'], ply=ply, fen=board.fen(),
+                        side_to_move='white' if board.turn else 'black', selected_move=move,
+                        result=summary['result'], white_player=summary['white_player'], black_player=summary['black_player'],
+                        batch_id=self.batch_id, status=summary['status'], termination=summary['termination'],
+                        claim_draw=self.manifest['settings']['rules']['claim_draw'])
+                    if self.output_format == 'csv':
+                        rows.writerow(position)
+                    else:
+                        stream.write(json.dumps(position, ensure_ascii=False)+'\n')
+                    board.push_uci(move)
+        counts = self.manifest['counts']
+        counts.update(saved_games=len(summaries), completed_games=sum(s['status']=='completed' for s in summaries),
+                      truncated_games=sum(s['status']=='truncated' for s in summaries), positions=sum(s['move_count'] for s in summaries))
+        self.manifest['results'] = {result: sum(s['result']==result for s in summaries) for result in ('1-0','0-1','1/2-1/2','*')}
+        self._save_manifest()
+        return replays
+
+    def set_work_complete(self, complete):
+        """設定邏輯工作是否已全數完成，歷史中斷嘗試不增加工作數。"""
+        self._logical_complete = bool(complete)
+
     def _save_manifest(self) -> None:
         self.manifest["updated_at"] = now_iso()
         write_json_atomic(self.path / "manifest.json", self.manifest)
@@ -91,6 +160,12 @@ class BatchWriter:
 
     def __enter__(self):
         try:
+            if getattr(self, "_reopening", False):
+                self.games_file = self._streams.enter_context((self.path / "games.csv").open("a", newline="", encoding="utf-8"))
+                self.positions_file = self._streams.enter_context((self.path / self.manifest["files"]["positions"]).open("a", newline="", encoding="utf-8"))
+                self.games_writer = csv.DictWriter(self.games_file, fieldnames=GAME_FIELDS)
+                self.positions_writer = csv.DictWriter(self.positions_file, fieldnames=POSITION_FIELDS)
+                return self
             (self.path / "replays").mkdir()
             self.games_file = self._streams.enter_context(
                 (self.path / "games.csv").open("x", newline="", encoding="utf-8"))
@@ -111,7 +186,7 @@ class BatchWriter:
 
     def add_game(self, game: PlayedGame, seed: int, *, execution: dict | None = None) -> str:
         expected_id = self.manifest["counts"]["saved_games"] + 1
-        if game.game_id != expected_id or expected_id > self.manifest["counts"]["requested_games"]:
+        if game.game_id != expected_id or expected_id > self.manifest["counts"]["requested_games"] and "experiment" not in self.manifest["settings"]:
             raise ValueError(f"Expected game_id {expected_id} within requested game count")
         rules = self.manifest["settings"]["rules"]
         started_at = game.started_at or now_iso()
@@ -130,7 +205,12 @@ class BatchWriter:
             "metadata": {key: summary[key] for key in (
                 "game_id", "started_at", "finished_at", "white_player", "black_player", "status", "termination")},
         }
-        replay["metadata"].update(batch_id=self.batch_id, rules=rules)
+        replay["metadata"].update(batch_id=self.batch_id, rules=rules, summary=summary)
+        if game.opening_line is not None:
+            replay["schema_version"] = 3
+            replay["metadata"]["opening_line"] = game.opening_line
+        if game.opening_book is not None:
+            replay["metadata"]["opening_book"] = game.opening_book
         if execution is not None:
             # 發布序號連續；固定工作編號獨立於並行完成順序。
             replay["metadata"]["execution"] = execution
@@ -141,10 +221,8 @@ class BatchWriter:
         replay_path = self.path / relative_replay
         replay_created = False
         try:
-            with replay_path.open("x", encoding="utf-8") as stream:
-                replay_created = True
-                json.dump(replay, stream, ensure_ascii=False, indent=2)
-                stream.write("\n")
+            replay_created = True
+            write_json_atomic(replay_path, replay)
             for row in game.positions:
                 position = {**row, "game_id": game_id, "batch_id": self.batch_id, "status": game.status,
                             "termination": game.termination,
@@ -176,7 +254,7 @@ class BatchWriter:
 
     def __exit__(self, exc_type, exc, traceback) -> None:
         self._streams.close()
-        complete = self.manifest["counts"]["saved_games"] == self.manifest["counts"]["requested_games"]
+        complete = getattr(self, "_logical_complete", self.manifest["counts"]["saved_games"] == self.manifest["counts"]["requested_games"])
         stopped = self.manifest["status"] == "stopped"
         self.manifest["status"] = "failed" if exc else "stopped" if stopped else "completed" if complete else "failed"
         self.manifest["finished_at"] = now_iso()
