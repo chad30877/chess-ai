@@ -90,6 +90,7 @@ class GroupTrainingView:
         app.button('learning_groups_new','新建並學習',(50,210,230,36),enabled=bool(self.selected) and not active,primary=True)
         app.button('learning_groups_resume','續跑／重試',(300,210,230,36),enabled=bool(self.path) and s.get('status')!='completed' and not active)
         app.button('learning_groups_stop','停止',(550,210,130,36),enabled=active)
+        app.button('learning_combinations','組合',(700,210,140,36),enabled=bool(s.get('completed_groups')) and not active)
         statuses = {'ready':'待開始','queued':'準備中','running':'訓練中','completed':'完成','stopped':'已停止','failed':'失敗','partial':'部分失敗','interrupted':'待續跑','incomplete':'未完成'}
         if s:
             app.text(f'{statuses.get(s["status"],s["status"])} · 候選 {s["completed"]}/{s["total"]} · 完成 {s["completed_groups"]} 組 · 失敗 {s["failed_groups"]} 組 · {s.get("elapsed_seconds",0):.1f} 秒',50,263,width=790)
