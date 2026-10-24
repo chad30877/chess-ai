@@ -40,7 +40,8 @@ def fail_second_color(work):
     from engine.sessions import batch_workers
     original = batch_workers.play_game
     def play(number, *args, **kwargs):
-        if number == 2:
+        # 每個配對的第二色都失敗，避免其他程序先完成整對而影響斷言。
+        if number % 2 == 0:
             raise RuntimeError("第二色受控失敗")
         return original(number, *args, **kwargs)
     with patch.object(batch_workers, "play_game", play):
@@ -251,6 +252,7 @@ class ParallelBatchTest(unittest.TestCase):
         self.assertIn("第二色受控失敗", state["error"])
         summary = load_comparison(Path(state["path"]) / "manifest.json")
         self.assertGreaterEqual(len(summary.games), 1)
+        self.assertTrue(all(game.candidate_color == "black" for game in summary.games))
         self.assertEqual(summary.completed_pairs, 0)
         self.assertIsNone(summary.paired_score_rate)
         self.replay_signatures(Path(state["path"]))

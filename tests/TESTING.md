@@ -19,7 +19,7 @@
 | `search/test_transposition.py` | 容量與替換、易位／吃過路兵、歷史／將死鍵值與搜尋隔離 |
 | `search/test_parallel_search.py` | 真實 spawn 搜尋、將死／歷史、取消、故障與程序清理 |
 | `self_play/test_batch_generation.py`、`test_batch_ui_storage.py` | 批次格式、保存失敗、流水號與日期分類 |
-| `self_play/test_batch_execution.py`、`test_parallel_batch.py` | 共用派工、單／多程序在保存前逐手回報、換局歸零、暫停／停止與失敗清理 |
+| `self_play/test_batch_execution.py`、`test_parallel_batch.py` | 共用派工、單／多程序在保存前逐手回報、換局歸零、暫停／停止、每對第二色失敗仍保留第一色與程序清理 |
 | `self_play/test_alphabeta_batch.py` | 一般 Alpha-Beta 批次、兩層真實 spawn、超額派工、保存失敗與後代清理 |
 | `self_play/test_evaluation_comparison.py`、`test_alphabeta_comparison.py`、`test_comparison_run.py` | 共同條件、交換黑白、多候選、逐場保存、停止與舊紀錄 |
 | `self_play/test_engine_match.py`、`test_cli_roundtrip.py` | 對戰 CLI、生成／匯出／回放往返 |
