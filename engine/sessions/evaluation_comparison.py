@@ -235,6 +235,7 @@ def run_evaluation_comparison(
     candidate: ComparisonParticipant | None = None,
     candidates: list[ComparisonParticipant] | tuple[ComparisonParticipant, ...] | None = None,
     initial_fens: list[str] | tuple[str, ...] = (chess.STARTING_FEN,),
+    opening_lines: list[dict] | tuple[dict, ...] | None = None,
     repetitions: int = 1,
     base_seed: int = 10_000,
     batch_root: Path = Path("data/batches"),
@@ -267,7 +268,8 @@ def run_evaluation_comparison(
         frozen = ExperimentDefinition(json.dumps(experiment_definition)).options(batch_root)
         actual = dict(baseline=baseline, candidates=list(candidates), initial_fens=tuple(initial_fens),
                       repetitions=repetitions, base_seed=base_seed, max_plies=max_plies, claim_draw=claim_draw)
-        if any(actual[key] != frozen[key] for key in actual):
+        actual["opening_lines"] = opening_lines
+        if any(actual[key] != frozen.get(key) for key in actual):
             raise ValueError("實際比較條件與預覽不一致")
     labels = [baseline.label, *(side.label for side in candidates)]
     if len(set(labels)) != len(labels):
@@ -287,7 +289,9 @@ def run_evaluation_comparison(
     from engine.sessions.parallel_batch import actual_workers, run_parallel
     from engine.sessions.batch_workers import participant_payload
 
-    positions = _normalized_positions(initial_fens)
+    from engine.opening_lines import normalize_openings
+    lines = normalize_openings(initial_fens, opening_lines, claim_draw=claim_draw)
+    positions = _normalized_positions([line['initial_fen'] for line in lines])
     evaluated = [side for side in (baseline, *candidates) if side.strategy != "random"]
     if evaluated and any(side.strategy != evaluated[0].strategy or side.search_config != evaluated[0].search_config
            for side in evaluated[1:]):
@@ -327,6 +331,8 @@ def run_evaluation_comparison(
             "initial_fens": positions,
             "repetitions": repetitions,
         }
+    if opening_lines is not None:
+        comparison_settings.update(opening_lines=lines, history_version=1)
     settings = {
         "num_games": work_count * 2,
         "comparison": comparison_settings,
@@ -400,6 +406,8 @@ def run_evaluation_comparison(
                         seed=seed, games=[])
             if multi_candidate:
                 pair.update(candidate_index=candidate_index, candidate_label=candidates[candidate_index].label)
+        if opening_lines is not None:
+            pair['opening_line'] = lines[position_index]
         game = replace(game, game_id=writer.manifest["counts"]["saved_games"] + 1)
         execution = dict(work_number=number, game_number=logical_number, elapsed_seconds=elapsed_seconds)
         if experiment_definition is not None:
@@ -439,7 +447,8 @@ def run_evaluation_comparison(
         candidate_index = (number - 1) // pair_count
         pair_number = (number - 1) % pair_count + 1
         return dict(number=number, skip_offsets=[offset for offset in (0, 1) if saved_color(number, bool(offset))], kind="evaluation", seed=base_seed + pair_number - 1,
-                    initial_fen=positions[(pair_number - 1) // repetitions], claim_draw=claim_draw, max_plies=max_plies,
+                    initial_fen=positions[(pair_number - 1) // repetitions],
+                    opening_line=lines[(pair_number - 1) // repetitions] if opening_lines is not None else None, claim_draw=claim_draw, max_plies=max_plies,
                     baseline=participant_payload(baseline), candidate=participant_payload(candidates[candidate_index]),
                     candidate_index=candidate_index,
                     participant_settings={"baseline": participant_settings["baseline"],
@@ -503,6 +512,7 @@ def run_evaluation_comparison(
                                         black_player = _ControlledPlayer(black_player, control)
                                     started = perf_counter()
                                     game_options = dict(initial_fen=initial_fen, claim_draw=claim_draw,
+                                                        opening_line=lines[position_index - 1] if opening_lines is not None else None,
                                                         max_plies=max_plies, progress=move_progress)
                                     if control is not None:
                                         game_options["control"] = control

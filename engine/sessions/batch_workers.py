@@ -119,7 +119,7 @@ def run_work(work):
                         players.append(_ControlledPlayer(player, search_control))
                     started = perf_counter()
                     game = play_game(game_number, *players, white.label, black.label,
-                                     initial_fen=work["initial_fen"], claim_draw=work["claim_draw"],
+                                     initial_fen=work["initial_fen"], opening_line=work.get("opening_line"), claim_draw=work["claim_draw"],
                                      max_plies=work["max_plies"], control=worker_control, progress=move_progress)
                 _RESULTS.put(("game", number, (game, work["seed"], perf_counter() - started)))
                 if game.termination == "user_stop":

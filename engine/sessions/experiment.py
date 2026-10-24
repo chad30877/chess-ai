@@ -30,10 +30,13 @@ class ExperimentDefinition:
         data = self.to_dict()
         search = ComparisonSearchConfig(**data['search'])
         participant = lambda item: ComparisonParticipant.alphabeta(item['label'], EvaluationConfig.from_dict(item['config']), search=search)
-        return dict(baseline=participant(data['baseline']), candidates=[participant(c) for c in data['candidates']],
+        options = dict(baseline=participant(data['baseline']), candidates=[participant(c) for c in data['candidates']],
                     initial_fens=tuple(data['initial_fens']), repetitions=data['repetitions'], base_seed=data['base_seed'],
                     max_plies=data['max_plies'], claim_draw=data['claim_draw'], batch_root=batch_root,
                     name=data['name'], tags=data['tags'], experiment_definition=data)
+        if 'opening_lines' in data:
+            options['opening_lines'] = data['opening_lines']
+        return options
 
 
 MAX_CANDIDATES = 10000
@@ -124,6 +127,27 @@ def build_experiment(options, field=None, values=None, *, rules=None):
                 max_plies=options['max_plies'], claim_draw=options['claim_draw'], name=options['name'], tags=options['tags'],
                 generation=dict(rules=rules, raw_candidate_count=count), duplicate_count=duplicates, baseline_count=unchanged,
                 planned_games=len(candidates)*len(options['initial_fens'])*options['repetitions']*2)
+    if options.get('opening_lines') is not None:
+        data.update(schema_version=2, opening_lines=options['opening_lines'])
+    data['id'] = stable_id(data)
+    return ExperimentDefinition(json.dumps(data, sort_keys=True))
+
+
+def freeze_comparison(options):
+    """保存既有設定檔及共同開局，重開不再讀取可變來源。"""
+    def snapshot(side):
+        config = side.evaluation_config.to_dict()
+        return dict(label=side.label, config=config, id=stable_id(config), differences={})
+
+    data = dict(schema_version=2, program_version='weight-experiment-1',
+                baseline=snapshot(options['baseline']),
+                candidates=[snapshot(side) for side in options['candidates']],
+                search=asdict(options['baseline'].search_config),
+                initial_fens=list(options['initial_fens']), opening_lines=options['opening_lines'],
+                repetitions=options['repetitions'], base_seed=options['base_seed'],
+                max_plies=options['max_plies'], claim_draw=options['claim_draw'],
+                name=options['name'], tags=options['tags'], generation=dict(mode='files'),
+                planned_games=len(options['candidates'])*len(options['opening_lines'])*options['repetitions']*2)
     data['id'] = stable_id(data)
     return ExperimentDefinition(json.dumps(data, sort_keys=True))
 

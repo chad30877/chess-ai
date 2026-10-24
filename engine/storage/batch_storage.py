@@ -197,6 +197,9 @@ class BatchWriter:
                 "game_id", "started_at", "finished_at", "white_player", "black_player", "status", "termination")},
         }
         replay["metadata"].update(batch_id=self.batch_id, rules=rules, summary=summary)
+        if game.opening_line is not None:
+            replay["schema_version"] = 3
+            replay["metadata"]["opening_line"] = game.opening_line
         if game.opening_book is not None:
             replay["metadata"]["opening_book"] = game.opening_book
         if execution is not None:

@@ -26,6 +26,7 @@ class OpeningBook:
                 or set(self.source.get("sha256", {})) != {"a.tsv", "b.tsv", "c.tsv", "d.tsv", "e.tsv", "COPYING.txt"}):
             raise ValueError("開局庫來源清單無效")
         self.moves = {}
+        self.lines = []
         for name, expected in self.source["sha256"].items():
             data = (root / name).read_bytes()
             if hashlib.sha256(data).hexdigest() != expected:
@@ -36,6 +37,8 @@ class OpeningBook:
                 game = chess.pgn.read_game(io.StringIO(row["pgn"]))
                 if game is None or game.errors:
                     raise ValueError(f"開局序列無效：{row['name']}")
+                self.lines.append(dict(eco=row["eco"], name=row["name"],
+                                       moves_uci=[move.uci() for move in game.mainline_moves()]))
                 board = game.board()
                 for move in game.mainline_moves():
                     if move not in board.legal_moves:

@@ -23,6 +23,51 @@ from engine.sessions.comparison_run import ComparisonRun
 
 
 class ChessApplicationTest(unittest.TestCase):
+    def test_common_openings_preview_stop_reopen_resume_and_replay(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from time import monotonic, sleep
+        self.prepare_comparison_configs()
+        self.click("mode:auto")
+        self.click("batch_mode:evaluation")
+        self.enter_comparison_field("depth", "1")
+        self.enter_comparison_field("max_plies", "12")
+        self.click("comparison_openings_generate")
+        lines = self.app.evaluation_fields.opening_lines
+        self.assertEqual(len(lines), 32)
+        self.click("comparison_openings_next")
+        self.assertEqual(self.app.evaluation_fields.opening_page, 1)
+        self.click("comparison_openings_view")
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            self.app.executor = executor
+            self.click("start")
+            run = self.app.batch
+            deadline = monotonic() + 20
+            while run.snapshot()['saved_games'] < 1 and not run.future.done() and monotonic() < deadline:
+                sleep(.01)
+            self.assertGreaterEqual(run.snapshot()['saved_games'], 1)
+            self.click("stop")
+            run.future.result(timeout=20)
+        self.assertEqual(run.snapshot()['status'], 'stopped')
+        path = Path(run.snapshot()['path'])
+        saved = {p: p.read_bytes() for p in (path/'replays').glob('*.json')}
+        self.app.close()
+        self.executor = ManualExecutor()
+        self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
+        self.addCleanup(self.app.close)
+        self.click("mode:records")
+        self.click("records_entry:0")
+        self.click("records_resume")
+        self.executor.finish()
+        self.assertEqual(self.app.batch.snapshot()['status'], 'completed')
+        self.assertTrue(all(p.read_bytes() == content for p, content in saved.items()))
+        self.click("batch_results")
+        self.assertEqual(len(self.app.records_view.summary.comparison.games), len(saved) +
+                         64 - sum(json.loads(content)['metadata']['termination'] != 'user_stop' for content in saved.values()))
+        self.click("records_game:0")
+        self.click("last")
+        self.assertGreaterEqual(self.app.replay.total_ply(), len(lines[0]['moves_uci']))
+        self.assertEqual(self.app.replay_data['moves_uci'][:len(lines[0]['moves_uci'])], lines[0]['moves_uci'])
+
     def test_opening_settings_start_human_game_and_report_corrupt_data(self):
         self.click("mode:human")
         self.app.opponent = "AlphaBeta"

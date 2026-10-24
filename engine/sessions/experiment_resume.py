@@ -36,7 +36,7 @@ def resume_options(path):
     data = manifest.get('settings', {}).get('experiment')
     if not data:
         raise ValueError('此舊紀錄缺少實驗快照，無法續跑')
-    if data.get('schema_version') != 1 or data.get('program_version') != 'weight-experiment-1':
+    if data.get('schema_version') not in (1, 2) or data.get('program_version') != 'weight-experiment-1':
         raise ValueError('實驗版本不相容，請建立新實驗')
     if manifest.get('schema_version') != 2:
         raise ValueError('保存契約不相容，請建立新實驗')
@@ -72,6 +72,8 @@ def recover_pairs(writer, definition):
             if games:
                 pair=dict(pair_number=number,position_index=position+1,repetition=(number-1)%definition['repetitions']+1,
                           initial_fen=definition['initial_fens'][position],seed=definition['base_seed']+number-1,games=games)
+                if 'opening_lines' in definition:
+                    pair['opening_line'] = definition['opening_lines'][position]
                 if len(definition['candidates']) > 1:
                     pair.update(candidate_index=index,candidate_label=candidate['label'])
                 pairs.append(pair)
