@@ -81,8 +81,8 @@ class LearnedComparisonView:
         app.button('learning_compare_config','返回開局／結果' if self.config else '完整設定',(620,260,220,32))
         if not self.path:
             for index,role in enumerate(('original','learned')):
-                app.button('learning_compare_role:'+role,('✓ ' if role in self.roles else '')+('原始設定' if role=='original' else '學習／組合設定'),(50+index*265,260,250,32))
-            app.button('learning_compare_stable',('✓ ' if self.stable else '')+'額外 stable 參考',(50,310,320,36))
+                app.button('learning_compare_role:'+role,('[x] ' if role in self.roles else '[ ] ')+('原始設定' if role=='original' else '學習／組合設定'),(50+index*265,260,250,32))
+            app.button('learning_compare_stable',('[x] ' if self.stable else '[ ] ')+'額外 stable 參考',(50,310,320,36))
             count=len(self.roles)*64
             app.text(f'純子力主比較 {count}局'+(f' ＋ stable {count}局' if self.stable else '')+f' ＝ 共{count*(2 if self.stable else 1)}局',50,365,width=790)
             app.text('原始與學習保留各自身份；各基準分開統計。',50,412,muted=True,width=790)
