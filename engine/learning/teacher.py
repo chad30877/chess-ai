@@ -45,6 +45,7 @@ class UciTeacher:
         self.process = None
         self.lines = Queue()
         self.metadata = None
+        self.last_output = []
 
     def check(self):
         if self.stop is not None and self.stop.is_set():
@@ -62,6 +63,7 @@ class UciTeacher:
 
     def receive(self, until):
         started, output = self.now(), []
+        self.last_output = output
         while True:
             self.check()
             if self.now() - started >= self.timeout:
