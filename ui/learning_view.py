@@ -9,6 +9,7 @@ from engine.learning.dataset import DatasetRun, SOURCE_URL, load_dataset
 from ui.teacher_view import TeacherView
 from ui.label_view import LabelView
 from ui.training_view import TrainingView
+from ui.group_training_view import GroupTrainingView
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
@@ -36,12 +37,13 @@ class LearningView:
         self.teacher = TeacherView()
         self.labels = LabelView()
         self.training = TrainingView(root)
+        self.group_training = GroupTrainingView(root)
 
     def active(self):
-        return (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active()
+        return (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active()
 
     def close(self, wait=False):
-        for run in (self.run, self.teacher.run, self.labels.run, self.training.run):
+        for run in (self.run, self.teacher.run, self.labels.run, self.training.run, self.group_training.run):
             if run and not run.future.done():
                 run.stop()
                 if wait:
@@ -98,6 +100,12 @@ class LearningView:
         self.teacher.open(path)
 
     def action(self, action, app):
+        if action == 'learning_groups' and not self.active() and self.labels.path:
+            try:
+                self.group_training.open(self.labels.path)
+                self.page = 'groups'
+            except (OSError,ValueError,KeyError) as exc: self.labels.message = str(exc)
+            return
         if action == 'learning_training' and not self.active() and self.labels.path:
             try:
                 self.training.open(self.labels.path)
@@ -118,6 +126,9 @@ class LearningView:
             return
         if action == 'learning_teacher' and self.page == 'labeling' and not self.active():
             self.page = 'teacher'
+            return
+        if self.page == 'groups':
+            self.group_training.action(action,app)
             return
         if self.page == 'training':
             self.training.action(action, app)
@@ -173,6 +184,9 @@ class LearningView:
             self.message = f'無法開啟資料：{exc}'
 
     def render(self, app):
+        if self.page == 'groups':
+            self.group_training.render(app)
+            return
         if self.page == 'training':
             self.training.render(app)
             return

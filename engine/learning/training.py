@@ -111,10 +111,12 @@ def create_training(label_path, *, run_path=None):
     stable=_read(ROOT/'configs/evaluation/stable.json')
     test_identity=digest([labeled['snapshot']['dataset_sha256'],sorted(r['position_id'] for r in labeled['positions'] if r['split']=='test')])
     prior=[]
-    for entry in (Path(label_path)/'training').glob('*/snapshot.json'):
-        earlier=_read(entry)
-        if (entry.parent/'report.json').exists() and earlier.get('dataset_identity')==labeled['snapshot']['dataset_sha256']:
-            prior.append(dict(experiment_id=earlier['id'],snapshot_identity=earlier['identity'],label_identity=earlier['label_identity']))
+    for folder in ('training','group-training'):
+        for entry in (Path(label_path)/folder).glob('*/snapshot.json'):
+            earlier=_read(entry)
+            if (earlier.get('dataset_identity')==labeled['snapshot']['dataset_sha256'] and
+                    ((entry.parent/'report.json').exists() or list(entry.parent.glob('groups/*/report.json')))):
+                prior.append(dict(experiment_id=earlier['id'],snapshot_identity=earlier['identity'],label_identity=earlier['label_identity']))
     path=Path(run_path) if run_path else Path(label_path)/'training'/uuid4().hex
     if path.exists(): raise ValueError('學習條件不可變；請建立新實驗')
     path.mkdir(parents=True)

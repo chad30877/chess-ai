@@ -56,6 +56,10 @@ flowchart TD
 
 標記公開入口位於 `engine.learning.labeling`：`create_labeling(dataset_path, pilot_path)` 建立快照；`run_labeling(path)`／`load_labeling(path)` 執行及恢復進度；`load_labeled_dataset(path)` 只回傳完整快照的有效局面與白方教師分數。標記完成後按「棋子位置學習」建立實驗：訓練組以固定 stable 校準教師尺度，固定棋子價值，只學中局／殘局 PST 倍率。弱／中／強三候選按逐盤驗證 MAE 選定後先凍結，再保存一次測試結果；結果包含純子力、同組原始／學習及 stable 的各階段誤差與實際權重，可另存完整設定及載入真人對戰。每次共用八小時，停止／關閉後手動續跑只補未完成候選；改條件建立新實驗，畫面標示相同測試資料的既有使用。無改善亦可保存，不宣稱棋力提升。數值套件 numpy／scipy 的實際版本、正則強度與尺度、容差、校準診斷及同分順序均在開始前凍結；版本改變須另建實驗。
 
+標記完成後亦可選「五個單群組」，各自學習棋子位置、兵形、活動力、王安全、協調共 32 個中局／殘局權重。所選群組及三種強度共用一次校準與整次八小時；候選逐個保存，停止重開只補未完成，單組失敗保留其他結果。結果並列原始／學習的驗證與測試誤差、階段、有效盤數／局面數及相對純子力、stable 的差異；校準正常且驗證、測試皆改善才標示優先觀察，未勝過 stable 仍可另存完整設定。可選組查看權重、另存及載入真人對戰；改選群組建立新實驗。
+
+五組公開入口位於 `engine.learning.group_training`：`create_group_training(label_path, groups=None)`、`run_group_training(path)`、`load_group_training(path)` 建立、執行及恢復；`load_group_candidate(path, group)` 只提供已完成組別的完整設定、凍結候選／校準／資料身份及誤差報告，供後續組合與對戰沿用；`save_group_config(path, group, destination)` 另存設定。
+
 - 先前里程碑 `857566d`（2026-04-14）：`優化可讀性`。
 - 先前里程碑 `e61e93a`（2026-04-13）：`有UI，generate資料後可執行play_ui來觀看`。
 
