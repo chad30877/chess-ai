@@ -68,6 +68,9 @@ class TrainingFlowTest(unittest.TestCase):
         self.assertTrue(config.phase_enabled)
         self.assertEqual(dict(config.piece_values),{'P':1,'N':3,'B':3,'R':5,'Q':9})
         self.assertFalse(any(t.enabled for t in config.mobility_terms.values()))
+        # 摘要寫入落後不能推翻正式提交的測試報告，也不能引起重新選擇。
+        (path/'status.json').write_text(json.dumps(dict(status='failed',elapsed_seconds=0,error='摘要落後')),encoding='utf-8')
+        self.assertEqual(load_training(path)['status'],'completed')
         before={p.name:p.read_bytes() for p in path.glob('*.json')}
         run_training(path)
         self.assertEqual({p.name:p.read_bytes() for p in path.glob('*.json')},before)

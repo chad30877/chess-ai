@@ -44,4 +44,3 @@ class TrainingUiTest(unittest.TestCase):
             app.opponent='Greedy'; app.start_game()
             self.assertEqual(app.live.settings.black_evaluation.to_dict(),app.learning.training.state['frozen']['config'])
             app.close()
-

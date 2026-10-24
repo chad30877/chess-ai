@@ -62,7 +62,8 @@ class TrainingView:
                 except (OSError,ValueError) as exc:
                     self.state=runtime
                     self.message=str(exc)
-                if runtime.get('status')=='failed': self.state.update(status='failed',error=runtime.get('error',''))
+                if runtime.get('status')=='failed' and not self.state.get('report'):
+                    self.state.update(status='failed',error=runtime.get('error',''))
                 self._loaded_run=self.run
         s=self.state; frozen=s.get('frozen'); report=s.get('report'); cal=s.get('calibration')
         app.text('學習實驗 · 棋子位置',50,78,large=True)
@@ -105,7 +106,9 @@ class TrainingView:
         if self.advanced and s.get('snapshot'):
             rules=s['snapshot']['rules']
             app.text(f'NNLS {rules["method"]} · λ .001 / .01 / .1 · 固定子力 · 每次共用八小時',50,647,width=790)
-            app.text(f'容差 {rules["tolerance"]} · 奇偶盤倍率偏差門檻 50% · 驗證同分優先強懲罰',50,675,muted=True,width=790)
+            deviation=cal.get('relative_deviation') if cal else None
+            diagnostic=f'{deviation:.1%}' if deviation is not None else '不足'
+            app.text(f'容差 {rules["tolerance"]} · 子集偏差 {diagnostic}／50% · 同分優先強懲罰',50,675,muted=True,width=790)
         app.text(f'已保存學習 {min(self.index+1,len(self.entries))}/{len(self.entries)}',50,725)
         app.button('learning_training_prev','上一份',(460,715,160,32),enabled=len(self.entries)>1 and not active)
         app.button('learning_training_next','下一份',(650,715,160,32),enabled=len(self.entries)>1 and not active)
