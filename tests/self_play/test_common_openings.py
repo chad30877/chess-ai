@@ -179,3 +179,24 @@ class CommonOpeningTest(unittest.TestCase):
         a = freeze_comparison(dict(options, opening_lines=[dict(initial_fen=chess.STARTING_FEN, moves_uci=prefix)])).to_dict()
         b = freeze_comparison(dict(options, opening_lines=[dict(initial_fen=chess.STARTING_FEN, moves_uci=[])])).to_dict()
         self.assertNotEqual(work_id(a, 0, 1, True), work_id(b, 0, 1, True))
+
+    def test_equal_configs_in_different_files_keep_distinct_resume_work(self):
+        from engine.sessions.experiment_resume import resume_experiment
+        from engine.replay.comparison_catalog import load_comparison
+        from ui.batch_setup import EvaluationFields
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder = root/'configs/evaluation'
+            folder.mkdir(parents=True)
+            for name in ['stable', 'candidate-a', 'candidate-b']:
+                (folder/f'{name}.json').write_text(json.dumps(EvaluationConfig().to_dict()), encoding='utf-8')
+            fields = EvaluationFields(root)
+            fields.candidates = [folder/'candidate-a.json', folder/'candidate-b.json']
+            fields.opening_lines = [dict(initial_fen=chess.STARTING_FEN, moves_uci=['e2e4'], source={}, name='短線')]
+            fields.values.update(depth='1', max_plies='1')
+            result = run_evaluation_comparison(**fields.options())
+            resume_experiment(result.path)
+            summary = load_comparison(result.path/'manifest.json')
+            self.assertEqual(len(summary.games), 4)
+            self.assertEqual(len({json.loads(path.read_text(encoding='utf-8'))['metadata']['execution']['work_id']
+                                  for path in (result.path/'replays').glob('*.json')}), 4)

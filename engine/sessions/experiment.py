@@ -137,7 +137,8 @@ def freeze_comparison(options):
     """保存既有設定檔及共同開局，重開不再讀取可變來源。"""
     def snapshot(side):
         config = side.evaluation_config.to_dict()
-        return dict(label=side.label, config=config, id=stable_id(config), differences={})
+        return dict(label=side.label, config=config,
+                    id=stable_id(dict(label=side.label, config=config)), differences={})
 
     data = dict(schema_version=2, program_version='weight-experiment-1',
                 baseline=snapshot(options['baseline']),
