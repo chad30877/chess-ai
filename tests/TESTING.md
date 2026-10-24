@@ -28,6 +28,7 @@
 | `ui/test_chess_application.py` | UI 事件、搜尋設定生效、保存、回放、縮放、進行中棋局手數與分頁，以及九候選排序另存與半組配對 |
 | `test_learning_dataset.py` | 串流來源、固定抽樣與整盤分組、同組／跨組去重、合法吃過路兵身份、歷史保存、損壞／停止／保存失敗與重開 |
 | `test_teacher_pilot.py`、`ui/test_teacher_pilot.py` | 教師完整歷史與白方視角、先導保存選擇重開、同手完整評分與界限、版本／異常／逾時／非法手、停止、八小時上限及保存失敗；UCI 使用外部可控制程序 |
+| `test_teacher_labeling.py`、`ui/test_teacher_labeling.py` | 全分組凍結標記、相容先導重用、篩選分布、正式學習閘門、共用八小時與停止、崩潰／保存失敗重試、摘要恢復、獨占執行及 UI 關閉重開續跑；只替換外部 UCI 程序 |
 | `test_discovery.py`、`test_engine_imports.py` | 測試發現及獨立程序載入 |
 | `test_ticket_completion.py` | 未驗收就關票、漏關票、GitHub／本機驗收不同步與發布索引定位 |
 | `test_complete_ticket.py` | 驗收完成才同步關票、讀回失敗中止、需求變更拒絕覆寫，以及重試不重複更新 |

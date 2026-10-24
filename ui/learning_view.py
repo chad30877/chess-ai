@@ -7,6 +7,7 @@ import pygame
 
 from engine.learning.dataset import DatasetRun, SOURCE_URL, load_dataset
 from ui.teacher_view import TeacherView
+from ui.label_view import LabelView
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
@@ -32,12 +33,13 @@ class LearningView:
         self.recent_page = 0
         self.page = 'data'
         self.teacher = TeacherView()
+        self.labels = LabelView()
 
     def active(self):
-        return (self.run is not None and not self.run.future.done()) or self.teacher.active()
+        return (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active()
 
     def close(self, wait=False):
-        for run in (self.run, self.teacher.run):
+        for run in (self.run, self.teacher.run, self.labels.run):
             if run and not run.future.done():
                 run.stop()
                 if wait:
@@ -98,6 +100,19 @@ class LearningView:
             self.teacher.commit()
             self.page = 'data'
             return
+        if action == 'learning_labels' and not self.active() and self.teacher.path:
+            try:
+                self.labels.open(self.path, self.teacher.path)
+                self.page = 'labeling'
+            except (OSError, ValueError, KeyError) as exc:
+                self.teacher.message = str(exc)
+            return
+        if action == 'learning_teacher' and self.page == 'labeling' and not self.active():
+            self.page = 'teacher'
+            return
+        if self.page == 'labeling':
+            self.labels.action(action, app)
+            return
         if self.page == 'teacher':
             self.teacher.action(action, app)
             return
@@ -146,6 +161,9 @@ class LearningView:
             self.message = f'無法開啟資料：{exc}'
 
     def render(self, app):
+        if self.page == 'labeling':
+            self.labels.render(app)
+            return
         if self.page == 'teacher':
             self.teacher.render(app)
             return
