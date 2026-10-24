@@ -34,6 +34,8 @@
 
 完整回歸 `D:/Python/chess-ai/.venv/Scripts/python.exe -m unittest discover -s tests -t . -q`：392項／402.985秒通過，日誌 `C:/Users/User/.codex/ml-small-trial-m10-full-tests.log`。相關比較／續跑／共同開局20項先行通過39.415秒；最後 UI 分頁與短局穩定性調整後，新 UI 單項5.848秒及真實深度三單項1.185秒通過。`git diff --check` 通過。本地功能及驗收完成，GitHub 由主整合代理合併後同步結案。
 
+合入 M07 及 #33 結案的最新整合 `9aef6c6` 後，組合、組合 UI、學習比較、比較 UI、共同開局與續跑相關19項／113.711秒通過，日誌 `C:/Users/User/.codex/ml-small-trial-m10-combined-tests.log`。組合 UI 測試另以直接／聯合兩種實際輸出各按「共同開局比較」並凍結，核對完整來源 payload、候選設定及每種計畫128局一致；LearningView 保留組合與比較各自路由。README、測試導覽及目前計畫已同時保留兩票成果。
+
 新增 `engine.learning.comparison` 與獨立 `LearnedComparisonView`，從群組結果進入原始／學習候選預覽；組合沿用 `LearningView.open_comparison(candidate)` 公開完整候選契約。比較計畫原子保存完整來源、原始／學習設定、教師驗證／測試報告及各基準完整實驗定義，來源檔後續修改不影響快照。候選 ID 包含來源與 role，即使數值相同也不合併；純子力與 stable 各自建立可停止／續跑的既有比較批次，一次最多一批執行。
 
 固定 32 條 CC0 來源共同開局，每條保留起始 FEN 與完整合法 UCI 前綴；每候選每基準 64 局。搜尋固定 3／q4、外層4／內層1、TT4096、不申請和棋、無手數上限，均保存於快照。補足既有通用實驗的 workers 保存、讀回及實際條件核對；舊實驗缺欄位仍沿原本單程序預設。結果從已核對的比較摘要建立整體／逐開局統計，待執行、有效未完成與歷史中斷分開；教師逐盤 MAE 及盤／局面數另列，不合成對戰總分。

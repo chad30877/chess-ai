@@ -54,4 +54,4 @@ UI 測試使用 dummy 顯示驅動。含程序觀測的測試與獨立效能工�
 
 `test_learned_comparison.py`：學習來源與原始／學習身份、各基準工作量、真實深度三短比較的停止、四程序續跑、逐開局報告及棋譜不變。`ui/test_learned_comparison.py` 以 UI 事件驗證預覽、額外參考、凍結、停止及重開；日常測試只跑小型合法開局。
 
-`test_combination_training.py`：直接權重精確保留、來源相容與測試曝光、固定四設定手算增量、聯合選定與合法另存、真實求解程序取消及共用期限恢復。`ui/test_combination_training.py` 以事件勾選預覽、訓練、重開、另存兩種組合並載入真人對戰。
+`test_combination_training.py`：直接權重精確保留、來源相容與測試曝光、固定四設定手算增量、聯合選定與合法另存、真實求解程序取消及共用期限恢復。`ui/test_combination_training.py` 以事件勾選預覽、訓練、重開、另存兩種組合、載入真人對戰，並核對直接／聯合候選送入共同開局比較後的完整設定及來源。
