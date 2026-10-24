@@ -51,3 +51,5 @@ UI 測試使用 dummy 顯示驅動。含程序觀測的測試與獨立效能工�
 `test_weight_training.py`：以手算資料驗證逐盤校準、空分層、正式特徵一致、非負下界、零初始權重與無百分比硬上限；真實求解及保存覆蓋驗證挑選、測試凍結、取消 worker、八小時到時、重開續跑與沿用測試來源。`ui/test_weight_training.py` 以 UI 事件完成學習、重開、另存及載入真人對戰。
 
 `test_group_training.py`：五組共用校準與整次期限、32 欄正式評分一致、零初始權重、群組隔離、部分保存失敗重試與已提交結果不重算。`ui/test_group_training.py` 以 UI 事件完成兩組後停止、重開續跑其餘組，查看階段與權重，另存並載入真人對戰。
+
+`test_combination_training.py`：直接權重精確保留、來源相容與測試曝光、固定四設定手算增量、聯合選定與合法另存、真實求解程序取消及共用期限恢復。`ui/test_combination_training.py` 以事件勾選預覽、訓練、重開、另存兩種組合並載入真人對戰。

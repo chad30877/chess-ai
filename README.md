@@ -60,6 +60,10 @@ flowchart TD
 
 五組公開入口位於 `engine.learning.group_training`：`create_group_training(label_path, groups=None)`、`run_group_training(path)`、`load_group_training(path)` 建立、執行及恢復；`load_group_candidate(path, group)` 只提供已完成組別的完整設定、凍結候選／校準／資料身份及誤差報告，供後續組合與對戰沿用；`save_group_config(path, group, destination)` 另存設定。
 
+五個單群組頁面的「組合」可勾選同一實驗中已完成的群組，預覽實際開關與中殘局權重。預設活動力＋王安全；直接組合精確沿用單組學習值，聯合訓練另以共同原始權重為懲罰中心試三強度。兩者分開保存、另存及載入真人對戰。固定四設定僅切換活動力／王安全開關，兩種背景下的王安全負增量代表教師誤差較小，不代表新增交互特徵或棋力提升。其他選組須同時含這兩組才有四設定報告。
+
+組合入口 `engine.learning.combination_training` 提供 `create_combination(source_path, groups=None)`、`run_combination(path)`、`load_combination(path)` 與 `save_combination_config(path, kind, destination)`；`kind` 為 `direct` 或 `joint`。`load_combination_candidate(path, kind)` 沿用單組完整設定／誤差／來源契約，另保留各來源候選。所有準備、固定比較與聯合候選共用每次八小時期限；停止重開只補未完成單元。新條件另建實驗，介面明列來源已曝光測試資料。
+
 - 先前里程碑 `857566d`（2026-04-14）：`優化可讀性`。
 - 先前里程碑 `e61e93a`（2026-04-13）：`有UI，generate資料後可執行play_ui來觀看`。
 
