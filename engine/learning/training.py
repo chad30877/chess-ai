@@ -33,6 +33,18 @@ def training_rules():
         selection_order=['strong','medium','weak'], max_seconds=28800)
 
 
+def select_candidate(candidates, rules, *, empty_error):
+    """按凍結順序比較驗證誤差；容差內保留較早的候選。"""
+    eligible = [candidates[name] for name in rules['selection_order']
+                if candidates[name]['validation']['mae'] is not None]
+    if not eligible: raise ValueError(empty_error)
+    best = eligible[0]
+    for item in eligible[1:]:
+        if item['validation']['mae'] < best['validation']['mae'] - rules['tie_tolerance']:
+            best = item
+    return best
+
+
 def _weights(rows):
     counts=defaultdict(int)
     for row in rows: counts[row['game_id']]+=1
@@ -284,11 +296,7 @@ def run_training(path, *, stop=None, progress=lambda state:None, now=monotonic, 
                     candidates[name]=record
                     report(completed=len(candidates),worker_pid=None)
                 check()
-                eligible=[candidates[name] for name in rules['selection_order'] if candidates[name]['validation']['mae'] is not None]
-                if not eligible: raise ValueError('驗證組無資料，無法選定或宣告完成獨立評估')
-                best=eligible[0]
-                for item in eligible[1:]:
-                    if item['validation']['mae']<best['validation']['mae']-rules['tie_tolerance']: best=item
+                best=select_candidate(candidates,rules,empty_error='驗證組無資料，無法選定或宣告完成獨立評估')
                 frozen=dict(strength=best['strength'],config=best['config'],validation=best['validation'],
                     snapshot_identity=snapshot['identity'],selection_order=rules['selection_order'])
                 check(); write_json_atomic(path/'frozen.json',frozen)

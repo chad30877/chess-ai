@@ -106,7 +106,7 @@ P3 將 Python 匯入路徑統一為 `engine.evaluation.*`、`engine.sessions.*`�
 
 ## 環境設定
 
-以下 PowerShell 指令都從專案根目錄執行。專案目前沒有 `requirements.txt`、`pyproject.toml` 或套件鎖定檔；直接使用的第三方套件為 `chess`、`pygame`，學習資料的 `.zst` 串流使用 `zstandard`。
+以下 PowerShell 指令都從專案根目錄執行。專案目前沒有 `requirements.txt`、`pyproject.toml` 或套件鎖定檔；直接使用的第三方套件為 `chess`、`pygame`，學習資料的 `.zst` 串流使用 `zstandard`，權重學習使用 `numpy`、`scipy`。
 
 ### 建立環境
 
@@ -219,7 +219,7 @@ P1 移除 2 個 ML 專屬案例，保留原有非 ML 覆蓋，新增 6 個對戰
 使用目前依賴的隔離環境指令：
 
 ```powershell
-uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/python.exe --with chess --with pygame --with zstandard python -m unittest discover -s tests -t . -v
+uv run --no-project --python .uv-python/cpython-3.12.13-windows-x86_64-none/python.exe --with chess --with pygame --with zstandard --with numpy --with scipy python -m unittest discover -s tests -t . -v
 ```
 
 先前功能提交另以 UI 真實背景執行緒完成 2 場正常終局，共 220 筆局面；CLI 驗證 2 場截斷 JSONL，共 24 筆。識別碼、數量、相對路徑、逐手 FEN、回放結果與依種子重跑均比對一致。畫面檢查包含設定、進度、日期回放清單、真人棋盤與高解析度渲染。

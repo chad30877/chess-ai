@@ -9,7 +9,7 @@ from uuid import uuid4
 from engine.evaluation.config import EvaluationConfig
 from engine.learning.group_training import GROUPS, load_group_candidate, load_group_training
 from engine.learning.teacher import digest
-from engine.learning.training import training_rules, fit_position_weights, evaluate_errors, TrainingStopped
+from engine.learning.training import training_rules, fit_position_weights, evaluate_errors, select_candidate, TrainingStopped
 from engine.sessions.experiment_resume import experiment_lock
 from engine.storage.batch_storage import write_json_atomic
 
@@ -230,11 +230,7 @@ def run_combination(path, *, stop=None, progress=lambda state:None, now=monotoni
                         calibration_identity=snapshot['calibration_identity']))
                     check(); write_json_atomic(path/'candidates'/f'{name}.json', candidate); candidates[name] = candidate
                     report(completed=len(candidates), worker_pid=None)
-                eligible = [candidates[n] for n in rules['selection_order'] if candidates[n]['validation']['mae'] is not None]
-                if not eligible: raise ValueError('驗證組無有效資料；不可選定聯合候選')
-                best = eligible[0]
-                for item in eligible[1:]:
-                    if item['validation']['mae'] < best['validation']['mae']-rules['tie_tolerance']: best = item
+                best = select_candidate(candidates, rules, empty_error='驗證組無有效資料；不可選定聯合候選')
                 frozen = freeze('joint', best['config'], validation=best['validation'], strength=best['strength'],
                     candidate_identity=best['identity'], selection_order=rules['selection_order'])
             else: frozen = previous['frozen']

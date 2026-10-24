@@ -9,7 +9,7 @@ from uuid import uuid4
 from engine.evaluation.config import EvaluationConfig
 from engine.learning.labeling import load_labeled_dataset
 from engine.learning.teacher import digest
-from engine.learning.training import training_rules, calibrate, fit_position_weights, evaluate_errors, TrainingStopped
+from engine.learning.training import training_rules, calibrate, fit_position_weights, evaluate_errors, select_candidate, TrainingStopped
 from engine.sessions.experiment_resume import experiment_lock
 from engine.storage.batch_storage import write_json_atomic
 
@@ -192,11 +192,7 @@ def run_group_training(path, *, stop=None, progress=lambda state: None, now=mono
                                 errors[name] = str(exc)
                                 write_json_atomic(root / 'failures.json', errors)
                         if len(candidates) != len(rules['strengths']): raise ValueError('群組有失敗候選，重試完成後才選定與測試')
-                        eligible = [candidates[n] for n in rules['selection_order'] if candidates[n]['validation']['mae'] is not None]
-                        if not eligible: raise ValueError('驗證組無資料；不可選定候選')
-                        best = eligible[0]
-                        for item in eligible[1:]:
-                            if item['validation']['mae'] < best['validation']['mae']-rules['tie_tolerance']: best = item
+                        best = select_candidate(candidates, rules, empty_error='驗證組無資料；不可選定候選')
                         frozen = _seal(dict(group=group, strength=best['strength'], config=best['config'], validation=best['validation'],
                             candidate_identity=best['identity'], snapshot_identity=snapshot['identity'], selection_order=rules['selection_order']))
                         check(); write_json_atomic(root / 'frozen.json', frozen)
