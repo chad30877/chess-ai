@@ -32,7 +32,7 @@
 
 ## 實作與驗證證據（2026-10-24）
 
-完整回歸 `D:/Python/chess-ai/.venv/Scripts/python.exe -m unittest discover -s tests -t . -q`：392項／402.985秒通過，日誌 `C:/Users/User/.codex/ml-small-trial-m10-full-tests.log`。相關比較／續跑／共同開局20項先行通過39.415秒；最後 UI 分頁與短局穩定性調整後，新 UI 單項5.848秒及真實深度三單項1.185秒通過。`git diff --check` 通過。本地功能及驗收完成，GitHub 由主整合代理合併後同步結案。
+完整回歸 `D:/Python/chess-ai/.venv/Scripts/python.exe -m unittest discover -s tests -t . -q`：392項／402.985秒通過，日誌 `C:/Users/User/.codex/ml-small-trial-m10-full-tests.log`。相關比較／續跑／共同開局20項先行通過39.415秒；最後 UI 分頁與短局穩定性調整後，新 UI 單項5.848秒及真實深度三單項1.185秒通過。`git diff --check` 通過。本票已合入整合分支，GitHub #36 已關閉並讀回確認。
 
 合入 M07 及 #33 結案的最新整合 `9aef6c6` 後，組合、組合 UI、學習比較、比較 UI、共同開局與續跑相關19項／113.711秒通過，日誌 `C:/Users/User/.codex/ml-small-trial-m10-combined-tests.log`。組合 UI 測試另以直接／聯合兩種實際輸出各按「共同開局比較」並凍結，核對完整來源 payload、候選設定及每種計畫128局一致；LearningView 保留組合與比較各自路由。README、測試導覽及目前計畫已同時保留兩票成果。
 
