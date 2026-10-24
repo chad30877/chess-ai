@@ -172,10 +172,11 @@ def fixed_weight_metrics(rows, config, scale, check=lambda:None):
 def run_combination(path, *, stop=None, progress=lambda state:None, now=monotonic, started_at=None):
     """直接結果與逐候選提交共用一次八小時；測試只評估各自凍結設定。"""
     path = Path(path)
+    began = now() if started_at is None else started_at
     with experiment_lock(path):
         saved = load_combination(path)
         if saved['status'] == 'completed': return path
-        snapshot = saved['snapshot']; rules = snapshot['rules']; began = now() if started_at is None else started_at
+        snapshot = saved['snapshot']; rules = snapshot['rules']
         state = dict(status='running', elapsed_seconds=0, error='', completed=saved['completed'], total=3, current_candidate='', worker_pid=None)
         def report(**updates):
             state.update(updates, elapsed_seconds=now()-began)
