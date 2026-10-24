@@ -6,6 +6,7 @@ from pathlib import Path
 import pygame
 
 from engine.learning.dataset import DatasetRun, SOURCE_URL, load_dataset
+from ui.teacher_view import TeacherView
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
@@ -29,9 +30,18 @@ class LearningView:
         self.message = ''
         self.sample_index = 0
         self.recent_page = 0
+        self.page = 'data'
+        self.teacher = TeacherView()
 
     def active(self):
-        return self.run is not None and not self.run.future.done()
+        return (self.run is not None and not self.run.future.done()) or self.teacher.active()
+
+    def close(self, wait=False):
+        for run in (self.run, self.teacher.run):
+            if run and not run.future.done():
+                run.stop()
+                if wait:
+                    run.future.result()
 
     def commit(self):
         if self.focus == 'path':
@@ -48,6 +58,8 @@ class LearningView:
         return True
 
     def input(self, event):
+        if self.page == 'teacher':
+            return self.teacher.input(event)
         if self.focus is None or event.type not in (pygame.TEXTINPUT, pygame.KEYDOWN):
             return False
         if event.type == pygame.TEXTINPUT:
@@ -79,8 +91,16 @@ class LearningView:
         self.path = Path(path)
         self.sample_index = 0
         self.message = ''
+        self.teacher.open(path)
 
     def action(self, action, app):
+        if action == 'learning_data' and not self.active():
+            self.teacher.commit()
+            self.page = 'data'
+            return
+        if self.page == 'teacher':
+            self.teacher.action(action, app)
+            return
         if not self.commit():
             return
         try:
@@ -102,6 +122,8 @@ class LearningView:
                 self.run = DatasetRun(self.root, source, int(self.seed), app.executor)
                 self.data = None
                 self.message = ''
+            elif action == 'learning_teacher' and self.path:
+                self.page = 'teacher'
             elif action.startswith('learning_open:'):
                 path = self.entries()[int(action.split(':')[1])].parent
                 if (path / 'dataset.json').exists():
@@ -124,8 +146,12 @@ class LearningView:
             self.message = f'無法開啟資料：{exc}'
 
     def render(self, app):
+        if self.page == 'teacher':
+            self.teacher.render(app)
+            return
         active = self.active()
         app.text('學習實驗 · 資料準備', 50, 78, large=True)
+        app.button('learning_teacher', '教師先導', (650, 74, 190, 36), enabled=self.data is not None and not active)
         app.button('learning_source', 'Lichess 2013-01 · CC0' if self.source == 'lichess' else '本機棋譜（授權自查）',
                    (50, 125, 470, 36), enabled=not active)
         if self.source == 'local':

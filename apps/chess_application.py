@@ -143,10 +143,7 @@ class ChessApplication:
                   round(width * self.scale) if width else None)
 
     def close(self):
-        if self.learning.active():
-            self.learning.run.stop()
-            if self._owns_executor:
-                self.learning.run.future.result()
+        self.learning.close(wait=self._owns_executor)
         if self.batch:
             self.batch.stop()
             # Never cancel a queued batch: its worker must publish the final manifest.
