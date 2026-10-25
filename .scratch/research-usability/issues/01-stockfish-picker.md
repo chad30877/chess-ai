@@ -1,6 +1,6 @@
 # R01：從教師先導選取 Stockfish 執行檔
 
-狀態：實作完成，待 Agent 真實系統選檔短流程驗收；不發布 GitHub。
+狀態：已完成本機驗收；不發布 GitHub。
 
 ## 父規格
 
@@ -18,7 +18,7 @@
 - [x] 取消選檔保留原值；以 UI 事件驗證。
 - [x] 不存在或無法使用的執行檔會顯示可辨識錯誤，修正後可建立新先導；以錯誤與恢復流程驗證。
 - [x] 重開既有先導顯示其保存路徑，不以新預設值改寫；以重開與快照比對驗證。
-- [ ] Agent 以真實系統檔案選擇器選取本機 Stockfish 並完成短先導，保存操作證據。
+- [x] Agent 以真實系統檔案選擇器選取本機 Stockfish 並完成短先導，保存操作證據。
 
 ## 阻擋來源
 
@@ -39,5 +39,5 @@
 - 選取含中文與空白的外部 UCI 教師啟動檔，實際執行新先導，核對保存的教師命令與 Stockfish 19 身分；不存在及不可執行的檔案先失敗，再修正路徑完成。新選取不改寫舊 `snapshot.json`，重新建立應用後仍取得保存路徑。
 - TDD：新增專案路徑 UI 測試先在空字串預設失敗，再加入專案根目錄與原生選檔流程後通過。
 - `python -m unittest tests.ui.test_teacher_picker tests.ui.test_teacher_pilot tests.test_teacher_pilot tests.ui.test_teacher_labeling`：12 項通過。
-- 原生操作入口：[隔離短流程](../evidence/r01-native-picker.py)。使用暫存資料集、真實視窗與正常事件迴圈；完成時輸出實際先導 JSON 及畫面。尚待整合 Agent 以原生視窗實際選取／取消並完成 Stockfish 短先導，不以回傳替身測試代替此項。
+- 原生操作入口：[隔離短流程](../evidence/r01-native-picker.py)。使用暫存資料集、真實視窗與正常事件迴圈；完成時輸出實際先導 JSON 及畫面。整合 Agent 以 cua 實際開啟系統選檔、取消確認原值，再以滑鼠雙擊選取隔離目錄的 `Stockfish 中文.exe`，按「建立新先導」。真實 Stockfish 19 完成 24/24 筆量測（12 局面 × 兩種預算），整次 5.313 秒；[保存條件與完成結果](../evidence/r01-real-pilot.json)、[完成畫面](../evidence/r01-real-pilot.png)已核對。
 - 操作說明及測試導覽已同步；程式、測試、驗收入口與本票一併提交。總索引及計畫由整合流程同步。
