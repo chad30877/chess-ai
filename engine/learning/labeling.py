@@ -8,22 +8,17 @@ from time import monotonic
 from uuid import uuid4
 
 from engine.learning.dataset import load_dataset, SPLITS
-from engine.learning.teacher import TeacherPool, TeacherStopped, TeacherWorkFailed, MAX_SECONDS, digest, load_pilot, validate_workers
+from engine.learning.teacher import (TeacherPool, TeacherStopped, TeacherWorkFailed, MAX_SECONDS,
+                                     digest, load_pilot, validate_workers, teacher_record_matches,
+                                     reusable_pilot_records)
 from engine.sessions.experiment_resume import experiment_lock
 from engine.storage.batch_storage import write_json_atomic
 
 LABEL_VERSION = 1
-SAMPLE_FIELDS = ('game_id', 'split', 'stage', 'initial_fen', 'moves_uci', 'fen')
 
 
 def _read(path):
     return json.loads(Path(path).read_text(encoding='utf-8'))
-
-
-def _matches(record, sample, nodes, score_policy):
-    return (record.get('sample_id') == sample['position_id'] and
-            record.get('requested_nodes') == nodes and record.get('score_policy') == score_policy and
-            all(record.get(key) == sample[key] for key in SAMPLE_FIELDS))
 
 
 def _envelope(snapshot, sample, record, origin):
@@ -66,11 +61,10 @@ def create_labeling(dataset_path, pilot_path, *, run_path=None):
     (path / 'records').mkdir()
     (path / 'failures').mkdir()
     by_id = {s['position_id']: s for s in data['positions']}
-    for record in pilot['records']:
-        sample = by_id.get(record['sample_id'])
-        if sample and _matches(record, sample, snapshot['nodes'], snapshot['teacher']['score_policy']):
-            write_json_atomic(path / 'records' / f'{sample["position_id"]}.json',
-                              _envelope(snapshot, sample, deepcopy(record), 'pilot'))
+    for sample_id, record in reusable_pilot_records(data, pilot, snapshot['nodes']).items():
+        sample = by_id[sample_id]
+        write_json_atomic(path / 'records' / f'{sample_id}.json',
+                          _envelope(snapshot, sample, deepcopy(record), 'pilot'))
     write_json_atomic(path / 'status.json', dict(status='ready', path=str(path), elapsed_seconds=0, error=''))
     return path
 
@@ -93,7 +87,7 @@ def load_labeling(path):
         sample = by_id.get(record.get('sample_id'))
         if (sample is None or record['sample_id'] in seen or record.get('snapshot_identity') != snapshot['identity'] or
                 record.get('work_id') != digest([snapshot['identity'], record['sample_id']]) or
-                not _matches(record['label'], sample, snapshot['nodes'], snapshot['teacher']['score_policy'])):
+                not teacher_record_matches(record['label'], sample, snapshot['nodes'], snapshot['teacher']['score_policy'])):
             raise ValueError('已提交教師標記身份不一致')
         records.append(record)
         seen.add(record['sample_id'])

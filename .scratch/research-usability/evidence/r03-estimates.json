@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-25",
+  "dataset_path": "D:\\Python\\research-usability-evidence\\r03\\run-20261025-140320\\data\\learning\\439c05f2be9147148ac3d71aaa4ecc44",
+  "pilot_path": "D:\\Python\\research-usability-evidence\\r03\\run-20261025-140320\\data\\learning\\439c05f2be9147148ac3d71aaa4ecc44\\teacher-pilots\\898e425a442c4fe7beca0220dd5fe9cd",
+  "teacher": "Stockfish 19",
+  "workers": 2,
+  "entry": "真實應用程式事件；dummy 表面畫面檢查",
+  "estimates_before_choice": {
+    "50000": {
+      "seconds": 1.331400000024587,
+      "measured_seconds": 2.219000000040978,
+      "completed": 60,
+      "remaining": 36,
+      "reused": 60
+    },
+    "200000": {
+      "seconds": 4.612799999979325,
+      "measured_seconds": 7.687999999965541,
+      "completed": 60,
+      "remaining": 36,
+      "reused": 60
+    }
+  },
+  "choice_nodes": 200000,
+  "reopen_estimates_identical": true,
+  "legacy_copy_missing_measurements": "顯示無法估計；未取用舊的程序分析秒數加總"
+}

@@ -32,6 +32,7 @@
 | `ui/test_teacher_picker.py` | 不同專案預設路徑、原生選檔回傳與取消、中文空白路徑外部教師、無效檔案恢復及保存重開 |
 | `test_teacher_pilot.py`、`ui/test_teacher_pilot.py` | 教師完整歷史與白方視角、先導保存選擇重開、同手完整評分與界限、版本／異常／逾時／非法手、停止、八小時上限及保存失敗；UCI 使用外部可控制程序 |
 | `test_teacher_parallel.py` | 外部教師重疊上限、亂序歷史、分預算整批量測、少量工作、凍結條件、舊資料身分、停止／失敗／期限及程序清理 |
+| `test_labeling_estimates.py`、`ui/test_labeling_estimates.py` | 兩種預算的整批吞吐手算、實際先導數、同條件重用、待分析篩除量、缺量測及 UI 選預算／重開 |
 | `test_teacher_labeling.py`、`ui/test_teacher_labeling.py` | 全分組凍結標記、相容先導重用、篩選分布、正式學習閘門、共用八小時與停止、崩潰／保存失敗重試、摘要恢復、獨占執行及 UI 關閉重開續跑；只替換外部 UCI 程序 |
 | `test_discovery.py`、`test_engine_imports.py` | 測試發現及獨立程序載入 |
 | `test_ticket_completion.py` | 未驗收就關票、漏關票、GitHub／本機驗收不同步與發布索引定位 |
