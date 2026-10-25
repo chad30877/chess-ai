@@ -127,6 +127,12 @@ class LiveSession:
         return self.status == "running" and self.players[self.board.turn] is None
 
     @property
+    def in_opening_book(self) -> bool:
+        """目前政策仍在庫內，且至少一方策略實際使用開局庫。"""
+        return bool(self.opening and not self.opening.exited
+                    and any(isinstance(player, AlphaBetaPlayer) for player in self.players.values()))
+
+    @property
     def thinking(self) -> bool:
         return self._pending is not None and not self._pending.done()
 

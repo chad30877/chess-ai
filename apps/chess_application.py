@@ -906,7 +906,10 @@ class ChessApplication:
             return "尚未開始"
         session = self.live
         if session.status == "running":
-            return "等待你落子" if session.human_turn else "AI 思考中" if session.thinking else "等待 AI 落子"
+            text = "等待你落子" if session.human_turn else "AI 思考中" if session.thinking else "等待 AI 落子"
+            if self.mode == "human" and session.in_opening_book:
+                text += " · 開局庫內"
+            return text
         return {"paused": "已暫停", "completed": "對局結束", "stopped": "已停止（未完成）",
                 "truncated": "達到執行上限", "failed": "AI 執行失敗"}.get(session.status, session.status)
 
@@ -1207,7 +1210,7 @@ class ChessApplication:
                           ("batch_search_workers", "搜尋 worker", str(self.batch_search_workers)),
                           ("batch_capacity", "表項上限", str(self.batch_transposition_capacity)),
                           ("opening_book", "開局庫", "開" if self.opening_book else "關"),
-                          ("opening_limit", "開局半回合上限", str(self.opening_max_plies))]
+                          ("opening_limit", "開局最多步數（雙方合計）", str(self.opening_max_plies))]
                 for index, (action, label, value) in enumerate(fields):
                     column, row = index % 2, index // 2
                     x, y = 64 + column * 396, 175 + row * 55
