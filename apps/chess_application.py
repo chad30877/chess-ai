@@ -22,6 +22,7 @@ from engine.sessions.batch_run import BatchSettings
 from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
 from ui.evaluation_profiles import profile_name, profile_summary, config_summary
+from ui.profile_selector import ProfileSelector
 from ui.learning_view import LearningView
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
@@ -105,6 +106,7 @@ class ChessApplication:
         self.confirm_action: str | None = None
         self.confirm_was_running = False
         self.message = ""
+        self.profile_selector = None
         self.saved = False
         self._last_ply = -1
         if replay_path is not None:
@@ -438,6 +440,9 @@ class ChessApplication:
         return [], 0
 
     def dispatch(self, action: str):
+        if self.profile_selector is not None:
+            self.profile_selector.action(action, self)
+            return
         if self.mode == 'learning' and action.startswith('learning_'):
             self.learning.action(action, self)
             return
@@ -454,17 +459,9 @@ class ChessApplication:
                 self._replay_breakdown_ply = -1
                 pygame.key.stop_text_input()
             elif action == "editor_profile":
-                files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
-                current = getattr(editor, "profile_path", None)
-                if files:
-                    path = files[(files.index(current) + 1) % len(files)] if current in files else files[0]
-                    try:
-                        config = EvaluationConfig.from_dict(json.loads(path.read_text(encoding="utf-8")))
-                        self.replay_editor = ReplayEvaluationEditor(config)
-                        self.replay_editor.profile_path = path
-                        self._replay_breakdown_ply = -1
-                    except (OSError, ValueError, TypeError, KeyError) as exc:
-                        editor.message = f"無法載入設定：{exc}"
+                self.profile_selector = ProfileSelector(
+                    PROJECT_ROOT / 'configs/evaluation', [getattr(editor, 'profile_path', None)],
+                    self._apply_replay_profile)
             elif action == "editor_save":
                 self._save_replay_evaluation()
             elif action.startswith("editor_group:"):
@@ -563,10 +560,9 @@ class ChessApplication:
                 return
             if action in ("batch_evaluation_white", "batch_evaluation_black"):
                 side = action.rsplit("_", 1)[1]
-                files = sorted((PROJECT_ROOT / "configs/evaluation").glob("*.json"))
-                if files:
-                    current = self.batch_evaluation_files[side]
-                    self.batch_evaluation_files[side] = files[(files.index(current) + 1) % len(files)] if current in files else files[0]
+                self.profile_selector = ProfileSelector(
+                    PROJECT_ROOT / 'configs/evaluation', [self.batch_evaluation_files[side]],
+                    lambda paths: self.batch_evaluation_files.update({side: paths[0]}))
                 return
         if self.mode == "auto" and action in ("interval", "count", "workers") and self.batch is None:
             self.evaluation_fields.commit()
@@ -592,11 +588,9 @@ class ChessApplication:
                 options = ("Random", "Greedy", "AlphaBeta")
                 setattr(self, action, options[(options.index(getattr(self, action)) + 1) % len(options)])
         elif action == "live_evaluation" and self.live is None:
-            self._refresh_evaluation_profiles()
-            if not self.live_evaluation_files:
-                return
-            current = self.live_evaluation_files.index(self.live_evaluation_file)
-            self.live_evaluation_file = self.live_evaluation_files[(current + 1) % len(self.live_evaluation_files)]
+            self.profile_selector = ProfileSelector(
+                PROJECT_ROOT / 'configs/evaluation', [self.live_evaluation_file],
+                lambda paths: setattr(self, 'live_evaluation_file', paths[0]))
         elif action == "live_depth" and self.live is None:
             depths = (1, 2, 3, 4, 5)
             self.live_search_depth = depths[(depths.index(self.live_search_depth) + 1) % len(depths)]
@@ -694,10 +688,15 @@ class ChessApplication:
 
     def handle_event(self, event):
         if event.type == pygame.QUIT:
+            if self.profile_selector is not None:
+                self.profile_selector.close(self)
             self.request_leave("quit")
             return
         if event.type == pygame.VIDEORESIZE:
             self.resize(pygame.display.set_mode((max(900, event.w), max(768, event.h)), pygame.RESIZABLE))
+            return
+        if self.profile_selector is not None:
+            self.profile_selector.input(event, self)
             return
         if self.mode == 'learning' and self.learning.input(event):
             return
@@ -866,6 +865,8 @@ class ChessApplication:
             self._render_confirmation()
         elif self.promotions:
             self._render_promotion()
+        if self.profile_selector is not None:
+            self.profile_selector.render(self)
 
     def _render_game(self):
         self._set_move_view_layout()
@@ -1021,6 +1022,13 @@ class ChessApplication:
                 (path for path in files if path.name == "stable.json"), files[0] if files else None,
             )
         self.evaluation_fields.files = files
+
+    def _apply_replay_profile(self, paths):
+        path = paths[0]
+        config = EvaluationConfig.from_dict(json.loads(path.read_text(encoding='utf-8')))
+        self.replay_editor = ReplayEvaluationEditor(config)
+        self.replay_editor.profile_path = path
+        self._replay_breakdown_ply = -1
 
     def _save_replay_evaluation(self):
         editor = self.replay_editor

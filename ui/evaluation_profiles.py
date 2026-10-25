@@ -9,14 +9,6 @@ from ui.replay_evaluation_editor import GROUPS
 def profile_name(path):
     if path is None:
         return "沒有設定檔"
-    names = {
-        "material": "純子力", "piece-square": "棋子位置", "pawn": "兵形",
-        "mobility": "活動力", "king-safety": "王安全", "coordination": "協調",
-    }
-    if path.stem.startswith("learning-"):
-        group = path.stem.removeprefix("learning-")
-        if group in names:
-            return "學習：" + names[group]
     return path.stem
 
 
