@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-25",
+  "entry": "ChessApplication.handle_event：先導、選定200k、標記停止、關閉、重開、續跑",
+  "display": "pygame dummy；以真實應用程式事件及真實 Stockfish 執行，不做畫面驗收",
+  "dataset_path": "D:\\Python\\research-usability-evidence\\r02\\run-20261025-135333\\data\\learning\\42f0cc235fda47dbab800148f09d3d9e",
+  "pilot_path": "D:\\Python\\research-usability-evidence\\r02\\run-20261025-135333\\data\\learning\\42f0cc235fda47dbab800148f09d3d9e\\teacher-pilots\\a0b8b3b1c4f14ea285d4f29794a5a408",
+  "labeling_path": "D:\\Python\\research-usability-evidence\\r02\\run-20261025-135333\\data\\learning\\42f0cc235fda47dbab800148f09d3d9e\\teacher-labels\\85d223c668db490ea898727a835e68fe",
+  "teacher": {
+    "name": "Stockfish 19",
+    "author": "the Stockfish developers (see AUTHORS file)"
+  },
+  "executable_sha256": "45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0",
+  "workers": 2,
+  "threads": 1,
+  "max_observed_processes": 2,
+  "pilot_sample_count": 60,
+  "pilot_seconds": 12.484000000054948,
+  "budget_measurements": {
+    "50000": {
+      "completed": 60,
+      "elapsed_seconds": 2.9369999999180436,
+      "workers": 2
+    },
+    "200000": {
+      "completed": 60,
+      "elapsed_seconds": 8.344000000040978,
+      "workers": 2
+    }
+  },
+  "stopped_completed": 61,
+  "stopped_remaining": 35,
+  "resumed_seconds": 7.420999999972992,
+  "final_completed": 96,
+  "final_remaining": 0,
+  "preserved_records_unchanged": 61,
+  "processes_released": true
+}

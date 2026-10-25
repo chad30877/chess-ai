@@ -101,7 +101,7 @@ class LabelView:
         app.button('learning_labels_advanced', '收起進階條件' if self.advanced else '進階條件', (50, 552, 230, 34))
         snapshot = state.get('snapshot')
         if self.advanced and snapshot:
-            app.text(f'固定 {snapshot["nodes"]:,} 節點 · 篩選 v{snapshot["filter_version"]} · SHA256 {snapshot["teacher"]["executable_sha256"][:16]}…', 50, 597, width=790)
+            app.text(f'固定 {snapshot["nodes"]:,} 節點 · {snapshot.get("workers", 1)} 程序 · 篩選 v{snapshot["filter_version"]} · SHA256 {snapshot["teacher"]["executable_sha256"][:16]}…', 50, 597, width=790)
             data = summary['data_exclusions']
             app.text('資料排除：' + ' · '.join(f'{label} {data.get(key, 0)}' for key, label in (('first_8_plies', '前八手'), ('in_check', '受將'), ('terminal', '終局'))), 50, 628, muted=True, width=790)
             app.text(f'抽樣上限 {data.get("not_sampled", 0)} · 跨組重複 {data.get("cross_split_duplicate", 0)} · 同組重複 {data.get("within_split_duplicate", 0)}', 50, 657, muted=True, width=790)

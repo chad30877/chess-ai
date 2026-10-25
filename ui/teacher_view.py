@@ -1,13 +1,14 @@
 """教師先導與固定預算選擇的簡短 UI。"""
 from pathlib import Path
 import pygame
-from engine.learning.teacher import PilotRun, choose_budget, load_pilot
+from engine.learning.teacher import PilotRun, choose_budget, load_pilot, default_teacher_workers, validate_workers
 
 
 class TeacherView:
     def __init__(self):
         self.dataset = None
         self.command = ''
+        self.workers = default_teacher_workers()
         self.focus = False
         self.draft = ''
         self.run = None
@@ -30,6 +31,7 @@ class TeacherView:
         self.dataset = Path(dataset)
         self.run, self._loaded_run = None, None
         self.state, self.path, self.message, self.index = {}, None, '', 0
+        self.workers = default_teacher_workers()
         entries = self.entries()
         if entries: self.load(entries[0].parent)
 
@@ -38,6 +40,7 @@ class TeacherView:
         self.path = Path(path)
         snapshot = self.state.get('snapshot')
         if snapshot:
+            self.workers = snapshot.get('workers', 1)
             command = snapshot['teacher']['command']
             self.command = command[0] if len(command) == 1 else command
 
@@ -52,7 +55,9 @@ class TeacherView:
                 value = pygame.scrap.get(pygame.SCRAP_TEXT)
                 if value: self.draft += value.decode('utf-8').rstrip('\x00')
             except (pygame.error, UnicodeError): self.message = '無法貼上，請輸入路徑'
-        elif event.key == pygame.K_RETURN: self.commit()
+        elif event.key == pygame.K_RETURN:
+            try: self.commit()
+            except ValueError as exc: self.message = str(exc)
         elif event.key == pygame.K_ESCAPE:
             self.focus = False
             pygame.key.stop_text_input()
@@ -60,23 +65,33 @@ class TeacherView:
 
     def commit(self):
         if self.focus:
-            self.command = self.draft.strip().strip('"')
+            if self.focus == 'workers':
+                try: workers = int(self.draft.strip())
+                except ValueError: raise ValueError('同時分析局面數必須是正整數') from None
+                self.workers = validate_workers(workers)
+            else:
+                self.command = self.draft.strip().strip('"')
             self.focus = False
             pygame.key.stop_text_input()
 
     def action(self, action, app):
-        self.commit()
         try:
+            # 無效輸入仍能重新取得焦點修正。
+            if action != 'learning_teacher_workers' or self.focus != 'workers': self.commit()
             if action == 'learning_pilot_stop' and self.active():
                 self.run.stop()
                 return
             if self.active(): return
             if action == 'learning_engine':
-                self.focus = True
+                self.focus = 'engine'
                 self.draft = str(self.command)
                 pygame.key.start_text_input()
+            elif action == 'learning_teacher_workers':
+                self.focus = 'workers'
+                self.draft = str(self.workers)
+                pygame.key.start_text_input()
             elif action == 'learning_pilot_start':
-                self.run = PilotRun(self.dataset, self.command, app.executor)
+                self.run = PilotRun(self.dataset, self.command, app.executor, workers=self.workers)
                 self.index = 0
                 self.message = ''
             elif action.startswith('learning_budget:'):
@@ -109,10 +124,12 @@ class TeacherView:
         app.text('學習實驗 · 教師先導', 50, 78, large=True)
         app.button('learning_data', '資料', (50, 122, 130, 34), enabled=not active)
         app.button('learning_labels', '教師標記', (195, 122, 190, 34), enabled=bool(state.get('choice')) and not active)
-        app.button('learning_engine', self.draft + ' |' if self.focus else str(self.command or '輸入／貼上 Stockfish 19 執行檔路徑'),
+        app.button('learning_engine', self.draft + ' |' if self.focus == 'engine' else str(self.command or '輸入／貼上 Stockfish 19 執行檔路徑'),
                    (50, 174, 790, 38), enabled=not active)
         app.button('learning_pilot_start', '建立新先導', (50, 230, 235, 36), enabled=not active, primary=True)
         app.button('learning_pilot_stop', '停止', (310, 230, 130, 36), enabled=active)
+        workers = self.draft + ' |' if self.focus == 'workers' else str(self.workers)
+        app.button('learning_teacher_workers', f'同時分析局面數：{workers}', (455, 230, 385, 36), enabled=not active)
         status = {'queued': '排隊', 'running': '量測中', 'completed': '量測完成', 'stopped': '已停止', 'failed': '失敗',
                   'interrupted': '未完成，請建立新先導'}
         if state:
