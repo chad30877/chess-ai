@@ -5,9 +5,11 @@ from engine.learning.teacher import PilotRun, choose_budget, load_pilot
 
 
 class TeacherView:
-    def __init__(self):
+    def __init__(self, root=None):
         self.dataset = None
-        self.command = ''
+        self.project_root = Path(root) if root is not None else Path(__file__).resolve().parents[1]
+        self.default_command = str(self.project_root / 'tools/stockfish/stockfish-windows-x86-64-universal.exe')
+        self.command = self.default_command
         self.focus = False
         self.draft = ''
         self.run = None
@@ -30,6 +32,7 @@ class TeacherView:
         self.dataset = Path(dataset)
         self.run, self._loaded_run = None, None
         self.state, self.path, self.message, self.index = {}, None, '', 0
+        self.command = self.default_command
         entries = self.entries()
         if entries: self.load(entries[0].parent)
 
@@ -75,6 +78,8 @@ class TeacherView:
                 self.focus = True
                 self.draft = str(self.command)
                 pygame.key.start_text_input()
+            elif action == 'learning_engine_pick':
+                self.pick_engine()
             elif action == 'learning_pilot_start':
                 self.run = PilotRun(self.dataset, self.command, app.executor)
                 self.index = 0
@@ -89,6 +94,27 @@ class TeacherView:
                 self.load(entries[self.index].parent)
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.message = str(exc)
+
+    def pick_engine(self):
+        import tkinter
+        from tkinter import filedialog
+        window = None
+        try:
+            window = tkinter.Tk()
+            window.withdraw()
+            window.attributes('-topmost', True)
+            current = Path(self.command) if isinstance(self.command, str) else self.project_root
+            chosen = filedialog.askopenfilename(parent=window, title='選取 Stockfish 執行檔',
+                initialdir=str(current.parent if current.parent.is_dir() else self.project_root),
+                filetypes=[('執行檔', '*.exe'), ('所有檔案', '*')])
+            if chosen:
+                self.command = chosen
+                self.message = ''
+        except (tkinter.TclError, OSError) as exc:
+            self.message = f'無法開啟檔案選擇器：{exc}'
+        finally:
+            if window is not None:
+                window.destroy()
 
     def render(self, app):
         active = self.active()
@@ -110,7 +136,8 @@ class TeacherView:
         app.button('learning_data', '資料', (50, 122, 130, 34), enabled=not active)
         app.button('learning_labels', '教師標記', (195, 122, 190, 34), enabled=bool(state.get('choice')) and not active)
         app.button('learning_engine', self.draft + ' |' if self.focus else str(self.command or '輸入／貼上 Stockfish 19 執行檔路徑'),
-                   (50, 174, 790, 38), enabled=not active)
+                   (50, 174, 630, 38), enabled=not active)
+        app.button('learning_engine_pick', '選取檔案', (695, 174, 145, 38), enabled=not active)
         app.button('learning_pilot_start', '建立新先導', (50, 230, 235, 36), enabled=not active, primary=True)
         app.button('learning_pilot_stop', '停止', (310, 230, 130, 36), enabled=active)
         status = {'queued': '排隊', 'running': '量測中', 'completed': '量測完成', 'stopped': '已停止', 'failed': '失敗',
