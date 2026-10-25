@@ -8,7 +8,7 @@ from time import monotonic
 from uuid import uuid4
 
 from engine.learning.dataset import load_dataset, SPLITS
-from engine.learning.teacher import UciTeacher, TeacherStopped, MAX_SECONDS, digest, load_pilot
+from engine.learning.teacher import TeacherPool, TeacherStopped, TeacherWorkFailed, MAX_SECONDS, digest, load_pilot, validate_workers
 from engine.sessions.experiment_resume import experiment_lock
 from engine.storage.batch_storage import write_json_atomic
 
@@ -42,7 +42,8 @@ def create_labeling(dataset_path, pilot_path, *, run_path=None):
     identity.pop('identity', None)
     if (choice['identity'] != digest(identity) or choice['dataset_sha256'] != digest(data) or
             choice['pilot_snapshot_sha256'] != digest(pilot['snapshot']) or
-            choice['teacher'] != pilot['snapshot']['teacher']):
+            choice['teacher'] != pilot['snapshot']['teacher'] or
+            choice.get('workers', 1) != pilot['snapshot'].get('workers', 1)):
         raise ValueError('教師選擇與資料或先導身份不一致；請建立新先導')
     if choice['filter_version'] != 1 or choice['cp_special_threshold'] != 20000:
         raise ValueError('篩選條件版本不相容；請建立新先導')
@@ -57,6 +58,8 @@ def create_labeling(dataset_path, pilot_path, *, run_path=None):
         choice=deepcopy(choice), teacher=deepcopy(choice['teacher']), nodes=choice['nodes'],
         filter_version=choice['filter_version'], cp_special_threshold=choice['cp_special_threshold'],
         max_seconds=MAX_SECONDS, pilot_path=str(pilot_path.resolve()))
+    if 'workers' in choice:
+        snapshot['workers'] = validate_workers(choice['workers'])
     snapshot['identity'] = digest(snapshot)
     write_json_atomic(path / 'dataset.json', data)
     write_json_atomic(path / 'snapshot.json', snapshot)
@@ -79,8 +82,10 @@ def load_labeling(path):
     identity = dict(snapshot)
     identity.pop('identity', None)
     if (snapshot.get('format_version') != 1 or snapshot.get('processing_version') != LABEL_VERSION or
-            snapshot['identity'] != digest(identity) or snapshot['dataset_sha256'] != digest(data)):
+            snapshot['identity'] != digest(identity) or snapshot['dataset_sha256'] != digest(data) or
+            snapshot.get('workers', 1) != snapshot['choice'].get('workers', 1)):
         raise ValueError('標記快照版本或資料身份不一致')
+    validate_workers(snapshot.get('workers', 1))
     by_id = {s['position_id']: s for s in data['positions']}
     records, seen = [], set()
     for file in sorted((path / 'records').glob('*.json')):
@@ -153,17 +158,16 @@ def run_labeling(path, *, stop=None, progress=lambda state: None, now=monotonic,
         report()
         current_sample = None
         teacher = None
+        current_record = None
         try:
-            with UciTeacher(snapshot['teacher']['command'], stop=stop, deadline=started + MAX_SECONDS,
-                            now=now, timeout=timeout) as teacher:
-                if teacher.metadata != snapshot['teacher']:
-                    raise ValueError('教師執行檔或 UCI 條件與凍結快照不同；請建立新先導及標記實驗')
-                completed = {record['sample_id'] for record in saved['records']}
-                for sample in data['positions']:
-                    if sample['position_id'] in completed:
-                        continue
+            completed = {record['sample_id'] for record in saved['records']}
+            remaining = [sample for sample in data['positions'] if sample['position_id'] not in completed]
+            with TeacherPool(snapshot['teacher']['command'], min(snapshot.get('workers', 1), len(remaining)),
+                             metadata=snapshot['teacher'], stop=stop, deadline=started + MAX_SECONDS,
+                             now=now, timeout=timeout) as teacher:
+                for sample, record in teacher.analyse(remaining, snapshot['nodes']):
                     current_sample = sample
-                    record = teacher.analyse(sample, snapshot['nodes'])
+                    current_record = record
                     teacher.check()
                     committed = _envelope(snapshot, sample, record, 'teacher')
                     write_json_atomic(path / 'records' / f'{sample["position_id"]}.json', committed)
@@ -176,12 +180,15 @@ def run_labeling(path, *, stop=None, progress=lambda state: None, now=monotonic,
         except TeacherStopped as exc:
             report(status='stopped', error=str(exc))
         except Exception as exc:
+            if isinstance(exc, TeacherWorkFailed):
+                current_sample = exc.sample
             if current_sample is not None:
                 failure_path = path / 'failures' / f'{current_sample["position_id"]}.json'
                 previous = _read(failure_path) if failure_path.exists() else {}
                 failure = dict(sample_id=current_sample['position_id'],
                     split=current_sample['split'], error=str(exc), attempts=previous.get('attempts', 0)+1,
-                    raw_output=getattr(teacher, 'last_output', []))
+                    raw_output=exc.raw_output if isinstance(exc, TeacherWorkFailed)
+                    else (current_record or {}).get('raw_output', []))
                 write_json_atomic(failure_path, failure)
                 failures[current_sample['position_id']] = failure
             report(status='failed', error=str(exc))
