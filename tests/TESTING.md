@@ -25,9 +25,11 @@
 | `self_play/test_evaluation_comparison.py`、`test_alphabeta_comparison.py`、`test_comparison_run.py` | 共同條件、交換黑白、多候選、逐場保存、停止與舊紀錄 |
 | `self_play/test_engine_match.py`、`test_cli_roundtrip.py` | 對戰 CLI、生成／匯出／回放往返 |
 | `replay/test_replay_session.py`、`test_records_catalog.py`、`test_comparison_catalog.py` | 回放跳步、日期查找與比較摘要 |
+| `ui/test_last_move.py` | 真人落子、回放前後跳步、易位／吃過路兵變動格、無歷史、翻轉與縮放後的棋格標示 |
 | `ui/test_live_session.py` | 背景落子、真人回合、停止及舊結果隔離 |
 | `ui/test_chess_application.py` | UI 事件、搜尋設定生效、保存、回放、縮放、進行中棋局手數與分頁，以及九候選排序另存與半組配對 |
 | `test_learning_dataset.py` | 串流來源、固定抽樣與整盤分組、同組／跨組去重、合法吃過路兵身份、歷史保存、損壞／停止／保存失敗與重開 |
+| `ui/test_teacher_picker.py` | 不同專案預設路徑、原生選檔回傳與取消、中文空白路徑外部教師、無效檔案恢復及保存重開 |
 | `test_teacher_pilot.py`、`ui/test_teacher_pilot.py` | 教師完整歷史與白方視角、先導保存選擇重開、同手完整評分與界限、版本／異常／逾時／非法手、停止、八小時上限及保存失敗；UCI 使用外部可控制程序 |
 | `test_teacher_labeling.py`、`ui/test_teacher_labeling.py` | 全分組凍結標記、相容先導重用、篩選分布、正式學習閘門、共用八小時與停止、崩潰／保存失敗重試、摘要恢復、獨占執行及 UI 關閉重開續跑；只替換外部 UCI 程序 |
 | `test_discovery.py`、`test_engine_imports.py` | 測試發現及獨立程序載入 |
