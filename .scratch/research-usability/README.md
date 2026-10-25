@@ -15,11 +15,11 @@
 | --- | --- | --- | --- | --- |
 | R01 | [選取 Stockfish 執行檔](issues/01-stockfish-picker.md) | 無 | 預設路徑、系統選檔、實際先導與重開 | 已驗收、已整合 |
 | R02 | [教師並行與停止續跑](issues/02-parallel-teachers.md) | 無 | 可調 workers 的先導及標記，凍結條件與舊資料相容 | 已驗收、已整合 |
-| R03 | [後續標記耗時預估](issues/03-labeling-estimates.md) | R02 | 以相同並行條件實測比較兩種預算的後續耗時 | 實作中 |
+| R03 | [後續標記耗時預估](issues/03-labeling-estimates.md) | R02 | 以相同並行條件實測比較兩種預算的後續耗時 | 已驗收、已整合 |
 | R04 | [最後一手變動格](issues/04-last-move-highlights.md) | 無 | 真人及回放正確標示特殊走棋、倒退及翻轉 | 已驗收、已整合 |
 | R05 | [評分設定檔搜尋與群組篩選](issues/05-profile-selector.md) | 無 | 各入口查找設定並在比較中多選候選 | 已驗收、已整合 |
-| R06 | [真人開局與搜尋狀態](issues/06-live-opening-state.md) | 無 | 真人顯示正確狀態，批次開局步數語意清楚 | 實作中 |
-| R07 | [CMD 環境與下載說明](issues/07-readme-onboarding.md) | R01、R03 | 對應實際教師介面的精簡 README 與可替換資源範例 | 等待 R03 |
+| R06 | [真人開局與搜尋狀態](issues/06-live-opening-state.md) | 無 | 真人顯示正確狀態，批次開局步數語意清楚 | 已驗收、已整合 |
+| R07 | [CMD 環境與下載說明](issues/07-readme-onboarding.md) | R01、R03 | 對應實際教師介面的精簡 README 與可替換資源範例 | 文件整理中 |
 
 沒有必要的全域前置重構。R02 在既有教師邊界內整合共用並行能力；R05 在第一個入口建立共用選擇器並接入其他入口，均隨各票交付可用流程。R01 與 R02 有共用畫面編輯位置，實作時協調修改即可，不構成功能阻擋。
 
