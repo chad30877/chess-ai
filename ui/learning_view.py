@@ -36,7 +36,7 @@ class LearningView:
         self.sample_index = 0
         self.recent_page = 0
         self.page = 'data'
-        self.teacher = TeacherView()
+        self.teacher = TeacherView(root)
         self.labels = LabelView()
         self.training = TrainingView(root)
         self.group_training = GroupTrainingView(root)
