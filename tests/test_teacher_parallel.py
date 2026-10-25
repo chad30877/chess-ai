@@ -22,7 +22,7 @@ from pathlib import Path
 log = Path(__file__).with_name(str(os.getpid()) + '.trace')
 def trace(event, **fields):
  with log.open('a', encoding='utf-8') as stream:
-  stream.write(json.dumps(dict(event=event, pid=os.getpid(), time=time.monotonic(), **fields)) + '\\n')
+  stream.write(json.dumps(dict(event=event, pid=os.getpid(), time=time.perf_counter(), **fields)) + '\\n')
 trace('process')''', 1)
     code = code.replace(" line=line.strip()", " line=line.strip()\n trace('command', command=line)")
     code = code.replace('  import chess', '''  nodes=int(line.split()[-1])

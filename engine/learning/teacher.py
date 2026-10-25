@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from contextlib import ExitStack
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 from queue import Queue, Empty
@@ -27,6 +28,7 @@ OPTIONS = {'Threads': 1, 'Hash': 16, 'MultiPV': 1, 'Ponder': False,
            'Skill Level': 20, 'UCI_LimitStrength': False, 'SyzygyPath': '', 'SyzygyProbeLimit': 0}
 RESET_POLICY = 'ucinewgame-clear-hash-isready-before-each-position-v1'
 SCORE_POLICY = 'latest-exact-pv-matches-bestmove-else-final-score-v1'
+SAMPLE_FIELDS = ('game_id', 'split', 'stage', 'initial_fen', 'moves_uci', 'fen')
 SOURCE = {'url': 'https://github.com/official-stockfish/Stockfish/releases/tag/sf_19',
           'source_url': 'https://github.com/official-stockfish/Stockfish/archive/refs/tags/sf_19.zip',
           'license': 'GPL-3.0', 'tag': 'sf_19'}
@@ -34,6 +36,57 @@ SOURCE = {'url': 'https://github.com/official-stockfish/Stockfish/releases/tag/s
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
+
+
+def teacher_record_matches(record, sample, nodes, score_policy):
+    return (record.get('sample_id') == sample['position_id'] and
+            record.get('requested_nodes') == nodes and record.get('score_policy') == score_policy and
+            all(record.get(key) == sample[key] for key in SAMPLE_FIELDS))
+
+
+def reusable_pilot_records(data, pilot, nodes):
+    """估時與標記建立共用同一重用條件；篩除結果也已完成教師分析。"""
+    by_id = {sample['position_id']: sample for sample in data['positions']}
+    policy = pilot['snapshot']['teacher']['score_policy']
+    reusable = {}
+    for record in pilot['records']:
+        sample = by_id.get(record.get('sample_id'))
+        if sample and teacher_record_matches(record, sample, nodes, policy):
+            reusable[sample['position_id']] = record
+    return reusable
+
+
+def _labeling_estimates(pilot):
+    estimates = {str(nodes): dict(seconds=None, measured_seconds=None, completed=0,
+                                 remaining=None, reused=0) for nodes in BUDGETS}
+    snapshot = pilot.get('snapshot')
+    if not snapshot:
+        return estimates
+    try:
+        data = load_dataset(snapshot['dataset_path'])
+    except (OSError, ValueError, KeyError, TypeError):
+        return estimates
+    if digest(data) != snapshot['dataset_sha256']:
+        return estimates
+    measurements = pilot.get('budget_measurements')
+    if not isinstance(measurements, dict): measurements = {}
+    for nodes in BUDGETS:
+        estimate = estimates[str(nodes)]
+        reused = len(reusable_pilot_records(data, pilot, nodes))
+        estimate.update(remaining=len(data['positions']) - reused, reused=reused)
+        measurement = measurements.get(str(nodes), {})
+        if not isinstance(measurement, dict): continue
+        elapsed, completed = measurement.get('elapsed_seconds'), measurement.get('completed')
+        if (measurement.get('workers') != snapshot.get('workers', 1) or
+                isinstance(completed, bool) or not isinstance(completed, int) or
+                not 0 < completed <= snapshot['sample_count'] or
+                isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)) or
+                not math.isfinite(elapsed) or elapsed <= 0):
+            continue
+        estimate.update(measured_seconds=elapsed, completed=completed)
+        if pilot['status'] == 'completed':
+            estimate['seconds'] = estimate['remaining'] * elapsed / completed
+    return estimates
 
 
 class TeacherStopped(Exception):
@@ -392,6 +445,7 @@ def load_pilot(path):
         state['summary'] = _summary(state['snapshot'], state['records'])
         state['completed'] = len(state['records'])
     state['choice'] = json.loads((path / 'choice.json').read_text(encoding='utf-8')) if (path / 'choice.json').exists() else None
+    state['labeling_estimates'] = _labeling_estimates(state)
     return state
 
 

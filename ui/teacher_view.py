@@ -4,6 +4,13 @@ import pygame
 from engine.learning.teacher import PilotRun, choose_budget, load_pilot, default_teacher_workers, validate_workers
 
 
+def _duration(seconds):
+    if 0 < seconds < .1: return '< 0.1 秒'
+    if seconds < 60: return f'{seconds:.1f} 秒'
+    if seconds < 3600: return f'{seconds / 60:.1f} 分'
+    return f'{seconds / 3600:.1f} 小時'
+
+
 class TeacherView:
     def __init__(self, root=None):
         self.dataset = None
@@ -161,15 +168,23 @@ class TeacherView:
                   'interrupted': '未完成，請建立新先導'}
         if state:
             display_status = 'interrupted' if state['status'] in ('running', 'queued') and not active else state['status']
+            saved_workers = f' · 實測 {state["snapshot"].get("workers", 1)} 程序' if state.get('snapshot') else ''
             app.text(f'{status.get(display_status, "未完成")} · {state.get("completed", 0)}/{state.get("total", 0)}'
-                     f' · {state.get("elapsed_seconds", 0):.1f} 秒', 50, 285, width=790)
+                     f' · {state.get("elapsed_seconds", 0):.1f} 秒{saved_workers}', 50, 285, width=790)
         if self.message or state.get('error'):
             app.text(self.message or state['error'], 50, 321, width=790)
         summary = state.get('summary')
         if summary:
             for index, nodes in enumerate((50000, 200000)):
                 group = summary['budgets'][str(nodes)]
-                app.text(f'{nodes:,} 節點：{group["elapsed_seconds"]:.2f} 秒 · 已完成 {group["completed"]} · 將篩除 {group["excluded"]}',
+                estimate = state.get('labeling_estimates', {}).get(str(nodes), {})
+                if estimate:
+                    elapsed = estimate.get('measured_seconds')
+                else:
+                    elapsed = state.get('budget_measurements', {}).get(str(nodes), {}).get('elapsed_seconds')
+                measured = _duration(elapsed) if elapsed is not None else '未取得'
+                expected = '約 ' + _duration(estimate['seconds']) if estimate.get('seconds') is not None else '無法估計'
+                app.text(f'{nodes:,} 節點 · 實測 {measured} · 後續標記 {expected} · 篩除 {group["excluded"]}',
                          50, 365 + index * 32, width=790)
             difference = summary['mean_absolute_difference_cp']
             text = f'{difference:.2f} cp' if difference is not None else '無有效配對'
