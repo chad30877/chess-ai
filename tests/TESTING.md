@@ -31,6 +31,7 @@
 | `test_learning_dataset.py` | 串流來源、固定抽樣與整盤分組、同組／跨組去重、合法吃過路兵身份、歷史保存、損壞／停止／保存失敗與重開 |
 | `ui/test_teacher_picker.py` | 不同專案預設路徑、原生選檔回傳與取消、中文空白路徑外部教師、無效檔案恢復及保存重開 |
 | `test_teacher_pilot.py`、`ui/test_teacher_pilot.py` | 教師完整歷史與白方視角、先導保存選擇重開、同手完整評分與界限、版本／異常／逾時／非法手、停止、八小時上限及保存失敗；UCI 使用外部可控制程序 |
+| `test_teacher_parallel.py` | 外部教師重疊上限、亂序歷史、分預算整批量測、少量工作、凍結條件、舊資料身分、停止／失敗／期限及程序清理 |
 | `test_teacher_labeling.py`、`ui/test_teacher_labeling.py` | 全分組凍結標記、相容先導重用、篩選分布、正式學習閘門、共用八小時與停止、崩潰／保存失敗重試、摘要恢復、獨占執行及 UI 關閉重開續跑；只替換外部 UCI 程序 |
 | `test_discovery.py`、`test_engine_imports.py` | 測試發現及獨立程序載入 |
 | `test_ticket_completion.py` | 未驗收就關票、漏關票、GitHub／本機驗收不同步與發布索引定位 |
@@ -38,6 +39,7 @@
 | `helpers/executors.py` | 供流程測試手動完成背景工作 |
 
 UI 測試使用 dummy 顯示驅動。含程序觀測的測試與獨立效能工具使用選用套件 `psutil`；效能量測見[搜尋與評分](../docs/搜尋與評分.md)，不在例行測試斷言深度 5 秒數。
+教師 UI 測試另涵蓋低 CPU 預設、workers 輸入、先導部分停止重開、凍結程序數，以及標記執行中關閉後續跑。真實 Stockfish 2 程序短流程見 [R02 驗收](../.scratch/research-usability/issues/02-parallel-teachers.md)。
 學習資料測試使用 `zstandard` 與小型本機棋譜；UI 事件另驗證建立、停止、修改種子另建、關閉重開與完整歷史回放，不下載整月資料。
 資料建立另驗證 Windows 暫時讀鎖解除後可原子提交、持續拒絕仍失敗；外部真實 60 盤／Stockfish／組合與深度三 UI 驗收證據見 [M11](../.scratch/ml-small-trial/issues/11-offline-guide-acceptance.md)，不在日常測試跑正式研究。離線教材以資源檢查及實際渲染驗收，不為文案或圖數新增測試。
 `self_play/test_experiment_flow.py`：從權重預覽到真實逐局保存，核對不可變設定、工作識別、失效預覽與非法候選阻擋。
