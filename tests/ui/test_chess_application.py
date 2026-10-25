@@ -220,7 +220,7 @@ class ChessApplicationTest(unittest.TestCase):
         board = chess.Board("r5k1/5ppp/8/3P4/2P5/2N5/5PPP/R1B1KB2 w Q - 0 1")
         for group, terms in expected_groups.items():
             with self.subTest(group=group):
-                self.click("editor_profile")
+                self.select_profile("editor_profile", "learning-" + group)
                 config = self.app.replay_editor.config
                 breakdown = HandcraftedEvaluator(config=config).evaluate_breakdown(board)
                 self.assertEqual({name for name, term in breakdown.terms.items() if term.enabled}, terms | {"material"})
@@ -247,7 +247,7 @@ class ChessApplicationTest(unittest.TestCase):
         self.assertTrue(self.app.open_replay(Path("data/replays/sample_replay.json")))
         self.click("replay_edit")
         self.assertIsNotNone(self.app.replay_editor)
-        self.click("editor_profile")
+        self.select_profile("editor_profile", "learning-coordination")
         config = self.app.replay_editor.config
         self.assertTrue(config.phase_enabled)
         self.assertFalse(config.pst_enabled)
@@ -262,10 +262,7 @@ class ChessApplicationTest(unittest.TestCase):
         self.assertEqual(restored, config)
         self.click("home")
         self.click("mode:human")
-        for _ in range(len(self.app.live_evaluation_files)):
-            if self.app.live_evaluation_file == saved:
-                break
-            self.click("live_evaluation")
+        self.select_profile("live_evaluation", saved.stem)
         self.click("start")
         self.assertEqual(self.app.live.settings.black_evaluation, config)
 
@@ -337,6 +334,13 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.render()
         button = next(b for b in self.app.buttons if b.action == action)
         self.app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=button.rect.center))
+
+    def select_profile(self, action, name):
+        self.click(action)
+        self.click('profile_search')
+        self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=name))
+        self.click('profile_row:0')
+        self.click('profile_confirm')
 
     def square_click(self, square):
         x, y = self.app.board_view._square_to_screen(square, self.app.flipped)
@@ -927,14 +931,14 @@ class ChessApplicationTest(unittest.TestCase):
             (folder / f'extra{index}.json').write_text(json.dumps(EvaluationConfig(pst_weight=index + 2).to_dict()), encoding='utf-8')
         self.click('mode:auto')
         self.click('batch_mode:evaluation')
-        for _ in range(7):
-            self.click('comparison_candidate_add')
+        for index in range(7):
+            self.select_profile('comparison_candidate_add', f'extra{index}')
         self.click('comparison_files_prev')
         self.click('comparison_files_next')
-        self.click('comparison_candidate_select:7')
+        self.select_profile('comparison_candidate_select:7', 'extra7')
         self.click('comparison_candidate_remove:7')
         self.assertEqual(len(self.app.evaluation_fields.candidates), 7)
-        self.click('comparison_candidate_add')
+        self.select_profile('comparison_candidate_add', 'extra7')
         self.enter_comparison_field('max_plies', '0')
         self.enter_comparison_field('depth', '1')
         self.click('start')
@@ -953,7 +957,7 @@ class ChessApplicationTest(unittest.TestCase):
         self.enter_comparison_field("search_workers", "2")
         self.enter_comparison_field("transposition_capacity", "3")
         self.enter_comparison_field("max_plies", "1")
-        self.click("comparison_candidate_add")
+        self.select_profile("comparison_candidate_add", "third")
         self.click("start")
         self.app.render()
         self.assertNotIn("pause", {button.action for button in self.app.buttons})
@@ -1065,7 +1069,7 @@ class ChessApplicationTest(unittest.TestCase):
                 self.assertIn("無法開始", self.app.message)
                 self.assertFalse((self.project / "data/batches").exists())
                 setup.values[field] = original
-        self.click("comparison_file:baseline")
+        self.select_profile("comparison_file:baseline", "example_tapered")
         self.assertEqual(self.app.evaluation_fields.baseline.name, "example_tapered.json")
         for size in ((900, 768), APP_SIZE, (1800, 1536)):
             self.app.resize(pygame.Surface(size))

@@ -8,6 +8,7 @@ import pygame
 
 from engine.evaluation.config import EvaluationConfig
 from ui.evaluation_profiles import profile_button
+from ui.profile_selector import ProfileSelector
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.sessions.evaluation_comparison import ComparisonParticipant, ComparisonSearchConfig, _normalized_positions
 
@@ -184,29 +185,25 @@ class EvaluationFields:
                 self.message = str(exc)
         elif action.startswith("comparison_file:"):
             self.commit()
-            side = action.split(":")[1]
-            if self.files:
-                current = getattr(self, side)
-                setattr(self, side, self.files[(self.files.index(current) + 1) % len(self.files)])
+            app.profile_selector = ProfileSelector(
+                self.project / 'configs/evaluation', [self.baseline], self.select_baseline)
         elif action == "comparison_files_next":
             self.file_page = (self.file_page + 1) % max(1, (len(self.candidates) + 6) // 7)
         elif action == "comparison_files_prev":
             self.file_page = max(0, self.file_page - 1)
         elif action == "comparison_candidate_add":
             self.commit()
-            available = [path for path in self.files if path != self.baseline and path not in self.candidates]
-            if available:
-                self.candidates.append(available[0])
-                self.file_page = (len(self.candidates) - 1) // 7
+            app.profile_selector = ProfileSelector(
+                self.project / 'configs/evaluation', self.candidates, self.select_candidates,
+                multiple=True, excluded=[self.baseline])
         elif action.startswith("comparison_candidate_select:"):
             index = int(action.split(":")[1])
             if 0 <= index < len(self.candidates):
                 current = self.candidates[index]
-                available = [path for path in self.files
-                             if path != self.baseline and (path == current or path not in self.candidates)]
-                if available:
-                    current_index = available.index(current) if current in available else -1
-                    self.candidates[index] = available[(current_index + 1) % len(available)]
+                app.profile_selector = ProfileSelector(
+                    self.project / 'configs/evaluation', [current],
+                    lambda paths: self.replace_candidate(index, paths[0]),
+                    excluded=[self.baseline, *(path for path in self.candidates if path != current)])
         elif action.startswith("comparison_candidate_remove:"):
             index = int(action.split(":")[1])
             if 0 <= index < len(self.candidates) and len(self.candidates) > 1:
@@ -217,6 +214,18 @@ class EvaluationFields:
             self.focus = action.split(":")[1]
             self.draft = self.values[self.focus]
             pygame.key.start_text_input()
+
+    def select_baseline(self, paths):
+        self.baseline = paths[0]
+        self.select_candidates(self.candidates)
+
+    def select_candidates(self, paths):
+        self.candidates = list(dict.fromkeys(path for path in paths if path != self.baseline))
+        self.file_page = min(self.file_page, max(0, (len(self.candidates) - 1) // 7))
+
+    def replace_candidate(self, index, path):
+        self.candidates[index] = path
+        self.select_candidates(self.candidates)
 
     def render(self, app):
         app.text("Ctrl+A 清空，Enter 確認。", 64, 158, muted=True)
@@ -268,10 +277,9 @@ class EvaluationFields:
                 y = 226 + (index - offset) * 38
                 profile_button(app, f"comparison_candidate_select:{index}", path, (460, y, 315, 32))
                 app.button(f"comparison_candidate_remove:{index}", "移除", (780, y, 56, 32))
-            app.button("comparison_candidate_add", "加入下一份不同設定檔",
+            app.button("comparison_candidate_add", "選擇候選設定（可多選）",
                        (460, 500, 376, 32),
-                       enabled=any(
-                           path != self.baseline and path not in self.candidates for path in self.files))
+                       enabled=True)
             app.button("comparison_files_prev", "上一頁", (460, 540, 180, 32), enabled=self.file_page > 0)
             app.button("comparison_files_next", "下一頁", (650, 540, 186, 32), enabled=(self.file_page + 1) * 7 < len(self.candidates))
         app.button('comparison_openings_generate', '產生 32 條共同開局線', (64, 672, 240, 40))

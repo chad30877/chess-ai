@@ -8,6 +8,7 @@
 
 | 檔案 | 測試內容 |
 | --- | --- |
+| `ui/test_profile_selector.py` | 共用設定選擇小視窗的名稱／群組查找、捲動、取消、各入口實際套用、多候選比較及損壞檔案恢復 |
 | `rules/test_game_rules.py` | 共用棋規、特殊走法、重複歷史與終局 |
 | `evaluation/test_evaluation_config.py`、`test_evaluator_semantics.py` | 設定驗證、舊版本讀取、保存、總分與白方視角 |
 | `evaluation/test_numeric_evaluation.py`、`search/test_numeric_search.py` | 全項／混合／零權重與特殊走法的舊版數值、分項一致性、單／多程序搜尋選步及原棋盤歷史 |
