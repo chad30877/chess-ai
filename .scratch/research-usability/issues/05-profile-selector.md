@@ -40,7 +40,7 @@
 
 - `tests/ui/test_profile_selector.py` 的七個應用程式事件案例驗證：真人及一般批次白黑方實際使用所選設定、回放載入及另存後重新查找；中文搜尋、18 份清單捲動；部分活動力＋王安全及額外協調的包含／精確差異、分階段開關不參與分類；純子力套用；多選取消、去重、排除基準及真實短比較保存；損壞檔不可選、確認前檔案消失不覆寫原值且可恢復選取。
 - 更新既有 `tests/ui/test_chess_application.py` 的設定選取操作以使用新對話窗；保留單群組實際評分、另存後真人套用、第八候選選取／移除／執行、多候選設定保存及無效輸入回歸。
-- `python -m unittest tests.ui.test_chess_application tests.ui.test_profile_selector -q`：57 項通過；新增多選比較保存斷言後，另跑選擇器七項皆通過。
+- `python -m unittest tests.ui.test_chess_application tests.ui.test_profile_selector -q`：57 項通過；新增多選比較保存斷言後，另跑選擇器七項皆通過。完整 UI 回歸 `python -m unittest discover -s tests/ui -t . -q` 共 76 項通過（130.477 秒）；合併整合分支後再跑選擇器七項通過。
 - Agent 執行 [畫面重現腳本](../evidence/r05-selector.py)，以真實應用程式事件操作 24 份長中文名稱設定，選兩份後切換精確組合，捲到第 23 份再多選並確認實際候選共三份；資料僅存暫存目錄，未修改研究資料。
 - Agent 目視檢查 [大量結果／多選](../evidence/r05-selector-many.png)（1280×960）及 [精確篩選／捲動](../evidence/r05-selector-scrolled.png)（900×768）。畫面由應用程式使用 dummy 顯示驅動渲染；名稱、實際群組摘要、已選標記、分頁與套用控制皆可辨識，沒有行間遮蓋。選擇小視窗使用應用程式內獨立模態對話窗。
 
