@@ -1,0 +1,2620 @@
+{
+  "repository": "chad30877/chess-ai",
+  "issues": [
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## Problem Statement\n\n目前評分器已有多個可調評分項，但分數拆解沒有出現在棋譜回放中，使用者難以理解各項如何影響局面分數。建立、調整多份評分設定檔也缺少順手的流程；真人對 AI 不能選擇設定檔或使用 Alpha-Beta。使用者希望以逐步、可檢視的方式調整既有設定，並以一致條件比較多份候選。\n\n## Solution\n\n在棋譜回放中顯示選定局面的靜態評分與已啟用評分項貢獻，並讓使用者以該棋譜實際使用的設定為起點調整既有欄位、即時查看局面分數變化、另存新設定檔。真人對 AI 加入 Alpha-Beta，讓對局可選擇已保存的評分設定檔。評分比較則擴充為一份基準對多份候選，以共同條件對局並並排呈現結果。\n\n交付順序：\n1. 棋譜回放的靜態評分拆解。\n2. 回放內調整設定、即時重算與另存新檔。\n3. 真人使用設定檔對 Alpha-Beta 對局。\n4. 多候選設定對照同一基準。\n\n## User Stories\n\n1. As a 棋譜回放使用者, I want 在目前回放局面看到總分, so that 我能快速理解評分器對此局面的判斷。\n2. As a 棋譜回放使用者, I want 知道總分是局面靜態評分, so that 我不會把它誤認為 Alpha-Beta 搜尋結果。\n3. As a 棋譜回放使用者, I want 總分以兵為單位、從白方視角呈現, so that 正負值有一致含義。\n4. As a 棋譜回放使用者, I want 以 0 為中心的雙向條形圖看到各已啟用評分項, so that 我能比較各項的正負方向和貢獻大小。\n5. As a 棋譜回放使用者, I want 每個條形圖項目顯示精確分數, so that 我可以核對分項加總和總分。\n6. As a 棋譜回放使用者, I want 選取棋譜步數後看到落子完成後的評分, so that 評分局面與目前棋盤一致。\n7. As a 棋譜回放使用者, I want 在現有回放資訊面板看到評分, so that 我不必切換到另一個分析頁。\n8. As a 調整評分設定的使用者, I want 從棋譜保存的實際設定建立草稿, so that 我能以重現該局 AI 行為的設定為起點。\n9. As a 調整評分設定的使用者, I want 按類別收合現有可調項, so that 編輯器不會一次顯示過多欄位。\n10. As a 調整評分設定的使用者, I want 預設聚焦已啟用的評分項, so that 我能先處理目前參與計分的設定。\n11. As a 調整評分設定的使用者, I want 修改既有設定欄位後立即看到該局面的總分和分項更新, so that 我能理解設定變化對此局面的影響。\n12. As a 調整評分設定的使用者, I want 把修改後設定另存為新設定檔, so that 原設定和既有對局紀錄仍可重現。\n13. As a 調整評分設定的使用者, I want 保留原設定並能放棄未保存草稿, so that 試驗不會意外覆寫設定。\n14. As 一位下棋的使用者, I want 在真人對局選擇一份已保存的評分設定檔, so that 我能實際體驗不同評分設定。\n15. As 一位下棋的使用者, I want 與使用該設定檔的 Alpha-Beta AI 對局, so that AI 能使用多步搜尋而非只看單步。\n16. As 一位下棋的使用者, I want 固定深度 Alpha-Beta 預設使用深度 2, so that 初次對局有明確且可重現的搜尋設定。\n17. As 一位下棋的使用者, I want 先只調整搜尋深度, so that 對局設定不會被其他搜尋選項淹沒。\n18. As 一位下棋的使用者, I want 真人對局初始選用 stable 設定檔, so that 不必先建立設定就能開始對局。\n19. As 一位查看真人棋譜的使用者, I want 棋譜保存實際使用的評分與搜尋設定, so that 之後仍能重現和解釋這盤棋。\n20. As 一位比較評分設定的使用者, I want 一次選一份基準與多份候選, so that 我能在同一批實驗中檢查多種設定。\n21. As 一位比較評分設定的使用者, I want 每份候選使用相同局面集、搜尋設定與預算對照基準, so that 結果能公平比較。\n22. As 一位比較評分設定的使用者, I want 每個起始局面交換黑白, so that 先後手影響能被控制。\n23. As 一位比較評分設定的使用者, I want 並排查看各候選對基準的結果, so that 我能逐一判讀候選而不把小樣本當成確定排名。\n24. As 一位調整評分設定的使用者, I want 用回放分數理解局面、用成對對局評估棋力, so that 單一局面的改善不會被誤認為整體棋力提升。\n25. As 一位調整評分設定的使用者, I want 以未參與調整的局面驗證候選設定, so that 我能檢查設定是否只適合已反覆查看的棋局。\n\n## Implementation Decisions\n\n- 評分項集合維持現況；本規格不新增評分項。\n- 回放顯示局面靜態評分，不把 Alpha-Beta 搜尋分數混入分項圖。總分與分項均以兵為單位、白方視角表示。\n- 條形圖以 0 為中心；正值向右代表有利白方，負值向左代表有利黑方。只顯示已啟用評分項，並顯示精確貢獻。\n- 評分使用棋譜目前選定步完成後的棋盤，放在現有回放資訊面板。\n- 調參草稿以該棋譜保存的實際評分設定為起點。所有既有可調欄位按類別收合，預設展開已啟用項；調整時重新計算目前局面的靜態評分。\n- 設定以另存新檔保存，不覆寫原設定。只有已保存的設定檔能被真人對局選用。\n- 真人對 AI 支援 Alpha-Beta 固定深度搜尋，預設深度 2，初版只向使用者提供深度設定；其他搜尋選項沿用現有預設。真人對局設定頁可選評分設定檔，預設 stable.json。\n- 真人棋譜保存實際評分設定及 Alpha-Beta 搜尋設定。\n- 多候選比較使用共同基準、局面集、搜尋設定和預算；每個局面交換黑白，結果逐候選呈現，不自動產生最佳設定排名。\n- 調參流程每輪只改少量相關權重，記錄預期影響；以未參與調整的新局面驗證候選。回放分數是理解工具，不是棋力證據。\n\n## Testing Decisions\n\n- 測試使用者可觀察的完整行為，不鎖定繪圖私有函式、欄位存在與否或其他實作細節。\n- 回放驗收涵蓋目前選定局面、總分、分項方向與精確值；總分應與已啟用分項貢獻一致。\n- 調參驗收涵蓋複製棋譜設定、修改後即時更新、另存後重新載入，以及原設定未被覆寫。\n- 真人對局驗收涵蓋所選評分設定與深度確實用於 AI 選步，並出現在已保存棋譜設定中。\n- 多候選比較驗收涵蓋共同實驗條件、交換黑白、候選各自的結果及完整／未完成配對處理。\n- 先前的回放 UI、真人 LiveSession 和評分比較流程已有外部行為測試，可沿用其測試邊界與資料模式。\n\n## Out of Scope\n\n- 新增評分項、機器學習或自動調整評分權重。\n- 在進行中的真人棋局即時顯示分數圖。\n- Alpha-Beta 固定時間搜尋、棋鐘或悔棋。\n- 依有限樣本自動宣布最佳設定，或宣稱已證明棋力提升。\n\n## Further Notes\n\n- 設定比較應固定搜尋條件並交換黑白；候選應以未用來調整的局面驗證。\n- 版本化完整設定快照是回放調整、真人對局與實驗結果可重現的共同基礎。",
+      "closedAt": "2026-10-14T09:13:32Z",
+      "comments": [],
+      "createdAt": "2026-10-14T08:38:49Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 1,
+      "parent": null,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "規劃評分可視化、設定調整與 Alpha-Beta 對戰",
+      "updatedAt": "2026-10-14T09:13:32Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/1"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## Parent\n\nPart of #1\n\n## What to build\n\n在棋譜回放中查看目前局面的靜態評分，能直接理解總分由哪些已啟用評分項組成。\n\n## Acceptance criteria\n\n- [ ] 選取棋譜步數時，評分對應落子後的目前棋盤；初始局面也能正確顯示。\n- [ ] 現有回放資訊面板顯示白方視角、以兵為單位的靜態總分。\n- [ ] 以 0 為中心的雙向條形圖只顯示已啟用評分項；正值向右、負值向左，並顯示精確貢獻值。\n- [ ] 總分和圖表清楚表示是局面靜態評分，不混淆 Alpha-Beta 搜尋分數。\n- [ ] 已啟用項目貢獻加總與顯示總分相符。\n\n## Blocked by\n\nNone (can start immediately).",
+      "closedAt": "2026-10-14T09:13:30Z",
+      "comments": [],
+      "createdAt": "2026-10-14T08:40:06Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 2,
+      "parent": null,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "在棋譜回放顯示局面靜態評分拆解",
+      "updatedAt": "2026-10-14T09:13:30Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/2"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## Parent\n\nPart of #1\n\n## What to build\n\n從棋譜實際使用的評分設定建立可編輯草稿；調整既有設定時，回放分數即時更新，並能將結果另存為新的評分設定檔。\n\n## Acceptance criteria\n\n- [ ] 編輯起點是棋譜保存的實際評分設定。\n- [ ] 現有可調項依類別收合，預設展開已啟用項；不提供新增評分項的流程。\n- [ ] 修改設定時，當前局面的靜態總分與分項貢獻立即更新。\n- [ ] 可為草稿命名並另存為新設定檔；不覆寫來源檔或棋譜保存的設定快照。\n- [ ] 放棄未保存的草稿後，來源設定仍保持不變。\n- [ ] 另存的設定檔可重新載入，且能重現保存前看到的評分結果。\n\n## Blocked by\n\n- #2 在棋譜回放顯示局面靜態評分拆解。",
+      "closedAt": "2026-10-14T09:13:33Z",
+      "comments": [],
+      "createdAt": "2026-10-14T08:40:14Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 3,
+      "parent": null,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "在棋譜回放調整並另存評分設定",
+      "updatedAt": "2026-10-14T09:13:33Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/3"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## Parent\n\nPart of #1\n\n## What to build\n\n在真人對局中選擇 Alpha-Beta 對手與一份已保存的評分設定檔，並能設定搜尋深度。\n\n## Acceptance criteria\n\n- [ ] 真人對局可選擇 Alpha-Beta；Random 與 Greedy 仍可使用。\n- [ ] 評分設定檔選擇器列出已保存設定，初始預選 stable.json。\n- [ ] Alpha-Beta 使用所選評分設定；固定深度預設為 2，使用者可調整深度。\n- [ ] 完成對局或保存棋譜時，記錄實際評分設定檔內容與搜尋深度。\n- [ ] 對局流程維持合法落子、終局判定及既有真人操作行為。",
+      "closedAt": "2026-10-14T09:13:35Z",
+      "comments": [],
+      "createdAt": "2026-10-14T08:40:27Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 4,
+      "parent": null,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "讓真人使用 Alpha-Beta 與指定評分設定檔對戰",
+      "updatedAt": "2026-10-14T09:13:35Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/4"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## Parent\n\nPart of #1\n\n## What to build\n\n在同一批評分比較中選擇一份基準與多份候選，並以一致的對局條件分別比較及呈現結果。\n\n## Acceptance criteria\n\n- [ ] 可選一份基準與多份不同候選評分設定檔。\n- [ ] 所有候選共用相同的起始局面集、搜尋設定、預算與配對條件。\n- [ ] 每份候選在每個起始局面各執一次白、一次黑，配對結果與未完成配對分開計算。\n- [ ] 結果逐候選呈現基準對照的勝、和、敗與配對得分率。\n- [ ] 候選結果並排可讀，不依有限樣本自動選出或排名最佳設定。\n- [ ] 批次保存可追溯每份候選與基準的完整設定快照和共同搜尋條件。",
+      "closedAt": "2026-10-14T09:13:36Z",
+      "comments": [],
+      "createdAt": "2026-10-14T08:40:28Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 5,
+      "parent": null,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "以一份基準比較多份候選評分設定",
+      "updatedAt": "2026-10-14T09:13:36Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/5"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "# Alpha-Beta 多核心搜尋與有界置換表\n\n## 問題陳述\n\n固定深度 5 的 Alpha-Beta 單步搜尋等待過久。目前自動對戰的程序並行分派不同對局，不能加速同一局面的搜尋。置換表只有同鍵覆寫的取捨，缺乏容量上限與全表淘汰；每次搜尋結束即丟棄內容。\n\n使用者希望所有 Alpha-Beta 使用情境能設定搜尋 worker 數，自動對戰也能讓每盤搜尋多核心執行，同時保留可設定的同時對局數與逐場保存。\n\n## 解決方案\n\n提供能實際跨核心執行的 Alpha-Beta 搜尋，將搜尋 worker 數與同時對局數分開設定，不新增依 CPU 核心數限制兩者乘積的規則。以程序平行根節點分枝作為優先評估方案，涵蓋真人對 AI、一般批次 Alpha-Beta 對戰，以及評分比較的 UI、CLI 和服務介面。\n\n置換表先加入最大項目數及淘汰策略，以搜尋深度、界限類型與世代新舊衡量保留價值。初版仍限同一次搜尋使用；跨搜尋保留只做後續可行性評估，不直接上線。\n\n## 使用者故事\n\n1. 身為真人對 AI 的使用者，我希望單次 Alpha-Beta 搜尋能使用多核心，以縮短固定深度 5 的落子等待。\n2. 身為使用者，我希望設定每次搜尋的 worker 數，以選擇投入多少 CPU 工作資源。\n3. 身為服務介面使用者，我希望同一搜尋能力能用於各 Alpha-Beta 呼叫入口，以維持設定語意一致。\n4. 身為使用者，我希望 worker 代表可執行 CPU 工作的單位，以取得多核心效果，而不被純 Python threads 的限制影響。\n5. 身為自動對戰使用者，我希望一般批次能選 Alpha-Beta 對戰，以直接產生所需對局。\n6. 身為自動對戰使用者，我希望同時對局數與搜尋 worker 數分開設定，以調整每盤速度與批次吞吐。\n7. 身為自動對戰使用者，我希望這兩個設定的乘積可超過核心數，以自行決定資源配置。\n8. 身為自動對戰使用者，我希望每場完成即保存，以在整批完成前取得可回放結果。\n9. 身為使用者，我希望停止或離開時取消在途搜尋並清理程序，以結束工作而不遺留背景計算。\n10. 身為使用者，我希望搜尋逾時或取消時取得既有契約允許的結果，以避免半完成分枝被當成完整搜尋。\n11. 身為使用者，我希望 worker 故障能回報失敗且保留已發布對局，以理解問題並取得既有成果。\n12. 身為使用者，我希望置換表項目數有上限，以限制每張表的成長。\n13. 身為使用者，我希望容量滿時優先保留較有價值的結果，以減少丟棄深度、精確界限與新近資訊的代價。\n14. 身為使用者，我希望不同棋規歷史、將死距離或評分設定的結果不被混用，以維持搜尋語意。\n15. 身為評分比較使用者，我希望基準設定和各候選設定使用相同搜尋 worker 與置換表條件，以保持比較條件一致。\n16. 身為對局紀錄使用者，我希望保存實際使用的搜尋與置換表設定，以理解對戰條件。\n17. 身為對局紀錄使用者，我希望既有批次與棋譜仍能讀取，以持續使用已保存資料。\n18. 身為使用者，我希望多核心結果符合合法落子與搜尋契約，而不要求與單 worker 的選步、平手順序及統計逐項相同。\n19. 身為開發者，我希望以固定局面與深度 5 比較耗時、節點量與程序樹記憶體，以判斷方案是否改善等待。\n20. 身為開發者，我希望分開量測啟動成本和後續多步成本，以避免只看單次速度而忽略程序池開銷。\n21. 身為開發者，我希望評估跨搜尋保留的命中效益與安全條件，以決定是否值得另行實作。\n\n## 實作決策\n\n- 所有現有 Alpha-Beta 使用入口共用搜尋能力；一般批次補上 Alpha-Beta 選項。既有未使用 Alpha-Beta 的資料生成器與對戰 CLI 不因此全面擴充。\n- 搜尋 worker 數是正整數，代表單次搜尋的 CPU 計算並行上限；worker 可是程序，不要求使用作業系統 threads。worker 數 1 保留為相容入口與效能基準，多場並行不能成為強制搜尋降為 1 的理由。\n- 同時對局數沿用既有設定語意；不新增按「同時對局數 × 搜尋 worker 數」限制 CPU 的規則。可派分枝數、可派對局數與程序池平台限制仍須如實處理。\n- 優先評估根節點分枝的程序平行化，沿用迭代加深、既有搜尋選項與評分器。最終分枝策略、程序池重用生命週期及置換表共享方式，需用實測選定並記錄，避免把程序建立成本放大到每個搜尋節點。\n- 分派時保留完整走法歷史與相對於原根節點的深度；協調端和 worker 不共用可修改的正式棋盤。不以單一 FEN 取代棋規歷史。\n- 程序間傳遞可還原的評分設定與搜尋條件；取消回呼由協調端轉成可傳遞的控制訊號。評分器無法供多程序使用時須明確回報，不可靜默更換評分器。\n- 只把整個已完成的迭代當作完成深度；逾時或合作式取消延續既有回傳契約。內部節點數、走法順序和單 worker 結果不要求逐項一致，將死、和棋、評分視角與深度語意仍須正確。\n- 置換表容量以最大項目數定義，必須有有限的預設值並可透過搜尋設定調整。淘汰考量深度、EXACT／LOWER／UPPER 界限類型及世代新舊；公式與預設值由基準實驗選定。處理同鍵更新與不同鍵間的容量淘汰，不能只在滿額時清空整張表。\n- 同次搜尋的迭代可重用置換資料，下一次搜尋仍建立新內容。若 worker 各持私有表，每張表均須有界，且需明確記錄容量單位、表份數與總記憶體；單表項目上限不等於整個程序樹的位元組上限。\n- 搜尋 worker 與置換表條件納入實際玩家設定快照，基準設定與候選設定使用相同搜尋條件。必要時調整版本，舊資料缺少新欄位仍可讀取，不虛構舊對局使用過多核心。\n- 真人對局保留舊結果不得套入新對局的隔離；一般批次保留暫停／繼續的落子邊界語意，評分比較維持不提供暫停；停止、錯誤和保存失敗須清理內外層程序並保留可讀的已發布結果。\n- worker 預設值及有限置換表預設容量需在實作時根據量測選定並記錄。本規格不預先指定加速倍數或容量數字。\n- 不需獨立的大範圍重構票；必要的搜尋協調與設定傳遞調整納入各功能切片，沿用現有搜尋與對局介面。\n\n## 測試決策\n\n主要測試介面是公開的 AlphaBetaSearcher.search：從有歷史的棋盤與搜尋條件輸入，驗證合法選步、戰術或終局語意、完成深度、取消／逾時結果及輸入棋盤不被修改。沿用既有搜尋、迭代加深與置換表測試的案例；不要求平行結果與單 worker 逐項相同，也不能只驗證有回傳任一合法走法。\n\n必要的上層整合介面是既有即時對局與批次服務的開始、停止及紀錄讀取流程。沿用背景選步、Alpha-Beta 評分比較、平行批次及 UI 事件測試，驗證 UI／CLI 設定實際影響搜尋、逐場發布、共同搜尋條件與舊紀錄相容。這些流程也驗證一般批次新增的 Alpha-Beta 對戰。\n\n容量與替換直接透過置換表公開存取行為驗證：持續寫入仍有界，保留偏好可觀察，淘汰後搜尋可繼續；避免鎖定私有容器、IPC 訊息格式或特定內部方法。\n\n至少有有界的真實 Windows spawn 整合案例，涵蓋外層多場與內層多搜尋 worker、合作式停止、worker 故障及清理。以小局面或有限手數完成，不在例行測試跑長時間深度 5 對局。超額派工行為可用有限工作量驗證不被新增的 CPU 乘積規則縮減。\n\n效能以獨立基準量測，記錄局面、評分設定、搜尋選項、硬體邏輯處理器數、作業系統及 Python 版本；比較單 worker 與多 worker 的深度 5 耗時、節點量、整個程序樹峰值記憶體與冷／熱啟動成本。固定總工作量衡量批次吞吐，並記錄超額派工下的結果。不用脆弱的 CI 秒數斷言代替效能證據。\n\n只新增能驗證上述重要行為或避免回歸的測試，不測靜態文案、匯出存在或 SDK 呼叫是否出現。\n\n## 範圍外\n\n- 正式跨步、跨對局、跨評分設定保留或共享置換內容；本次只包括後續可行性評估。\n- 強制要求單 worker 與多 worker 的最佳走法、平手選擇、分數或節點統計逐項一致。\n- 依 CPU 核心數限制兩層 worker 數的乘積，或自動改成搜尋單 worker。\n- 新增評分項、歷史啟發式、LMR、Null-move、自動調參及其他棋力演算法。\n- 以固定時間取代既有固定深度評分比較，或新增跨機器分散式計算。\n- 為現有未使用 Alpha-Beta 的資料生成器與對戰 CLI 全面新增策略。\n\n## 補充\n\n使用者已確認多核心目標、所有 Alpha-Beta 使用情境、兩個並行設定並存且不加乘積限制、有界置換表方向及跨搜尋保留延後評估。跨搜尋可行性需特別分析根節點距離與將死分數、可逆歷史、和棋政策、評分設定失效及命中效益。\n\n跨搜尋評估應交付可驗證的結論與建議；若值得實作，另行建立正式持久化規格，不能在評估票中直接啟用。\n",
+      "closedAt": "2026-10-16T01:35:35Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABcehZvA",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已完成並整合至 codex/parallel-search-transposition（382434ff）。完整 297 項測試通過，規範與規格審查皆無未解決問題。深度 5 搜尋、兩層派工與記憶體資料保存在 tools/benchmarks/，方法與限制見 docs/搜尋與評分.md；開發計畫已整理為目前狀態與後續方向。人工驗證：UI 選 Alpha-Beta、搜尋 workers 設為 2，確認落子、停止清理與棋譜保存；批次另檢查逐場結果及共同搜尋設定。",
+          "createdAt": "2026-10-16T01:35:34Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/11#issuecomment-6206020028",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-15T05:54:42Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 11,
+      "parent": null,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbgXg",
+            "number": 12,
+            "state": "CLOSED",
+            "title": "讓 Alpha-Beta 使用有界置換表並保存容量設定",
+            "url": "https://github.com/chad30877/chess-ai/issues/12"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbjNg",
+            "number": 13,
+            "state": "CLOSED",
+            "title": "在真人對 AI 使用可設定 worker 的多核心 Alpha-Beta 搜尋",
+            "url": "https://github.com/chad30877/chess-ai/issues/13"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVblww",
+            "number": 14,
+            "state": "CLOSED",
+            "title": "讓一般批次逐場保存多核心 Alpha-Beta 對戰",
+            "url": "https://github.com/chad30877/chess-ai/issues/14"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbosw",
+            "number": 15,
+            "state": "CLOSED",
+            "title": "在評分比較 UI 與 CLI 使用共同多核心搜尋條件",
+            "url": "https://github.com/chad30877/chess-ai/issues/15"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbrxw",
+            "number": 16,
+            "state": "CLOSED",
+            "title": "驗證深度 5 加速與兩層 worker 的效能成本",
+            "url": "https://github.com/chad30877/chess-ai/issues/16"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbvEg",
+            "number": 17,
+            "state": "CLOSED",
+            "title": "評估跨搜尋保留置換表的安全性與收益",
+            "url": "https://github.com/chad30877/chess-ai/issues/17"
+          }
+        ],
+        "totalCount": 6
+      },
+      "title": "規格：Alpha-Beta 多核心搜尋與有界置換表",
+      "updatedAt": "2026-10-16T01:35:35Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/11"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbvEg",
+            "number": 17,
+            "state": "CLOSED",
+            "title": "評估跨搜尋保留置換表的安全性與收益",
+            "url": "https://github.com/chad30877/chess-ai/issues/17"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbosw",
+            "number": 15,
+            "state": "CLOSED",
+            "title": "在評分比較 UI 與 CLI 使用共同多核心搜尋條件",
+            "url": "https://github.com/chad30877/chess-ai/issues/15"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVblww",
+            "number": 14,
+            "state": "CLOSED",
+            "title": "讓一般批次逐場保存多核心 Alpha-Beta 對戰",
+            "url": "https://github.com/chad30877/chess-ai/issues/14"
+          }
+        ],
+        "totalCount": 3
+      },
+      "body": "## 上層規格\n\nhttps://github.com/chad30877/chess-ai/issues/11\n\n## 要完成的行為\n\n每次 Alpha-Beta 搜尋都使用有界置換表；容量滿時依搜尋價值淘汰，真人對 AI 與既有評分比較取得有限預設值，紀錄保存實際容量設定。\n\n## 驗收條件\n\n- [x] 搜尋設定可指定正整數的最大表項目數，省略時也有有限預設值；實際表項數不超過所定義上限。\n- [x] 同鍵更新與滿額淘汰均考慮搜尋深度、EXACT／LOWER／UPPER 及世代新舊；不靠滿額後清空整表。\n- [x] 透過公開置換表行為與公開搜尋 API 驗證容量、保留偏好、滿額後可繼續搜尋，以及歷史／將死／棋盤隔離語意。\n- [x] 相鄰兩次搜尋不共用舊評分；同次迭代仍可重用資料，關閉置換表的既有行為可用。\n- [x] 既有玩家建立、評分比較共同條件及實際設定快照傳遞容量；舊紀錄仍可讀取。\n- [x] 記錄容量單位與選定預設值的依據，說明項目上限不等同程序樹記憶體上限。\n- [x] 人工以小容量連續搜尋，再查看保存設定與舊紀錄；更新必要文件與簡單測試說明。\n",
+      "closedAt": "2026-10-16T01:35:09Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABcehFwQ",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已完成並整合至 codex/parallel-search-transposition（382434ff）。完整 297 項測試通過，規範與規格審查皆無未解決問題。深度 5 搜尋、兩層派工與記憶體資料保存在 tools/benchmarks/，方法與限制見 docs/搜尋與評分.md；開發計畫已整理為目前狀態與後續方向。人工驗證：UI 選 Alpha-Beta、搜尋 workers 設為 2，確認落子、停止清理與棋譜保存；批次另檢查逐場結果及共同搜尋設定。",
+          "createdAt": "2026-10-16T01:35:08Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/12#issuecomment-6206014913",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-15T05:54:45Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 12,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABXVbeQA",
+        "number": 11,
+        "state": "CLOSED",
+        "title": "規格：Alpha-Beta 多核心搜尋與有界置換表",
+        "url": "https://github.com/chad30877/chess-ai/issues/11"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "讓 Alpha-Beta 使用有界置換表並保存容量設定",
+      "updatedAt": "2026-10-16T01:35:09Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/12"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbosw",
+            "number": 15,
+            "state": "CLOSED",
+            "title": "在評分比較 UI 與 CLI 使用共同多核心搜尋條件",
+            "url": "https://github.com/chad30877/chess-ai/issues/15"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVblww",
+            "number": 14,
+            "state": "CLOSED",
+            "title": "讓一般批次逐場保存多核心 Alpha-Beta 對戰",
+            "url": "https://github.com/chad30877/chess-ai/issues/14"
+          }
+        ],
+        "totalCount": 2
+      },
+      "body": "## 上層規格\n\nhttps://github.com/chad30877/chess-ai/issues/11\n\n## 要完成的行為\n\n使用者在真人對 AI 設定 Alpha-Beta 搜尋 worker 數；同一公開搜尋 API 使用能跨核心的 CPU worker 計算，縮短單步搜尋等待。\n\n## 驗收條件\n\n- [x] 從公開搜尋 API、玩家建立到真人對 AI 設定，正整數 worker 設定實際生效；worker 數 1 保留相容與基準用途。\n- [x] 先量測現有深度 5 基準，再評估程序根分枝等方案；交付確實可跨核心的執行方式，不能只把工作移到一般 Python 背景 thread。\n- [x] 協調端若參與搜尋也計入 CPU 計算 worker 上限；可派分枝數與平台限制如實處理，不按 CPU 數任意縮減使用者的搜尋設定。\n- [x] 分派完整棋盤歷史與原根深度資訊，保留將死、和棋、評分視角、完成深度與輸入棋盤隔離；程序評分器不支援時明確報錯。\n- [x] 逾時／取消回傳既有契約允許的結果；停止、換局與離開後清理工作，舊結果不套入新棋局；worker 故障能結束並回報。\n- [x] 真人棋譜保存實際搜尋 worker 條件，舊棋譜仍可讀取。\n- [x] 以公開搜尋與即時對局流程驗證重要行為，加入有界真實 Windows spawn 案例；不要求與單 worker 選步或統計逐項相同。\n- [x] 人工選 worker 數 2 以上完成 AI 落子，再於搜尋中停止或換局，確認介面回應、紀錄條件與程序清理。\n",
+      "closedAt": "2026-10-16T01:35:13Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABcehJDQ",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已完成並整合至 codex/parallel-search-transposition（382434ff）。完整 297 項測試通過，規範與規格審查皆無未解決問題。深度 5 搜尋、兩層派工與記憶體資料保存在 tools/benchmarks/，方法與限制見 docs/搜尋與評分.md；開發計畫已整理為目前狀態與後續方向。人工驗證：UI 選 Alpha-Beta、搜尋 workers 設為 2，確認落子、停止清理與棋譜保存；批次另檢查逐場結果及共同搜尋設定。",
+          "createdAt": "2026-10-16T01:35:13Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/13#issuecomment-6206015757",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-15T05:54:49Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 13,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABXVbeQA",
+        "number": 11,
+        "state": "CLOSED",
+        "title": "規格：Alpha-Beta 多核心搜尋與有界置換表",
+        "url": "https://github.com/chad30877/chess-ai/issues/11"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "在真人對 AI 使用可設定 worker 的多核心 Alpha-Beta 搜尋",
+      "updatedAt": "2026-10-16T01:35:13Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/13"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbgXg",
+            "number": 12,
+            "state": "CLOSED",
+            "title": "讓 Alpha-Beta 使用有界置換表並保存容量設定",
+            "url": "https://github.com/chad30877/chess-ai/issues/12"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbjNg",
+            "number": 13,
+            "state": "CLOSED",
+            "title": "在真人對 AI 使用可設定 worker 的多核心 Alpha-Beta 搜尋",
+            "url": "https://github.com/chad30877/chess-ai/issues/13"
+          }
+        ],
+        "totalCount": 2
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbrxw",
+            "number": 16,
+            "state": "CLOSED",
+            "title": "驗證深度 5 加速與兩層 worker 的效能成本",
+            "url": "https://github.com/chad30877/chess-ai/issues/16"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "## 上層規格\n\nhttps://github.com/chad30877/chess-ai/issues/11\n\n## 要完成的行為\n\n一般批次可讓雙方選 Alpha-Beta，分別設定同時對局數與每次搜尋 worker 數；每場搜尋使用所選多核心條件，完成即保存。\n\n## 驗收條件\n\n- [x] 一般批次可選 Alpha-Beta 對 Alpha-Beta，並使用既有評分設定、固定深度、搜尋 worker 與有界置換表條件；既有其他策略仍可執行。\n- [x] UI 與批次服務都區分同時對局數及搜尋 worker 數；沿用既有外層有效值規則，不新增按兩者乘積限制 CPU 的規則，也不因多場並行而強制內層 worker 數為 1。\n- [x] 每場結果到達即保存並更新進度；保存雙方實際評分、搜尋 worker 與置換表條件，舊批次可讀取。\n- [x] 一般批次暫停／繼續沿用落子邊界及場間等待語意；停止、錯誤或保存失敗時清理內外層工作並保留可讀的已發布前綴。\n- [x] 以有界 Windows spawn 案例跑至少兩場與每次至少兩個搜尋 worker，驗證逐場發布、停止和故障，不只模擬 executor 呼叫。\n- [x] 驗證超額派工設定沒有被新增的 CPU 乘積限制縮減；以有限工作量執行，不要求效能線性提升。\n- [x] 人工跑少量有限手數的 Alpha-Beta 對戰，完成一場即回放，再測多場在途時停止及保存結果。\n",
+      "closedAt": "2026-10-16T01:35:18Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABcehMfw",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已完成並整合至 codex/parallel-search-transposition（382434ff）。完整 297 項測試通過，規範與規格審查皆無未解決問題。深度 5 搜尋、兩層派工與記憶體資料保存在 tools/benchmarks/，方法與限制見 docs/搜尋與評分.md；開發計畫已整理為目前狀態與後續方向。人工驗證：UI 選 Alpha-Beta、搜尋 workers 設為 2，確認落子、停止清理與棋譜保存；批次另檢查逐場結果及共同搜尋設定。",
+          "createdAt": "2026-10-16T01:35:17Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/14#issuecomment-6206016639",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-15T05:54:52Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 14,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABXVbeQA",
+        "number": 11,
+        "state": "CLOSED",
+        "title": "規格：Alpha-Beta 多核心搜尋與有界置換表",
+        "url": "https://github.com/chad30877/chess-ai/issues/11"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "讓一般批次逐場保存多核心 Alpha-Beta 對戰",
+      "updatedAt": "2026-10-16T01:35:18Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/14"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbjNg",
+            "number": 13,
+            "state": "CLOSED",
+            "title": "在真人對 AI 使用可設定 worker 的多核心 Alpha-Beta 搜尋",
+            "url": "https://github.com/chad30877/chess-ai/issues/13"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbgXg",
+            "number": 12,
+            "state": "CLOSED",
+            "title": "讓 Alpha-Beta 使用有界置換表並保存容量設定",
+            "url": "https://github.com/chad30877/chess-ai/issues/12"
+          }
+        ],
+        "totalCount": 2
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbrxw",
+            "number": 16,
+            "state": "CLOSED",
+            "title": "驗證深度 5 加速與兩層 worker 的效能成本",
+            "url": "https://github.com/chad30877/chess-ai/issues/16"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "## 上層規格\n\nhttps://github.com/chad30877/chess-ai/issues/11\n\n## 要完成的行為\n\n評分比較可透過 UI、CLI 與服務設定搜尋 worker 及置換表容量；基準設定和每份候選設定使用相同條件，交換黑白的結果仍逐場保存。\n\n## 驗收條件\n\n- [x] UI、CLI、比較參數及實際玩家共同傳遞搜尋 worker 與有界置換表設定，並驗證基準設定與候選設定使用一致條件。\n- [x] 同時對局數與搜尋 worker 數保持獨立，不新增按乘積限制 CPU 的規則。\n- [x] 交換黑白配對、共同種子、多候選、未完成配對及不自動排名語意保留；比較仍不提供暫停。\n- [x] 實際設定快照、批次資料與比較摘要反映新條件；必要時版本化，既有比較紀錄仍可讀取。\n- [x] 每場完成即發布，不等待整組配對完成；合作式停止與 worker 錯誤會清理內外程序，保留已保存結果與未完成配對。\n- [x] 沿用完整比較流程測試 UI／CLI 設定生效、配對發布、舊資料相容與有界 Windows spawn；避免只驗證參數轉送存在。\n- [x] 人工以一份基準及多份候選跑短局，檢查各方設定快照、逐場保存與停止後不完整配對。\n",
+      "closedAt": "2026-10-16T01:35:23Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABcehQkA",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已完成並整合至 codex/parallel-search-transposition（382434ff）。完整 297 項測試通過，規範與規格審查皆無未解決問題。深度 5 搜尋、兩層派工與記憶體資料保存在 tools/benchmarks/，方法與限制見 docs/搜尋與評分.md；開發計畫已整理為目前狀態與後續方向。人工驗證：UI 選 Alpha-Beta、搜尋 workers 設為 2，確認落子、停止清理與棋譜保存；批次另檢查逐場結果及共同搜尋設定。",
+          "createdAt": "2026-10-16T01:35:22Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/15#issuecomment-6206017680",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-15T05:54:56Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 15,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABXVbeQA",
+        "number": 11,
+        "state": "CLOSED",
+        "title": "規格：Alpha-Beta 多核心搜尋與有界置換表",
+        "url": "https://github.com/chad30877/chess-ai/issues/11"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "在評分比較 UI 與 CLI 使用共同多核心搜尋條件",
+      "updatedAt": "2026-10-16T01:35:23Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/15"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVblww",
+            "number": 14,
+            "state": "CLOSED",
+            "title": "讓一般批次逐場保存多核心 Alpha-Beta 對戰",
+            "url": "https://github.com/chad30877/chess-ai/issues/14"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbosw",
+            "number": 15,
+            "state": "CLOSED",
+            "title": "在評分比較 UI 與 CLI 使用共同多核心搜尋條件",
+            "url": "https://github.com/chad30877/chess-ai/issues/15"
+          }
+        ],
+        "totalCount": 2
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## 上層規格\n\nhttps://github.com/chad30877/chess-ai/issues/11\n\n## 要完成的行為\n\n交付可重現的深度 5 單步延遲與批次吞吐量測，據此完成多核心方案、worker 預設值與置換表容量／淘汰策略的調整。\n\n## 驗收條件\n\n- [x] 以固定局面集合、評分設定及搜尋選項，比較單 worker 與至少兩種多 worker 設定；記錄硬體邏輯處理器數、作業系統與 Python 版本。\n- [x] 分別量測冷啟動、程序池重用後的多步搜尋耗時、總節點量，以及包含所有子程序的峰值記憶體。\n- [x] 固定總對局工作量比較不同「同時對局數 × 搜尋 worker 數」，包含超額派工；記錄吞吐、單步延遲與記憶體，不藉此新增 CPU 硬限制。\n- [x] 量測置換表容量／淘汰參數的取捨，記錄共享或私有表的容量語意、表份數及最終預設值。\n- [x] 代表性深度 5 集合呈現可重現的單步等待改善；若未改善，調整方案後再驗收，不能以較高 CPU 占用率代替成果。\n- [x] 驗證完成、停止、worker 故障和保存失敗後工作已結束且紀錄可讀；不要求單／多 worker 搜尋結果逐項相同。\n- [x] 將基準入口與結論保留為簡潔可重現的實驗資料，更新現況與開發計畫；例行 CI 不使用脆弱的深度 5 耗時斷言。\n",
+      "closedAt": "2026-10-16T01:35:27Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABcehTug",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已完成並整合至 codex/parallel-search-transposition（382434ff）。完整 297 項測試通過，規範與規格審查皆無未解決問題。深度 5 搜尋、兩層派工與記憶體資料保存在 tools/benchmarks/，方法與限制見 docs/搜尋與評分.md；開發計畫已整理為目前狀態與後續方向。人工驗證：UI 選 Alpha-Beta、搜尋 workers 設為 2，確認落子、停止清理與棋譜保存；批次另檢查逐場結果及共同搜尋設定。",
+          "createdAt": "2026-10-16T01:35:26Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/16#issuecomment-6206018490",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-15T05:55:01Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 16,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABXVbeQA",
+        "number": 11,
+        "state": "CLOSED",
+        "title": "規格：Alpha-Beta 多核心搜尋與有界置換表",
+        "url": "https://github.com/chad30877/chess-ai/issues/11"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "驗證深度 5 加速與兩層 worker 的效能成本",
+      "updatedAt": "2026-10-16T01:35:27Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/16"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABXVbgXg",
+            "number": 12,
+            "state": "CLOSED",
+            "title": "讓 Alpha-Beta 使用有界置換表並保存容量設定",
+            "url": "https://github.com/chad30877/chess-ai/issues/12"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## 上層規格\n\nhttps://github.com/chad30877/chess-ai/issues/11\n\n## 要完成的行為\n\n以已完成的有界置換表評估同一盤棋相鄰搜尋保留內容的可行性，交付是否值得另行實作的結論。\n\n## 驗收條件\n\n- [x] 用可重現的同局連續搜尋案例比較現況與隔離的保留實驗，量測有效命中、耗時及容量代價。\n- [x] 分析根節點距離與將死分數、可逆歷史、和棋政策、評分設定變更及不同玩家／對局的失效邊界。\n- [x] 說明在保留現有保守鍵值下的實際收益，與改鍵值或分數正規化所需的安全條件。\n- [x] 交付保留或延後的建議及證據；若值得實作，描述所需獨立規格，不在本票正式啟用跨搜尋快取。\n- [x] 研究輸出沿用既有功能文件或 GitHub issue，避免新增完整歷史型文件。\n",
+      "closedAt": "2026-10-16T01:35:32Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABcehXUA",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已完成並整合至 codex/parallel-search-transposition（382434ff）。完整 297 項測試通過，規範與規格審查皆無未解決問題。深度 5 搜尋、兩層派工與記憶體資料保存在 tools/benchmarks/，方法與限制見 docs/搜尋與評分.md；開發計畫已整理為目前狀態與後續方向。人工驗證：UI 選 Alpha-Beta、搜尋 workers 設為 2，確認落子、停止清理與棋譜保存；批次另檢查逐場結果及共同搜尋設定。",
+          "createdAt": "2026-10-16T01:35:31Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/17#issuecomment-6206019408",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-15T05:55:06Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 17,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABXVbeQA",
+        "number": 11,
+        "state": "CLOSED",
+        "title": "規格：Alpha-Beta 多核心搜尋與有界置換表",
+        "url": "https://github.com/chad30877/chess-ai/issues/11"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "評估跨搜尋保留置換表的安全性與收益",
+      "updatedAt": "2026-10-16T01:35:32Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/17"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## 問題陳述\n\n使用者在真人對戰的一般搜尋深度 5 等待過久。已確認搜尋評分會建立完整分項說明，且停用項目仍計算原始特徵；但尚未量測各成本的比例。只跳過停用項無法解決全部評分項啟用的使用情境。既有量測固定使用預設評分器，尚不足以比較全評分設定的表現。\n\n## 解法\n\n先提供能載入實際評分設定、重現代表局面與保存完整條件的量測流程，區分評分、搜尋量與歷史／快取／程序成本。再交付搜尋用純數值評分的優化，讓全部啟用與部分啟用的設定都能接受前後驗證。保留回放與編輯器需要的分項說明。\n\n目標是減少真人單步等待，不設定固定秒數承諾。保持評分與搜尋語意，容許正確的界限剪枝、置換表與排序；不要求每個節點求出 EXACT。同分走法因排序變動須另行辨識。\n\n## 使用者故事\n\n1. 身為對戰玩家，我希望深度 5 的等待縮短，以便更順暢地下棋。\n2. 身為全評分設定使用者，我希望所有評分項啟用時也獲得改善，以免優化只對簡化設定有效。\n3. 身為設定比較者，我希望指定完整評分設定量測，以便重現真正使用的條件。\n4. 身為開發者，我希望取得各類成本的剖析證據，以便避免憑猜測優化。\n5. 身為開發者，我希望在開局、中局與殘局比較，以便辨識局面差異。\n6. 身為開發者，我希望保留與重現走法歷史，以便正確測試和棋語意。\n7. 身為評分設定使用者，我希望加速後分數意義不變，以便既有設定仍然有效。\n8. 身為回放使用者，我希望分項說明仍與總分一致，以便解釋每個局面。\n9. 身為玩家，我希望搜尋不修改原棋盤或殘留子程序，以便能正常停止與重新開局。\n10. 身為開發者，我希望區分完整深度與逾時結果，以免把少算幾層誤認為加速。\n11. 身為比較者，我希望看到前後條件、節點與耗時，以便判斷改善是否可重現。\n12. 身為開發者，我希望知道同分走法變動與分數回歸的差別，以便維持正確驗收。\n\n## 實作決策\n\n- 擴充既有效能工具接受完整評分設定，保留原先預設使用方式。報告保存解析後的完整設定、程式版本、環境、搜尋選項、FEN 與必要走法歷史、完成深度、逾時狀態、節點／命中／重搜計數及耗時。\n- 固定全項啟用與既有基準設定，覆蓋代表開局、中局、殘局與含可逆歷史的案例；一般深度 5 與 quiescence 深度分開記錄。全項設定須驗證啟用狀態，不能將範例名稱當作證據。\n- 單 worker 作為先行剖析條件，另檢查多 worker 的實際使用行為；前後相同條件、重複量測並記錄中位數與分散程度。程序冷啟動與重用分開報告，不以 CPU 使用率代替延遲。\n- 剖析耗時與未剖析的延遲量測分開；有時間截斷的試驗不得列為完成深度 5 的加速比。長案例可分開執行，但必須明列未完成情況。\n- 搜尋只取得數值總分；分項說明在需要時才建構。兩條介面共用一致的特徵與權重定義，維持白方視角、兵單位、中局／殘局混合、開關與既有設定相容性。全部啟用仍應避免僅供說明的物件成本。\n- 未啟用項在純數值計算中不必執行無用計算；分項介面維持既有對停用項的說明行為。只在結果一致時共用特徵計算，不能更改特徵定義換取速度。\n- 優化先限定於評分路徑。剖析若顯示其他主要瓶頸，交付證據與後續建議，不把未確認的搜尋改寫包進本次實作；本輪不能宣稱已解決所有深度 5 延遲。\n- 保留界限類型、將死距離、和棋歷史、取消及程序生命週期。不得把 BOUND 當 EXACT、刪除歷史或降低深度作為本規格的加速。\n\n## 測試決策\n\n- 主要測試入口為公開搜尋操作，以固定棋盤、設定及搜尋條件檢查輸出與原棋盤狀態。沿用既有 Minimax 對照、將死／和棋、置換表、迭代搜尋及真實多程序測試。\n- 評分使用公開數值與分項介面比對，涵蓋全項／混合開關、零權重、中局／殘局與特殊走法後局面；採明確數值容差，不用寬鬆容差掩蓋選步差異。\n- 同一評分與搜尋條件下核對完成深度、分數與唯一最佳走法；同分差異需以參考結果證明為等價選項，而非直接忽略所有選步變化。\n- 取消、多程序故障與關閉不留下子程序或將舊結果套用到新局。\n- 效能報告以獨立工具重現，不新增不穩定的 CI 秒數門檻，也不以 helper 呼叫次數、物件類別或常數存在與否代替行為測試。\n- 驗收須包含全評分設定的實際前後量測；若改善不成立，不能宣稱完成加速，須回報量測限制或調整方案。\n\n## 不在範圍內\n\n選擇性減深或猜測性剪枝、新評分特徵、改變分數尺度、神經網路與 ML 訓練、跨搜尋長存置換表、固定時間比較模式、保證任意局面在指定秒數內完成。\n\n## 補充說明\n\n既有置換表、PVS、排序與多程序搜尋均已存在。本規格要求量測及優化，不將這些既有功能重列為新功能。人工驗收以同一全項設定進行深度 5 對戰、回放分項、搜尋中停止與重新開始，再對照報告。\n\r\n",
+      "closedAt": "2026-10-23T08:52:17Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABeygMmg",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "子票 #20、#21 已完成並整合至 codex/issue-18-evaluation-performance，最終提交 f2717bf。交付可載入完整設定與歷史的獨立剖析工具、純數值評分優化、公開介面回歸驗證及實際前後交錯量測。Standards與Spec審查發現的摘要混樣問題已修復並CLI實跑確認。完整證據、限制與人工測試方式見 docs/搜尋與評分.md；開發計畫已整理。人工驗收：以 benchmark-all 設定進行深度5真人對戰、查看回放分項、搜尋中停止並重新開局，對照文件量測命令。",
+          "createdAt": "2026-10-23T08:52:16Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/18#issuecomment-6361189530",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-23T08:20:13Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 18,
+      "parent": null,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUuYUg",
+            "number": 20,
+            "state": "CLOSED",
+            "title": "T01：全評分設定的可重跑效能剖析",
+            "url": "https://github.com/chad30877/chess-ai/issues/20"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUub6g",
+            "number": 21,
+            "state": "CLOSED",
+            "title": "T02：減少搜尋評分成本並驗證語意與耗時",
+            "url": "https://github.com/chad30877/chess-ai/issues/21"
+          }
+        ],
+        "totalCount": 2
+      },
+      "title": "規格 A：全評分設定下保持搜尋語意的效能改善",
+      "updatedAt": "2026-10-23T08:52:17Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/18"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## 問題陳述\n\n目前已有基準對多候選、共同搜尋條件與交換黑白的比較引擎，但使用者仍須手動複製設定檔，難以比較多個權重的組合。既有 UI 候選選擇最多七份，無法涵蓋兩個參數各三值的九組實驗；長時間比較也尚未支援關閉程式後續跑。\n\n## 解法\n\n提供從基準設定選擇已啟用權重、輸入數值或相對基準百分比、預覽組合，到執行比較、排序結果、回放及另存設定的完整流程。每個實驗保存不可變的實際條件與進度，停止或關閉後能接續未完成工作。\n\n## 使用者故事\n\n1. 身為調參使用者，我希望選定基準設定，以便所有候選都有共同參照。\n2. 身為使用者，我希望只調已啟用評分項，以免改權重時暗中改變評分項集合。\n3. 身為使用者，我希望直接輸入多個值，以便比較自己指定的候選。\n4. 身為使用者，我希望用起點、終點與間隔產生值，以便避免大量重複輸入。\n5. 身為使用者，我希望用相對基準百分比操作，以便理解每次增減幅度。\n6. 身為使用者，我希望同時看到實際權重，以便確認百分比最後套用的數值。\n7. 身為使用者，我希望基準為零時仍能設定實際值，以便研究原先沒有貢獻的已啟用項目。\n8. 身為使用者，我希望比較多參數的所有選定組合，以便觀察搭配效果。\n9. 身為使用者，我希望先看到候選數與對局數，以便評估實驗規模。\n10. 身為使用者，我希望重複或未改變的候選被明確辨識，以免浪費對局時間。\n11. 身為使用者，我希望預覽與實際對戰使用同一份設定，以便結果可重現。\n12. 身為比較者，我希望各候選與基準使用共同搜尋條件和開局、交換黑白，以便公平比較。\n13. 身為使用者，我希望每局完成就保存，以免必須等待整個實驗結束才取得成果。\n14. 身為使用者，我希望看到勝和敗、得分率與完成樣本數，以便判斷結果的限制。\n15. 身為使用者，我希望未完成棋局不被當作和棋，以免統計失真。\n16. 身為使用者，我希望排序結果並查看參數差異，以便挑選值得再驗證的候選。\n17. 身為使用者，我希望從候選結果開啟棋譜，以便觀察實際選步。\n18. 身為使用者，我希望另存候選為評分設定檔，以便真人對戰或下輪比較使用。\n19. 身為長時間實驗使用者，我希望停止、關閉或意外退出後續跑，以免完成的成果作廢。\n20. 身為使用者，我希望續跑不重複計入棋局，也不偷偷改條件，以便維持結果可信度。\n21. 身為舊紀錄使用者，我希望原有比較結果仍能讀取，以便保留既有資料。\n22. 身為未來 ML 使用者，我希望學習出的設定能作為候選載入，以便沿用同一套驗證流程。\n\n## 實作決策\n\n- 沿用既有評分比較、背景執行、逐局保存與紀錄讀取流程；新增一個實驗定義，串接候選生成、比較、結果與續跑，不另做第二套對戰引擎。\n- 第一版固定棋子價值、評分項開關、階段模型與搜尋條件。可調欄位為已啟用的 PST 倍率及現有位置評分項權重；階段混合啟用時中局與殘局權重可分別選取，停用時不產生無效的殘局調整。此規則是 UI 比較範圍，不替下一批 ML 決定訓練策略。\n- 數值清單與起點／終點／正間隔兩種輸入都支援。範圍按間隔產生不超過終點的數值，只有對齊間隔時才包含終點；拒絕非有限數、非法負值、倒置範圍及零間隔。\n- 相對基準百分比以該次不可變基準權重為分母，100% 等於基準，150% 為其 1.5 倍，不要求各項合計 100%。基準為零時停用百分比輸入並提供實際值。切換表示模式不可偷偷改變候選實際值。\n- 多參數形成笛卡兒積，按穩定順序產生候選；兩參數各三值應得到九組，再依完整有效設定去重，移除與基準相同的候選並顯示數量變化。顯示名稱不作唯一識別。\n- 預覽包含基準快照、每個候選實際差異、有效候選數、局面數、重複次數與計畫對局數。基準／參數／搜尋條件變更會使舊預覽失效；執行只能使用已預覽的同一份定義。\n- 計畫對局數為有效候選數 × 起始局面數 × 重複次數 × 2。支援九組及更多候選的分頁或捲動，不能保留七份的顯示／執行限制或靜默截斷；大型輸入先計數，避免同步展開使介面失去回應。遇資源限制須在啟動前清楚回報。\n- 保存完整基準／候選設定、候選生成規則、共同搜尋／開局／種子／棋規／手數限制及程式／特徵版本。穩定的候選與棋局工作識別是比較、回放及續跑的共同依據。\n- 所有候選使用相同搜尋條件，各自對基準以同起始局面交換黑白，不是候選彼此總循環。沿用既有配對種子政策；不把確定性棋局重複當成額外獨立棋力證據。\n- 結果表呈現參數差異、勝和敗、完整配對得分率、完整配對數、未完成數與對局耗時。得分率為完整配對中的勝得 1、和得 0.5 除以其中棋局數；無完整配對時顯示無資料，不能填 0%。孤立完成棋局可回放，但尚不計入配對得分率。\n- 排序只改變展示順序；未完成與無資料須可辨識，不自動宣告最強。對局耗時加總與實驗經過時間分開定義，不把並行工作時間加總誤稱為使用者等待時間。\n- 另存設定使用候選的實際快照而非重新套用百分比，不覆寫基準；保存後可從現有真人對戰及比較入口載入。既有紀錄保持可讀，缺欄位不補造統計。\n- 實驗可執行數小時或過夜。已提交完成的棋局不可重跑或重複計數；未完成／被中斷的工作可從該局起點重跑，保留已存在的中斷紀錄並與有效完成結果區分。正常達到手數上限的截斷是既定工作結果，不在每次續跑無限重跑，也不列為和棋。\n- 續跑讀取已保存的實驗定義，不從可能已修改的設定檔重建；條件不相容時拒絕混接並提示建立新實驗。同一實驗不可同時由兩個執行者續跑。\n- 保存順序與恢復流程須能處理棋局已保存、進度尚未更新的中斷點；重開後依穩定工作識別恢復一致統計，不能重複加總或覆寫完整棋局。已完成實驗的續跑操作不再派工。\n\n## 測試決策\n\n- 主要入口為應用程式事件／比較執行操作，走到真實實驗快照、棋局保存與重新讀取；沿用現有 dummy UI、可控背景工作及比較整合測試。\n- 先驗證單參數選擇到棋局結果的完整流程，再驗證九組候選、實際值與百分比等價輸入、範圍邊界、零基準、停用項及重複候選。\n- 高層測試核對預覽與對戰實際快照一致、基準不被修改、共同條件及交換黑白保持、配對得分率分母正確。不得僅測按鈕文字、欄位存在或 helper 有被呼叫。\n- 結果排序後仍開啟正確候選棋譜、另存正確設定；保存再載入數值與開關一致，舊比較紀錄可讀。\n- 續跑測試從完整完成一局、半組配對、保存後未更新進度、執行中故障等情況重建應用狀態，驗證不漏局、不重複計數、不混設定及不殘留工作程序；至少一項測試跨新程序驗證。\n- 沿用真實多程序的少量比較情境確認停止與關閉清理，不以大量長局當單元測試。短測只驗證流程，正式棋力試驗使用另留局面。\n\n## 不在範圍內\n\nML 訓練與教師標記介面、搜尋參數自動調優、評分項開關的組合搜尋、新評分項、權重合計 100% 的偏好配置、自動宣告最強或 Elo 保證、固定時間對戰比較、進行到一半棋局的逐手斷點續下、雲端執行。\n\n## 補充說明\n\n人工驗收選兩個已啟用權重各三個非基準值，預覽九組候選後執行短局；核對結果與另存設定。另以能完成配對的短測試局面，保存一局後停止並重開，接續剩餘工作且原局只計一次。短局截斷必須顯示未完成，不能當作和棋。\n\r\n",
+      "closedAt": "2026-10-23T09:59:28Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABezmiow",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已於整合分支 codex/issue-19-resumable-experiments 完成並推送，最終提交 b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb。完整測試 316 項通過，最後顯示調整另跑 UI／catalog 50 項通過；規範與規格審查發現已修正。人工驗收：兩權重各三值預覽九候選並執行；結果排序、翻頁、回放及另存；保存一局後停止、關閉再由紀錄續跑，確認原局只計一次，中斷嘗試可回放。操作文件見 docs/評分調整與實驗.md。",
+          "createdAt": "2026-10-23T09:59:27Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/19#issuecomment-6362342051",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-23T08:20:15Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 19,
+      "parent": null,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUufag",
+            "number": 22,
+            "state": "CLOSED",
+            "title": "T03：單一權重候選從介面建立到成對比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/22"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUumYg",
+            "number": 23,
+            "state": "CLOSED",
+            "title": "T04：多參數組合與相對基準百分比",
+            "url": "https://github.com/chad30877/chess-ai/issues/23"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUuq5A",
+            "number": 24,
+            "state": "CLOSED",
+            "title": "T05：比較結果排序、回放與另存設定",
+            "url": "https://github.com/chad30877/chess-ai/issues/24"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUut_g",
+            "number": 25,
+            "state": "CLOSED",
+            "title": "T06：停止及重啟後續跑評分實驗",
+            "url": "https://github.com/chad30877/chess-ai/issues/25"
+          }
+        ],
+        "totalCount": 4
+      },
+      "title": "規格 B：可續跑的評分權重比較介面",
+      "updatedAt": "2026-10-23T09:59:28Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/19"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUub6g",
+            "number": 21,
+            "state": "CLOSED",
+            "title": "T02：減少搜尋評分成本並驗證語意與耗時",
+            "url": "https://github.com/chad30877/chess-ai/issues/21"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "## 所屬規格\n\nhttps://github.com/chad30877/chess-ai/issues/18\n\n## 要交付的行為\n\n開發者能載入實際評分設定，在固定代表局面重跑深度 5 搜尋，取得完整條件、結果與成本剖析，回答全部評分項啟用時時間花在哪裡，而非只看到總秒數。\n\n## 驗收條件\n\n- [ ] 支援完整評分設定輸入，原預設操作仍可用；報告保存正規化後設定、程式版本、環境、一般／延伸深度、worker、表容量與其他搜尋開關。\n- [ ] 固定並保存全項啟用及基準設定，涵蓋開局、中局、殘局與含歷史的局面；全項啟用可由報告核對。\n- [ ] 報告包含局面與必要歷史、合法選步、分數、完成深度、逾時狀態、搜尋計數與耗時，能以保存條件重跑。\n- [ ] 單 worker 剖析區分評分／分項建構、搜尋節點、棋盤歷史／置換鍵等成本；多程序條件另記冷啟動與重用差異。不以單 worker profiler 宣稱已剖析子程序全部成本。\n- [ ] 量測重複執行，保存原始樣本與摘要；剖析和一般計時分開，逾時案例不冒充深度 5 完成。\n- [ ] 以實測排序成本並說明限制；沒有證據的項目仍標待量測，提供 T02 可用的基準。\n- [ ] 以工具實際執行驗收，不新增靜態欄位或 CI 耗時斷言測試；使用文件提供簡短重現方式。\n\r\n",
+      "closedAt": "2026-10-23T08:39:33Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABeyTD4A",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已於整合分支 codex/issue-18-evaluation-performance 完成，提交 685fbdf，合併 01a22c9。完整設定／歷史重現、獨立 profiler、原始樣本與程序冷／重用量測均已實際執行；重現方式與數據見 docs/搜尋與評分.md。全項中局逾時明列，不當作深度 5 完成或加速證據。後續 #21 依此剖析進行評分路徑優化。",
+          "createdAt": "2026-10-23T08:39:32Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/20#issuecomment-6360974304",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-23T08:20:17Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 20,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZUuVEg",
+        "number": 18,
+        "state": "CLOSED",
+        "title": "規格 A：全評分設定下保持搜尋語意的效能改善",
+        "url": "https://github.com/chad30877/chess-ai/issues/18"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "T01：全評分設定的可重跑效能剖析",
+      "updatedAt": "2026-10-23T08:39:33Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/20"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUuYUg",
+            "number": 20,
+            "state": "CLOSED",
+            "title": "T01：全評分設定的可重跑效能剖析",
+            "url": "https://github.com/chad30877/chess-ai/issues/20"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## 所屬規格\n\nhttps://github.com/chad30877/chess-ai/issues/18\n\n## 要交付的行為\n\n搜尋只取得需要的數值評分，回放仍可取得完整分項說明；全部與部分評分項啟用時都保持原有評分語意，並以 T01 相同條件證明實際成本與延遲變化。\n\n## 驗收條件\n\n- [ ] 依 T01 剖析選定評分路徑中的具體成本；純數值入口避免建立僅供說明的完整分項，跳過沒有作用的停用項計算並避免不必要的重複特徵計算。\n- [ ] 全項與混合設定、中局／殘局、零權重及特殊走法後的總分與既有分項介面一致；分項說明、設定版本與白方／兵單位語意保持。\n- [ ] 公開搜尋入口的完成深度、分數、唯一最佳走法及原棋盤歷史正確；同分選步差異需證明等價並記錄。\n- [ ] 真人及多程序搜尋使用同一評分語意，取消／故障／重開不殘留子程序或套用舊結果。\n- [ ] 不刪和棋歷史、不更改將死尺度、不減少一般或延伸深度、不將 BOUND 當 EXACT。\n- [ ] 以 T01 的全項與基準設定、代表局面交錯重跑前後比較，記錄完成深度與計數。全項路徑須有可重現的改善證據，未改善的案例與限制明列，不只呈現停用項獲益。\n- [ ] 若評分優化無可重現收益，回報證據並修正方案，不以程式碼變短或微基準代替搜尋加速驗收；其他瓶頸只列後續建議，不擴張到選擇性搜尋。\n- [ ] 通過既有相關搜尋、評分、取消與程序清理測試，補足重要回歸案例並更新人工測試方式。\n\r\n",
+      "closedAt": "2026-10-23T08:52:14Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABeygI7w",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已完成於整合分支 codex/issue-18-evaluation-performance，實作 25ea24f、審查修正 fd545af，最終整合 f2717bf。純數值評分保留逐項插值與加總、完整說明及搜尋語意；相關評分、搜尋、真實 spawn、取消與清理測試通過。交錯量測全項 start/rook 中位耗時降低15.9%/21.4%；完成的單程序 SearchResult 全部一致，多程序同分走法已驗證等價。history與多程序波動、中局逾時限制完整列於 docs/搜尋與評分.md，不宣稱所有深度5延遲已解決。",
+          "createdAt": "2026-10-23T08:52:13Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/21#issuecomment-6361188591",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-23T08:20:22Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 21,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZUuVEg",
+        "number": 18,
+        "state": "CLOSED",
+        "title": "規格 A：全評分設定下保持搜尋語意的效能改善",
+        "url": "https://github.com/chad30877/chess-ai/issues/18"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "T02：減少搜尋評分成本並驗證語意與耗時",
+      "updatedAt": "2026-10-23T08:52:14Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/21"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUut_g",
+            "number": 25,
+            "state": "CLOSED",
+            "title": "T06：停止及重啟後續跑評分實驗",
+            "url": "https://github.com/chad30877/chess-ai/issues/25"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUuq5A",
+            "number": 24,
+            "state": "CLOSED",
+            "title": "T05：比較結果排序、回放與另存設定",
+            "url": "https://github.com/chad30877/chess-ai/issues/24"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUumYg",
+            "number": 23,
+            "state": "CLOSED",
+            "title": "T04：多參數組合與相對基準百分比",
+            "url": "https://github.com/chad30877/chess-ai/issues/23"
+          }
+        ],
+        "totalCount": 3
+      },
+      "body": "## 所屬規格\n\nhttps://github.com/chad30877/chess-ai/issues/19\n\n## 要交付的行為\n\n使用者在 UI 選基準與一個已啟用位置權重，輸入數值清單，預覽候選後直接執行既有成對比較，從保存紀錄核對實際設定，不再手動複製 JSON。\n\n## 驗收條件\n\n- [ ] 從既有比較入口選基準與已啟用的 PST 或位置權重，列舉實際值即可預覽與執行；棋子價值、開關、階段模型固定，未選欄位繼承基準。\n- [ ] 預覽顯示候選差異、有效候選數與對局數；拒絕非法值並明列去重與排除基準相同候選的結果，零個有效候選不得執行。\n- [ ] 建立可保存的不可變實驗定義，包含完整設定、共同條件、版本、生成規則及穩定候選／棋局工作識別，為後續組合、結果與續跑提供同一份來源。\n- [ ] 修改基準或條件使既有預覽失效；執行與保存的實際設定必須等於確認的預覽，不重新讀取已變更的來源設定。\n- [ ] 各候選對基準沿用同局面交換黑白、相同搜尋條件及種子政策；完成一局就保存，既有比較紀錄仍可讀。\n- [ ] 可經現有結果／回放入口檢視此次比較；停止與關閉沿用既有工作清理，不在此票宣稱已完成跨次續跑。\n- [ ] 從 UI 事件經比較執行到真實保存／讀取的測試證明整條流程成立，基準設定不被覆寫。\n\r\n",
+      "closedAt": "2026-10-23T09:59:19Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABezmYEA",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已於整合分支 codex/issue-19-resumable-experiments 完成並推送，最終提交 b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb。完整測試 316 項通過，最後顯示調整另跑 UI／catalog 50 項通過；規範與規格審查發現已修正。人工驗收：兩權重各三值預覽九候選並執行；結果排序、翻頁、回放及另存；保存一局後停止、關閉再由紀錄續跑，確認原局只計一次，中斷嘗試可回放。操作文件見 docs/評分調整與實驗.md。",
+          "createdAt": "2026-10-23T09:59:18Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/22#issuecomment-6362339344",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-23T08:20:26Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 22,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZUuWmg",
+        "number": 19,
+        "state": "CLOSED",
+        "title": "規格 B：可續跑的評分權重比較介面",
+        "url": "https://github.com/chad30877/chess-ai/issues/19"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "T03：單一權重候選從介面建立到成對比較",
+      "updatedAt": "2026-10-23T09:59:19Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/22"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUufag",
+            "number": 22,
+            "state": "CLOSED",
+            "title": "T03：單一權重候選從介面建立到成對比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/22"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## 所屬規格\n\nhttps://github.com/chad30877/chess-ai/issues/19\n\n## 要交付的行為\n\n使用者可選多個已啟用權重，以實際值或相對基準百分比、數值清單或起訖間隔生成組合，預覽後直接比較全部有效候選。\n\n## 驗收條件\n\n- [ ] 支援數值清單及起點／終點／正間隔，範圍只產生不超過終點的間隔值；拒絕非法、非有限及倒置範圍。\n- [ ] 100% 還原基準、150% 為基準 1.5 倍；顯示實際值，不將各項正規化為合計 100%。零基準使用實際值，模式切換不改變有效候選。\n- [ ] 已啟用階段混合時可分別選中局／殘局欄位；未啟用時不產生無作用的殘局調整，不隱含啟用評分項。\n- [ ] 兩個參數各三個非基準值生成九組候選，可全部預覽、執行並核對保存結果，不受舊七份限制。\n- [ ] 以完整有效設定去重，百分比與實際值產生相同設定時不重複對戰；穩定候選識別不依顯示名稱或排序位置。\n- [ ] 預覽顯示計畫對局數與去重結果；大量組合先計數，UI 不因同步展開而失去回應，無靜默截斷。使用者開始後才派工。\n- [ ] 與 T03 相同的實驗定義保存所有有效候選及生成規則，回放中的實際設定與預覽一致；測試涵蓋九組、零基準、重複與範圍邊界。\n\r\n",
+      "closedAt": "2026-10-23T09:59:22Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABezmbdw",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已於整合分支 codex/issue-19-resumable-experiments 完成並推送，最終提交 b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb。完整測試 316 項通過，最後顯示調整另跑 UI／catalog 50 項通過；規範與規格審查發現已修正。人工驗收：兩權重各三值預覽九候選並執行；結果排序、翻頁、回放及另存；保存一局後停止、關閉再由紀錄續跑，確認原局只計一次，中斷嘗試可回放。操作文件見 docs/評分調整與實驗.md。",
+          "createdAt": "2026-10-23T09:59:21Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/23#issuecomment-6362340215",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-23T08:20:35Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 23,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZUuWmg",
+        "number": 19,
+        "state": "CLOSED",
+        "title": "規格 B：可續跑的評分權重比較介面",
+        "url": "https://github.com/chad30877/chess-ai/issues/19"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "T04：多參數組合與相對基準百分比",
+      "updatedAt": "2026-10-23T09:59:22Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/23"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUufag",
+            "number": 22,
+            "state": "CLOSED",
+            "title": "T03：單一權重候選從介面建立到成對比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/22"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## 所屬規格\n\nhttps://github.com/chad30877/chess-ai/issues/19\n\n## 要交付的行為\n\n使用者能在比較表檢視各候選的差異與結果，排序後仍能開啟正確棋譜，將選中的實際設定另存並用於下次對戰。\n\n## 驗收條件\n\n- [ ] 表格包含參數差異、勝和敗、完整配對得分率、完整配對數、未完成數及對局耗時，九組以上也能正常瀏覽。\n- [ ] 得分率只計入完整成對終局，勝 1／和 0.5；孤立完成局、截斷、停止及失敗不補成和棋，無完整配對顯示無資料而非 0%。\n- [ ] 耗時標示清楚區分累積對局時間與實驗經過時間；並行工作時間不誤作牆鐘等待時間。\n- [ ] 可排序數值欄位，無資料明確區分；排序不改變儲存識別或自動宣稱最強設定。\n- [ ] 排序後開啟的棋譜與候選一致；另存使用實際完整候選快照，不重算百分比、不覆寫基準。\n- [ ] 新設定可從現有真人對戰／比較選單載入，設定往返一致；舊比較紀錄仍能閱讀，不造出不存在的新統計。\n- [ ] UI 到紀錄讀取、回放與另存的行為測試涵蓋完整／半組配對及排序後候選識別，避免測靜態文字。\n\r\n",
+      "closedAt": "2026-10-23T09:59:24Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABezmd6w",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已於整合分支 codex/issue-19-resumable-experiments 完成並推送，最終提交 b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb。完整測試 316 項通過，最後顯示調整另跑 UI／catalog 50 項通過；規範與規格審查發現已修正。人工驗收：兩權重各三值預覽九候選並執行；結果排序、翻頁、回放及另存；保存一局後停止、關閉再由紀錄續跑，確認原局只計一次，中斷嘗試可回放。操作文件見 docs/評分調整與實驗.md。",
+          "createdAt": "2026-10-23T09:59:23Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/24#issuecomment-6362340843",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-23T08:20:40Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 24,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZUuWmg",
+        "number": 19,
+        "state": "CLOSED",
+        "title": "規格 B：可續跑的評分權重比較介面",
+        "url": "https://github.com/chad30877/chess-ai/issues/19"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "T05：比較結果排序、回放與另存設定",
+      "updatedAt": "2026-10-23T09:59:24Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/24"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZUufag",
+            "number": 22,
+            "state": "CLOSED",
+            "title": "T03：單一權重候選從介面建立到成對比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/22"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "## 所屬規格\n\nhttps://github.com/chad30877/chess-ai/issues/19\n\n## 要交付的行為\n\n使用者從實驗紀錄選擇續跑，關閉程式或意外中斷前已完成的棋局保留，只執行剩餘工作，最終配對結果不重複也不混入新設定。\n\n## 驗收條件\n\n- [ ] 停止／關閉後重新啟動，可從保存實驗重新建立工作，使用不可變的基準、候選、開局、種子與搜尋條件。\n- [ ] 已提交完成的棋局不重跑；半組配對保留完成的顏色，只補另一局。未完成工作可從該局起點重跑，中斷嘗試不重複計入有效結果。\n- [ ] 正常因手數上限截斷的工作保留未完成結果，不在每次續跑無限重試，不改列和棋。\n- [ ] 處理棋局已保存但進度未更新的故障點，重開可按穩定工作識別恢復一致狀態，不漏局、不重複計數、不覆寫完成紀錄。\n- [ ] 原設定檔變更不影響實驗快照；程式／特徵或保存契約不相容時拒絕混接並明示原因。缺必要快照的舊紀錄仍可讀，但不猜測條件續跑。\n- [ ] 同一實驗不得同時被兩個執行者續跑；失效的執行中狀態可恢復，已完成實驗不再派工。\n- [ ] 續跑前後完整配對統計與等條件不中斷執行一致，已保存紀錄隨時可回放；停止、故障與重開均正確清理兩層工作程序。\n- [ ] 以 UI／比較入口整合測試覆蓋正常停止、半組配對及保存邊界故障，至少一項跨新程序重開測試；人工驗收能停止後關閉再繼續。\n\r\n",
+      "closedAt": "2026-10-23T09:59:26Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABezmgNA",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "已於整合分支 codex/issue-19-resumable-experiments 完成並推送，最終提交 b2b9c8b741cc7dbc8248147f2a8c1ab1c3f83bdb。完整測試 316 項通過，最後顯示調整另跑 UI／catalog 50 項通過；規範與規格審查發現已修正。人工驗收：兩權重各三值預覽九候選並執行；結果排序、翻頁、回放及另存；保存一局後停止、關閉再由紀錄續跑，確認原局只計一次，中斷嘗試可回放。操作文件見 docs/評分調整與實驗.md。",
+          "createdAt": "2026-10-23T09:59:25Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/25#issuecomment-6362341428",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-23T08:20:44Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 25,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZUuWmg",
+        "number": 19,
+        "state": "CLOSED",
+        "title": "規格 B：可續跑的評分權重比較介面",
+        "url": "https://github.com/chad30877/chess-ai/issues/19"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "T06：停止及重啟後續跑評分實驗",
+      "updatedAt": "2026-10-23T09:59:26Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/25"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "# 規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證\r\n\r\n## 問題陳述\r\n\r\n使用者想知道從教師評分學習現有評分項權重，是否值得繼續投入以提升棋力。目前只能手動調整設定，部分範例實際累加多個群組，難以理解單一評分項群組的作用，也無法從 UI 完成資料準備、教師標記及學習。王安全等群組可能必須搭配其他群組才有作用，不能只憑單組排名淘汰。\r\n\r\n純子力的開局選擇可能對同分走法及搜尋條件敏感，但尚未實驗證實；反覆重跑同一確定性開局不能增加獨立證據。長時間實驗需要看得見進度、可停止與關閉後續跑，並有實際截圖教學說明各控制項何時使用。\r\n\r\n## 解法\r\n\r\n在現有應用程式提供從選資料、教師先導量測與標記、單群組或自選組合學習、查看獨立資料誤差、另存候選，到共同開局對戰驗證的完整流程。先比較純子力與五個單群組，保留現有 stable 作額外參考，再驗證活動力與王安全的搭配及使用者選定組合。\r\n\r\n教師使用固定 Stockfish 19；學習固定棋子價值，只調現有非負位置權重。開局庫另供一般對戰／真人對 AI 選用；評分比較則使用事先凍結的共同開局線。首輪對戰固定深度 3／q4、同時 4 局、每局 1 個搜尋 worker、每張置換表 4,096 筆。交付可離線閱讀、附真實操作截圖的 HTML 教學。實驗可以得到「未改善或證據不足」的有效結論，不以必須提升棋力作為軟體交付條件。\r\n\r\n## 使用者故事\r\n\r\n1. 身為使用者，我希望從 UI 完成試驗，以便不必手工拼接命令與設定。\r\n2. 身為使用者，我希望看到純子力與五個單群組預設，以便分辨加入各群組的效果。\r\n3. 身為使用者，我希望看到設定的中文名稱、實際啟用群組與分階段狀態，以便不被檔名誤導。\r\n4. 身為使用者，我希望保留現有 stable，以便重現既有對戰。\r\n5. 身為研究者，我希望固定棋子價值與群組開關，以便隔離權重學習的效果。\r\n6. 身為使用者，我希望選取有授權及來源紀錄的公開棋譜，以便追溯教材。\r\n7. 身為研究者，我希望固定抽樣種子及來源快照，以便重現資料集。\r\n8. 身為研究者，我希望先按整盤分組再抽局面，以便減少訓練與測試洩漏。\r\n9. 身為研究者，我希望去除重複棋譜及跨組重複局面，以便避免重複資料美化結果。\r\n10. 身為使用者，我希望看到資料篩選原因及實際數量，以便知道為何未滿預計上限。\r\n11. 身為研究者，我希望看到不同棋局階段的分布，以便理解樣本限制。\r\n12. 身為使用者，我希望先量測教師的兩種節點預算，以便在本機選擇可負擔的標記成本。\r\n13. 身為研究者，我希望教師版本、執行檔與設定可追溯，以便重現標記。\r\n14. 身為研究者，我希望教師收到完整走棋歷史，以便保留和棋判斷需要的資訊。\r\n15. 身為研究者，我希望保存原始教師分數及白方視角，以便檢查轉換是否正確。\r\n16. 身為使用者，我希望異常教師輸出與失敗局面被列出，以便修復後重試。\r\n17. 身為使用者，我希望標記逐局面保存，以便停止時保留已完成成果。\r\n18. 身為使用者，我希望每次教師標記與訓練執行有八小時上限，以便掌握資源使用。\r\n19. 身為使用者，我希望時間到就保存並停止，以便自行決定何時續跑。\r\n20. 身為使用者，我希望關閉程式後仍可續跑，以便不必連續開著應用程式。\r\n21. 身為研究者，我希望所有群組共用同一教師尺度，以便比較不同設定的誤差。\r\n22. 身為研究者，我希望只從訓練組估計教師尺度，以便驗證與測試保持獨立。\r\n23. 身為使用者，我希望看到校準的限制與異常，以便不把不穩定的數字當成可靠排名。\r\n24. 身為使用者，我希望先學單一群組，以便了解該組原始與學習權重的差別。\r\n25. 身為研究者，我希望中局與殘局權重分別學習，以便保留既有階段模型。\r\n26. 身為使用者，我希望已啟用群組的零權重仍可增加，以便不錯過原先未發揮的特徵。\r\n27. 身為研究者，我希望未選群組保持關閉，以便避免學習偷偷改變實驗範圍。\r\n28. 身為使用者，我希望比較弱、中、強偏離懲罰，以便讓驗證資料選擇適合的調整幅度。\r\n29. 身為使用者，我希望看到學習前後實際權重，以便知道 config 改了什麼。\r\n30. 身為研究者，我希望各盤等權計算 MAE，以便局面較多的棋譜不支配結果。\r\n31. 身為研究者，我希望先由驗證組挑選，再對凍結候選評估測試組一次，以便減少反覆挑測試結果的偏差。\r\n32. 身為使用者，我希望並列純子力、同組原始／學習設定與 stable，以便區分加入群組及學習本身的效果。\r\n33. 身為研究者，我希望沒有改善也能保存完整報告，以便作出停止或調整研究方向的決定。\r\n34. 身為使用者，我希望五組訓練共用一次執行預算，以免總耗時變成五倍上限。\r\n35. 身為使用者，我希望修改資料或訓練條件會建立新實驗，以免混用不同條件的成果。\r\n36. 身為使用者，我希望另存學習後的完整評分設定檔，以便用於回放、真人對戰及比較。\r\n37. 身為使用者，我希望勾選多個群組建立組合，以便檢查自己的搭配假設。\r\n38. 身為研究者，我希望直接組合與聯合訓練分開保存，以便區分組合效果與重新擬合效果。\r\n39. 身為研究者，我希望王安全即使單組不突出仍能與活動力搭配驗證，以便觀察背景差異。\r\n40. 身為使用者，我希望只執行明確選取的組合，以免自動展開大量實驗。\r\n41. 身為使用者，我希望一般對戰可啟用開局庫，以便從收錄走法開始下棋。\r\n42. 身為使用者，我希望可調開局庫手數上限，以便控制何時改由 Alpha-Beta 選步。\r\n43. 身為研究者，我希望首次離庫後不再進入，以便開局行為清楚可重現。\r\n44. 身為研究者，我希望比較設定重播同一批開局線並交換黑白，以便控制開局與先後手條件。\r\n45. 身為使用者，我希望比較前看到固定開局清單及預計局數，以便確認工作量。\r\n46. 身為研究者，我希望派工、搜尋、續跑與回放都保留開局歷史，以便不破壞判和與重現。\r\n47. 身為使用者，我希望長對局持續顯示手數與輪到方，以便知道工作仍在前進。\r\n48. 身為研究者，我希望逐開局查看勝和敗及未完成數，以便辨別總分掩蓋的差異。\r\n49. 身為使用者，我希望透過有實際截圖的離線教學找到控制項，以便知道想調什麼時該用哪個功能。\r\n50. 身為研究者，我希望報告清楚區分教師誤差與對戰結果，以免把擬合改善誤認為棋力提升。\r\n\r\n## 實作決策\r\n\r\n### 範圍與既有介面\r\n\r\n- 沿用評分設定、評分器、比較執行、背景工作、逐局保存、不可變實驗快照、續跑及回放入口；新增一個學習實驗執行入口管理資料、教師、訓練與結果。UI 只提交工作與呈現狀態，不在畫面執行長工作或另造對戰引擎。\r\n- 不先做橫跨專案的重構。必要的資料契約擴充隨第一個可完整操作的切片加入；既有手動權重比較與舊棋譜讀取繼續可用。新增格式有版本與明確相容規則，舊資料缺少歷史時不得捏造。\r\n- 純子力為主要實驗對照；五個單群組為棋子位置、兵形、活動力、王安全與協調。新學習預設啟用相同階段混合規則，子力倍率固定 1，中殘局棋子價值均固定 P/N/B/R/Q＝1/3/3/5/9。保留 stable 的原始數值及關閉分階段的狀態，顯示為「子力＋棋子位置」，不宣稱已證明較強。全項設定留在既有效能及後續組合比較用途。\r\n- 棋子位置使用現有整組 PST 倍率，並非每格或每種棋子各學一個值。五組共 16 個位置項，各有中局／殘局權重，合計 32 個；固定現有特徵、符號、階段模型與表格版本。\r\n\r\n### 資料與教師\r\n\r\n- 首輪來源為 Lichess 2013 年 1 月標準棋公開棋譜，保存來源、CC0 授權、下載版本／雜湊及抽樣種子。來源以串流處理，不要求把整個壓縮檔展開載入記憶體；支援 UI 選本機來源與可追溯取得方式。既有專案棋譜只作流程檢查，不冒充未見測試資料。\r\n- 先排除重複棋譜，再固定抽取 500 盤，按整盤分為 350／75／75 盤訓練／驗證／測試，然後每盤最多抽 12 個局面。略過前 8 手，一方落子算一手。抽樣兼顧棋局階段、固定重現規則；不足額明確報告，不重複補足或放寬條件。\r\n- 同組相同局面只留一份；跨組重複局面從所有組排除。去重依棋子位置、輪到方、易位權、有效吃過路兵資訊，不因回合計數不同視為新局面；去重鍵與搜尋保留和棋歷史的置換鍵用途不同。樣本仍保存來源棋譜及完整合法走法前綴。\r\n- 排除已終局、受將、教師預見將死、教師最佳手為吃子／升變、只回傳上下界或殘局資料庫特殊分數的紀錄。保留原始標記及各排除原因、階段分布及最終有效量；篩選不保證留下的局面完全無戰術。教師不啟用殘局資料庫，遇無法解釋的輸出明確報錯，不把特殊分數當一般 cp。\r\n- 教師固定 Stockfish 19，保存執行檔雜湊、引擎識別、選項、實際節點預算及處理版本。以 UCI 邊界傳遞起始局面與完整歷史，保存原始分數視角、轉換後白方分數及最佳手。先在訓練來源中取約 100 局面比較 50,000／200,000 節點，報告耗時、分數差異與篩除量；正式預算由使用者看量測後選定並凍結，不預先宣稱任一預算品質足夠。\r\n- 同一標記快照固定引擎選項及逐局面狀態初始化政策，避免續跑結果暗中依賴前次教師快取。下載／引擎不存在、版本不合、異常終止、逾時、非法最佳手及保存失敗都須在 UI 顯示原因；已成功成果保留。\r\n\r\n### 校準、訓練及評估\r\n\r\n- 只在訓練組，以固定 stable 的局面靜態評分為參照，對白方教師分數估計一次、不含截距、逐盤等權的最小平方倍率。其後所有群組與驗證／測試共用同倍率，不能每組重估。Stockfish 仍是教師；stable 只提供本專案的分數尺度，100 cp 不直接等同本專案一兵。\r\n- 保存參照快照、校準殘差及訓練子集倍率穩定性診斷。零分母、非有限或非正倍率不可默默改為 1；UI 呈現無法校準，保留資料以供處理。穩定性診斷方式與標示規則在執行前固定於快照，異常時不得自動產生可靠排名或晉級宣告，也不得查看測試後修改規則。\r\n- 訓練為非負線性最小平方，目標為逐盤等權的教師擬合誤差，加上按各權重尺度標準化的偏離原始權重平方懲罰。固定子力，只有選定群組可變；分階段後的特徵向量須精確對應正式評分器，不另定一套分數算法。\r\n- 先試弱／中／強三個固定懲罰強度，由驗證組選擇；具體值、正尺度、數值求解器版本／容差及同分選擇順序在實驗開始前寫入快照。這些是可重現的實作參數，不得依測試結果調整。不加統一百分比硬上限，已啟用零權重可學成正值；其尺度採固定正絕對值，未選群組保持關閉。\r\n- 驗證挑選完成後凍結候選，再對測試組評估一次。重新開啟顯示保存結果，不重新擬合或重新挑選；修改條件建立新實驗並標示資料沿用，不能把已看過的測試重新宣稱未見資料。\r\n- 主要指標為逐盤平均 MAE：先平均每盤保留局面的絕對誤差，再平均各盤，無有效局面的棋譜不當成零誤差。另報階段分層、各組盤數與局面數。並列純子力、同群組原始與學習設定、stable，分清群組增益與學習增益。\r\n- 驗證及測試皆改善者優先進入對戰觀察，不設 5%／10% 硬門檻，也不把未勝過 stable 視為失去組合價值。沒有改善、資料不足或求解未完成都是真實結果，不輸出虛假成功或棋力結論。\r\n- 第一個訓練切片以棋子位置走通完整流程，再擴充五個單群組；UI 可勾選組合，不自動展開所有群組排列。直接組合沿用各單組學習數值，聯合訓練同時調整所選群組；兩者身份與結果分開保存。\r\n- 預先安排活動力＋王安全，不以王安全單組勝出為前提。在同資料、固定權重與一致階段規則下比較純子力、加活動力、加王安全、兩者皆加的四設定，呈現兩種背景下加入王安全的增量；聯合重訓另列。現有加法評分器沒有新增交互特徵，觀察的是誤差及對戰的搭配效果。\r\n\r\n### 執行、保存與 UI\r\n\r\n- 教師標記與訓練各自每次執行最多 8 小時；同次選定的所有群組及候選共用訓練預算，不逐組重置。時間到保存已完成工作並停止，不自動重啟；停止或關閉後由使用者手動續跑。\r\n- 教師以完成局面、訓練以完成候選為提交單位。未完成候選可重跑，不承諾數值求解器中途續算。預算到期或停止時不能無限等待求解器；隔離長工作並處理停止、程序清理及原子提交，未完成輸出不算成功。\r\n- 快照涵蓋資料分組、來源／版本、教師、篩選、特徵、校準、群組、原始值、訓練條件及結果身份。沿用可恢復保存與獨占執行思路，避免雙重派工及重複計數；條件改變另建實驗，不覆寫原始設定或已完成候選。\r\n- UI 提供目前階段、已完成、剩餘、需重跑、耗時與失敗原因，進階條件收起。結果可查看權重前後差異、排序及另存完整合法設定，並直接選入既有對戰比較。保持頁面簡短，不堆疊由元件狀態已可理解的說明。\r\n\r\n### 開局與對戰\r\n\r\n- 使用 Lichess 具名開局資料（CC0），保存來源版本與完整合法序列。一般對戰／真人對 AI 可選擇啟用：在目前局面收錄的不同合法走法間等機率選擇，不依開局名稱出現次數加權；不暗示資料包含勝率權重或逐線棋力保證。\r\n- 預設最多使用開局庫 12 手，UI 可調；首次查無走法或達上限，該局永久離庫並使用 Alpha-Beta。保存種子、已走序列與離庫狀態，重新開始新局才重置；真人選步也須更新當局是否已離庫。\r\n- 比較先固定 32 條不同開局線，分散選取不同開局、依實際序列排除重複，於執行前保存清單。按共同 12 手上限截取合法前綴，可較短；所有設定重播相同線後才搜尋。每條交換黑白，每個候選對一個基準共 64 局；若另選 stable 參考比較，獨立顯示額外局數，不能把兩個基準混成同一個 64 局分母。\r\n- 開局契約保存起始 FEN 加 UCI 走法前綴，串接棋盤、搜尋、派工、判和、工作識別、保存、續跑與回放；不能只傳開局結束 FEN。既有只有 FEN 的輸入等價於空前綴，原紀錄不補造歷史。非法序列在開跑前拒絕；開始搜尋前已終局的線明確處理並避免進入無意義比較。\r\n- 本輪比較固定深度 3／q4、同時 4 局、每局 1 個搜尋 worker、TT 4,096 筆，雙方條件相同。沿用目前判和政策及手數限制控制，實際值必須納入快照，截短或中止不算和棋；不是把深度 3 的對戰結果拿去訓練，也不影響教師節點預算。\r\n- 沿用逐場保存、完整配對統計、結果排序、回放、續跑，以及目前已完成的逐局手數／回合／輪到方顯示；開局前綴納入回放與手數定義，避免畫面從中局又從零誤數。報告逐開局結果與未完成量，不把換 seed 的確定性重跑算獨立證據，也不把 64 局初步觀察當棋力提升證明。\r\n\r\n## 測試決策\r\n\r\n- 以使用者能觀察的完整行為驗證，避免測試私有呼叫次數、固定文案、常數、import 或 SDK 呼叫存在。主測試入口為應用程式事件／學習實驗公開執行入口，經實際保存後重新開啟，連到現有比較與回放入口。\r\n- 對資料分組、跨組去重、教師視角、篩選、共用尺度、固定子力、非負權重、驗證挑選與測試凍結，以小型可手算資料驗證外部結果。特徵向量與正式評分的一致性是重要數值契約，允許少量針對性行為測試，不測內部矩陣組裝細節。\r\n- UCI 教師是唯一主要外部替身邊界，使用可控制的測試程序回傳分數、mate、bound、非法走法、超時及崩潰。資料分割、訓練、保存及續跑盡量用真實實作；真實 Stockfish 先導量測獨立執行，不放入日常測試或以固定引擎分數作脆弱斷言。\r\n- 沿用現有權重實驗流程、續跑、比較執行、UI 事件及回放的測試方式，涵蓋停止、重新啟動、提交後摘要落後、儲存失敗與重複執行。用可控制時鐘驗證八小時總預算，不真的等待八小時。\r\n- 開局以真人／批次／比較入口驗證合法走法、不同走法去重、離庫狀態、12 手界線、配對一致、完整歷史的重複判和、回放與舊格式相容。少量真實 spawn 測試驗證歷史與停止跨程序保留，其餘走高層流程即可。\r\n- Agent 負責軟體流程驗收：由 UI 建立實驗、準備資料、真實教師先導／標記、學習、停止與重開續跑、另存及深度 3 對戰。一般切片可用應用程式 UI 事件整合測試及必要畫面檢查；M11 仍須串接實際來源與 Stockfish 走通真實 UI 短流程，產生實際版本的 HTML 截圖並核對離線資源，不為靜態文案加測試。\r\n- 完整資料、五組及預定組合、每候選 64 局研究實驗由使用者於交付後分次執行，不是每張軟體工作票結案前必須跑滿的工作。未執行狀態如實呈現，不以短流程驗收宣稱棋力。\r\n- 使用者已核准一般 `/implement` 包含必要驗證、GitHub 與本機票／索引／開發計畫同步、提交與關閉本票，最後讀回確認。供使用者重現的操作方式不阻擋結案；實際失敗或必要資源不足才留下明確阻礙，不另等例行人工展示。\r\n- 測試入口及工作票切分已經使用者核准；本規格不表示功能已實作或已驗收。\r\n\r\n## 不在範圍內\r\n\r\n- 深度 5 的本輪對戰驗證、進一步搜尋加速、改置換表共享／保留策略、因容量假設直接擴大預設、搜尋參數自動調優。\r\n- 神經網路、自學新特徵、學棋子價值、對局結果學習、強化學習、無教師路線及自動全組合搜尋。\r\n- 覆寫 stable、宣稱 stable 已證明較強、把全項設定當首輪唯一基準、用單組結果淘汰所有組合用途。\r\n- 有償算力、到時自動重啟、無人值守連續多個八小時、兩天開發期限、多實驗管理平台與額外美化。\r\n- 將教師誤差改善或有限對局勝率當成保證棋力提升；用已看過資料冒充全新測試。\r\n- 從零重做已完成的比較 UI、逐手進度、手動權重組合、排序另存及續跑功能。\r\n\r\n## 補充說明\r\n\r\n- 公開來源：[Lichess 棋譜資料庫](https://database.lichess.org/)、[Lichess 具名開局資料](https://github.com/lichess-org/chess-openings)、[Stockfish](https://stockfishchess.org/)。實作時核對並固定實際來源與授權；本輪規格整理尚未下載引擎或資料。\r\n- 現有比較功能已交付於規格 #19 及工作票 #22–#25；搜尋效能規格 #18 與相關工作已完成。本規格擴充學習來源及開局歷史，不重開或修改已完成父規格。\r\n- 具體教師節點數依已約定的先導量測由使用者選擇。具體懲罰強度、穩定性診斷及選樣排序等工程參數由實作固定、顯示並保存，不新增需求訪談，不得在測試後偷偷調整。\r\n- 交付判準是完整、可重現、可停止續跑且誠實報告的流程；研究結果允許改善、無改善或證據不足。保存限制及下一步建議，不要求為得到正向結論不斷增加預算。\r\n\r\n\r\n## 整體交付與驗收狀態（2026-10-24）\r\n\r\n規格與十一張子票均已完成軟體驗收並結案；整合分支 `codex/ml-small-trial`。各票的實作、測試、UI 證據及限制見[工作票索引](README.md)，操作及人工重現見[離線教學](../../docs/ML試驗教學.html)。\r\n\r\n- 完整回歸 397 項通過；最後的共用候選挑選重構另以單組、五組、組合及 UI 共 17 項測試確認前後均通過，隔離環境依賴指令亦已驗證。\r\n- 真實 60 盤／Stockfish 19 走通資料、先導、標記、五組、直接組合、聯合訓練及三種候選的深度三共同開局搜尋、停止重開續跑、報告與回放。離線 HTML 使用交付版本實際畫面，已核對本地資源與渲染。\r\n- 規範軸無明文違反；重複挑選邏輯與 README 依賴指令已修正並複查。需求軸無未解決缺漏；整批結案同步稽核通過。\r\n- 正式 500 盤完整標記、全套候選研究、每候選每基準 64 局及八小時實際長跑尚未執行；屬交付後研究，不以短流程宣稱棋力提升。\r\n",
+      "closedAt": "2026-10-24T03:27:04Z",
+      "comments": [
+        {
+          "id": "IC_kwDOU_Tk9c8AAAABfDxrcQ",
+          "author": {
+            "login": "chad30877"
+          },
+          "authorAssociation": "OWNER",
+          "body": "整份規格已交付：十一張子票均完成必要驗收與結案，397 項完整測試及最後重構 17 項回歸通過，雙軸審查及修正完成。真實 Stockfish 19 短流程、離線截圖教學與限制已同步本機規格；整合分支 codex/ml-small-trial，收尾提交見本次 Git。正式完整研究留交付後分次執行。",
+          "createdAt": "2026-10-24T03:27:04Z",
+          "includesCreatedEdit": false,
+          "isMinimized": false,
+          "minimizedReason": "",
+          "reactionGroups": [],
+          "url": "https://github.com/chad30877/chess-ai/issues/26#issuecomment-6379301745",
+          "viewerDidAuthor": true
+        }
+      ],
+      "createdAt": "2026-10-23T14:08:37Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 26,
+      "parent": null,
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZYy-Q",
+            "number": 27,
+            "state": "CLOSED",
+            "title": "M01：從 UI 辨識、選用與另存單群組設定",
+            "url": "https://github.com/chad30877/chess-ai/issues/27"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZY3WA",
+            "number": 28,
+            "state": "CLOSED",
+            "title": "M02：從 UI 建立可重現的棋譜資料分組與局面預覽",
+            "url": "https://github.com/chad30877/chess-ai/issues/28"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZY8IA",
+            "number": 29,
+            "state": "CLOSED",
+            "title": "M03：從 UI 量測 Stockfish 教師預算並保存選擇",
+            "url": "https://github.com/chad30877/chess-ai/issues/29"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZBKQ",
+            "number": 30,
+            "state": "CLOSED",
+            "title": "M04：逐局面教師標記、篩選與八小時停止續跑",
+            "url": "https://github.com/chad30877/chess-ai/issues/30"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZGFw",
+            "number": 31,
+            "state": "CLOSED",
+            "title": "M05：完成單群組校準、學習、獨立誤差評估與另存",
+            "url": "https://github.com/chad30877/chess-ai/issues/31"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZKxA",
+            "number": 32,
+            "state": "CLOSED",
+            "title": "M06：五個單群組共用預算學習與完整結果比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/32"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZQhw",
+            "number": 33,
+            "state": "CLOSED",
+            "title": "M07：自選群組直接組合、聯合訓練與搭配效果比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/33"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZVbg",
+            "number": 34,
+            "state": "CLOSED",
+            "title": "M08：一般與真人對戰可選開局庫並在離庫後搜尋",
+            "url": "https://github.com/chad30877/chess-ai/issues/34"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZaAQ",
+            "number": 35,
+            "state": "CLOSED",
+            "title": "M09：固定共同開局線的成對比較、續跑與完整歷史回放",
+            "url": "https://github.com/chad30877/chess-ai/issues/35"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZepw",
+            "number": 36,
+            "state": "CLOSED",
+            "title": "M10：學習結果接入深度三共同開局驗證與研究報告",
+            "url": "https://github.com/chad30877/chess-ai/issues/36"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZk5A",
+            "number": 37,
+            "state": "CLOSED",
+            "title": "M11：交付附實際截圖的離線教學並完成端到端驗收",
+            "url": "https://github.com/chad30877/chess-ai/issues/37"
+          }
+        ],
+        "totalCount": 11
+      },
+      "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+      "updatedAt": "2026-10-24T03:27:04Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/26"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZGFw",
+            "number": 31,
+            "state": "CLOSED",
+            "title": "M05：完成單群組校準、學習、獨立誤差評估與另存",
+            "url": "https://github.com/chad30877/chess-ai/issues/31"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# M01：從 UI 辨識、選用與另存單群組設定\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n讓使用者從既有設定選擇與回放評分入口，辨識純子力與五個單群組、查看實際內容並另存合法設定，用於現有真人對戰與比較。不需要先完成 ML 即可展示。\n\n## 驗收條件\n\n- [x] 提供純子力，以及子力分別搭配棋子位置、兵形、活動力、王安全、協調的五組學習預設；各組固定相同階段規則與棋子價值，不把既有累加範例誤當單群組。\n- [x] 設定選擇呈現中文名稱、實際群組與分階段狀態；既有 stable 保留原數值、關閉分階段且標示為子力＋棋子位置，不被新預設覆寫。\n- [x] 使用者能查看設定、另存完整版本化設定，再從真人對戰或評分比較載入，實際評分反映選定群組。\n- [x] 五組包含 16 個現有位置項，中殘局各一權重；棋子位置維持整組 PST 倍率，沒有擴充成每格學習。\n- [x] 透過既有 UI 事件、評分與保存／讀回流程驗證群組隔離及設定實際生效；不為名稱常數或 JSON 靜態內容增加測試。\n- [x] 由 Agent 透過應用程式 UI 事件整合測試或實際操作，驗證選一組、查看內容、另存並開啟對戰。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n\n## 實作與驗證狀態（2026-10-23）\n\n實作已完成，提交 `658fede`；Issue #27 已結案。六份預設、實際群組與分階段顯示、回放載入／查看／另存及真人／比較讀回皆已接通，stable 原值保留。\n\n完整測試 325 項通過，UI 測試 47 項通過；規範審查發現的重複摘要已修正，需求審查無缺漏。編譯檢查及 `git diff --check` 通過。\n\n使用者於 2026-10-23 核准一般工作票改由 Agent 完成操作驗證與結案。此票已透過 `test_profile_selection_isolates_groups_in_actual_evaluation_and_comparison` 及 `test_single_group_profile_roundtrips_through_replay_and_live_game` 驗證實際群組評分、回放選用、另存讀回及真人對戰載入；此次 UI 與結案工具回歸共 62 項通過。這是應用程式 UI 事件整合測試證據，沒有宣稱已取得人工展示紀錄。文件與實作提交已有 `658fede`、`327701d`；修訂後各項驗收均完成。\n\n供使用者重現：開啟任一回放 →「調整評分」→ 切換設定並展開群組查看權重 → 輸入新名稱另存 → 回首頁進入真人對戰，選取新設定並開始。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n",
+      "closedAt": "2026-10-23T15:08:23Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:08:40Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 27,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M01：從 UI 辨識、選用與另存單群組設定",
+      "updatedAt": "2026-10-23T15:42:41Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/27"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZY8IA",
+            "number": 29,
+            "state": "CLOSED",
+            "title": "M03：從 UI 量測 Stockfish 教師預算並保存選擇",
+            "url": "https://github.com/chad30877/chess-ai/issues/29"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# M02：從 UI 建立可重現的棋譜資料分組與局面預覽\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n使用者可選取／取得固定來源棋譜，建立學習實驗，預覽訓練、驗證、測試的實際樣本及排除數，保存後重新開啟查看。這個資料準備切片獨立於設定預設及教師程序。\n\n## 驗收條件\n\n- [x] UI 提供 Lichess 2013 年 1 月標準棋資料來源與本機檔案入口；取得方式、CC0 授權、來源雜湊、種子及處理版本保存於不可變快照。大檔串流處理，錯誤可見，背景處理不凍結 UI。\n- [x] 去重棋譜後抽 500 盤，先按整盤分為 350／75／75，再每盤最多抽 12 局面；略過前 8 手，兼顧棋局階段，保留完整合法歷史。來源不足須明確報告，不重複補足。\n- [x] 同組重複局面只留一份，跨組重複從所有組排除；局面身份使用盤面、輪到方、易位與有效吃過路兵，不以回合數區別。\n- [x] 教師前先排除已終局及受將局面，保存排除原因；UI 顯示各分組盤數、局面數、階段分布與篩除統計，接受總量不足 6,000。\n- [x] 完成資料可重新開啟，變更來源、種子或處理規則建立新實驗；停止或失敗不把部分產物標成完整資料，已完成快照不受影響。\n- [x] 高層資料建立／保存／重開測試以小型棋譜驗證確定性、整盤隔離、跨組重複、有效吃過路兵身份及損壞輸入；測試不依賴下載完整公開檔案。\n- [x] 由 Agent 透過應用程式 UI 事件整合測試或實際操作，建立並重開資料預覽。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n\n## 實作與驗證（2026-10-24）\n\n實作提交 `4823d74` 已合併至整合分支 `codex/ml-small-trial`（`9b070ea`）；GitHub #28 已經專案結案命令同步關閉並讀回確認，必要驗收全部完成。\n\n- `engine.learning.dataset` 提供建立、背景執行與重開入口；完整資料只以原子提交的 `dataset.json` 發布，執行狀態獨立保存。完成資料拒絕覆寫；改來源或種子一律另建目錄，處理規則與版本隨快照凍結。\n- 來源按區塊取得及雜湊，壓縮檔串流解壓、逐盤處理；棋譜去重索引放磁碟，記憶體保留最多 500 盤。Zstandard 另核對 frame 結尾，截短檔即使含可讀 PGN 也不視為完整。官方月檔來源與 CC0 已核對；本機檔只有符合官方 SHA256 才辨識為該固定來源，其他來源誠實標示授權未確認。\n- `tests/test_learning_dataset.py` 以 501 盤驗證精確 350／75／75 分組，以 12 盤加重複棋譜驗證不足額、重現、每盤上限及合法完整前綴；另驗證跨組全排除、同組只留一次、有效／無效吃過路兵（含保存結果）、回合數、損壞 PGN／截短壓縮檔、停止與磁碟保存失敗。測試使用小型來源與 HTTP 邊界替身，不下載整月檔。\n- `tests/ui/test_chess_application.py` 已實際送出 pygame 滑鼠與文字事件：選本機來源、建立時立即返回、完成預覽、棋盤歷史、關閉應用程式後重開、停止待執行工作、修改種子另建，以及失敗紀錄重開查看原因。資料、保存與重開皆用真實實作。變動範圍 70 項及完整 360 項測試全部通過（164.775 秒）；`git diff --check` 通過。已合入整合分支 `f362917`，包含既有多程序測試競態修正。\n- Agent 已檢視實際 render 畫面：分組、階段、排除量、來源與歷史入口無溢位。截圖保留於 `C:/Users/User/.codex/ml-small-trial-m02-ui-small.png`。額外真實月份 UI 驗證完成：讀取 121,332 盤，去重 811 盤後選取 500 盤（350／75／75），保留 5,809 局面（訓練 4,075、驗證 881、測試 853）；880.141 秒完成背景處理。官方雜湊與 CC0 已保存，程序重開、完整歷史及跨組隔離通過，退出碼 0。證據與實際截圖位於 `C:/Users/User/.codex/ml-small-trial-m02-acceptance/`，不宣稱完成 ML 研究。\n- 本提交包含程式、測試、README、測試說明及目前開發計畫；未修改或關閉其他工作票。\n\n人工重現方式：啟動 `python -m apps.play_ui` →「學習實驗」→ 選 Lichess 來源或切為本機檔案並輸入／貼上路徑 → 設種子並「建立新實驗」→ 查看分組及排除量、「棋盤與完整歷史」；關閉重開後於保存清單選取同一實驗。處理中可「停止」，修改種子再建立時應保留原完成快照。\n\n限制：本票交付資料準備與預覽；教師標記及權重學習由後續票接入。任意本機來源不自動宣稱 CC0，沒有可用資料的盤不補樣湊數；正式研究仍須由使用者選擇資料與教師預算。\n",
+      "closedAt": "2026-10-24T01:37:16Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:08:44Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 28,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M02：從 UI 建立可重現的棋譜資料分組與局面預覽",
+      "updatedAt": "2026-10-24T01:42:27Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/28"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZY3WA",
+            "number": 28,
+            "state": "CLOSED",
+            "title": "M02：從 UI 建立可重現的棋譜資料分組與局面預覽",
+            "url": "https://github.com/chad30877/chess-ai/issues/28"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZBKQ",
+            "number": 30,
+            "state": "CLOSED",
+            "title": "M04：逐局面教師標記、篩選與八小時停止續跑",
+            "url": "https://github.com/chad30877/chess-ai/issues/30"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# M03：從 UI 量測 Stockfish 教師預算並保存選擇\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n使用者選擇固定 Stockfish 19，對訓練來源中的約 100 個局面量測兩個節點預算，查看耗時與分數差異，再選定正式標記條件。提供真正可操作的教師準備流程。\n\n## 驗收條件\n\n- [x] UI 可選教師執行檔並檢查引擎識別，保存版本、雜湊、UCI 選項、快取初始化政策及來源／授權資訊；不靜默替換版本。\n- [x] 僅從訓練來源固定抽取約 100 局面，分別使用 50,000／200,000 節點，保存完整歷史、原始分數／視角、白方分數、最佳手與耗時；不使用測試資料決定預算。\n- [x] 顯示兩種預算的耗時、有效分數差異及無法比較／將被篩除數；由使用者選定預算後保存不可變條件，不宣稱節點數保證品質。\n- [x] UCI 通訊與棋局狀態重設有一致政策，選項與資料身份相同才可重用既有標記；教師不啟用殘局資料庫。\n- [x] UI 顯示進度、停止及缺少執行檔、引擎崩潰、逾時、非法走法等錯誤；停止後釋放程序，不把不完整結果當成功。先導執行也受八小時上限約束。\n- [x] 以可控制 UCI 測試程序，從公開執行入口驗證白方視角、歷史、預算選擇、錯誤與取消；真實 Stockfish 做獨立短先導，不放入日常測試。\n- [x] 由 Agent 從 UI 入口完成真實 Stockfish 先導並重開已保存選擇，記錄量測結果；不以教師替身取代真實先導。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n\n## 實作與驗證證據（2026-10-24）\n\n實作 `655f7c0` 已合併至整合分支 `codex/ml-small-trial`（`f9e6099`）；GitHub #29 已由專案結案命令同步關閉並讀回確認。完整 369 項測試通過；整合雙軸審查於本批全部功能完成後執行。\n\n- 公開入口 `run_pilot`／`load_pilot`／`choose_budget` 與 UI 事件測試，使用真實棋譜處理及檔案保存，只在 UCI 外部程序替換教師。驗證白方視角、完整前綴、不可變選擇、重開、錯版本、崩潰、逾時、非法手、界限／將死／特殊分數、保存失敗、讀取中停止及可控制時鐘八小時上限。\n- 完整回歸：`python -m unittest discover -s tests -t . -q` 共 369 項通過（210.390 秒）；教師／UI 專項 9 項通過，後續補強的 null 最佳手拒絕與 UI 操作亦重跑通過；`git diff --check` 通過。\n- 使用每局面 `ucinewgame`、`Clear Hash`、`isready`；Threads 1、Hash 16 MB、MultiPV 1、無強度限制、SyzygyPath 空且 ProbeLimit 0。原始輸出、最後分數行與採用分數行／深度／節點數分開保存。節點到期界限只可回退到 PV 首手等於最終最佳手的最近完整評分，否則保留 bound-only；政策先於正式標記凍結，不依測試組調整。\n- 真實 UI 事件驗收：完整 Lichess 2013-01（CC0，官方 SHA256 已核對）、seed 2026，從 350 盤訓練組固定取 100 局面，完成兩種預算共 200 筆。Stockfish 19 執行檔 SHA256：`45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0`。\n- 最終量測：50,000 節點合計 13.690 秒、篩除 27；200,000 節點合計 55.049 秒、篩除 31；69 組有效配對，31 組無法比較，平均絕對差 18.4203 cp、最大 94 cp，整體含保存約 74.8 秒。原因可重疊：50k 為 mate 2／capture 26，200k 為 mate 6／capture 27。這些是先導量測，不能宣稱節點品質或棋力提升。\n- 實際畫面檢查：`C:/Users/User/.codex/ml-small-trial-m03-acceptance/teacher-measured.png`、`teacher-reopened.png`；事件腳本及 `evidence.json` 同目錄。UI 以 dummy 顯示驅動渲染實際畫面，非模擬稿；已核對完整量測、預算選擇及重新建立應用程式後選擇不變。驗收選 50k 只測保存，正式研究預算仍由使用者看量測後選定。\n- 最終先導資料：`C:/Users/User/.codex/ml-small-trial-m02-acceptance/data/learning/206d529a76b0482aa259b2a2946d8dea/teacher-pilots/c694fa797eac4f0daf9c09190747f69c`。先前試跑與一次輸入路徑重複的失敗紀錄均保留；以上統計只取最終固定政策的完整先導。\n\n人工重現：首頁「學習實驗」建立／重開資料 →「教師先導」輸入 Stockfish 19 路徑 →「建立新先導」→ 查看兩種預算 → 選定預算 → 關閉重開同一資料，核對已保存選擇；可在執行中按停止再查看保留數。\n",
+      "closedAt": "2026-10-24T01:51:44Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:08:48Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 29,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M03：從 UI 量測 Stockfish 教師預算並保存選擇",
+      "updatedAt": "2026-10-24T01:51:57Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/29"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZY8IA",
+            "number": 29,
+            "state": "CLOSED",
+            "title": "M03：從 UI 量測 Stockfish 教師預算並保存選擇",
+            "url": "https://github.com/chad30877/chess-ai/issues/29"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZGFw",
+            "number": 31,
+            "state": "CLOSED",
+            "title": "M05：完成單群組校準、學習、獨立誤差評估與另存",
+            "url": "https://github.com/chad30877/chess-ai/issues/31"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# M04：逐局面教師標記、篩選與八小時停止續跑\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n使用者對已準備資料執行完整教師標記，看到保留與排除原因，能停止、關閉及續跑，完成可供學習使用的資料集。\n\n## 驗收條件\n\n- [x] 使用已凍結教師設定標記所有分組，逐局面提交原始輸出及轉換結果；相容先導標記可重用，不同預算或條件不得混用。\n- [x] 篩除 mate、最佳手吃子／升變、bound-only 與殘局資料庫特殊分數；保存各原因與計數，不把未知輸出當一般 cp。另合併資料階段的排除統計。\n- [x] 每次執行共享最多八小時，時間到或手動停止保存並退出，不自動重啟；UI 顯示完成、剩餘、失敗／需重跑與有效分組分布。\n- [x] 重新開啟後只處理未完成工作，已成功標記不重複計入；提交後摘要落後可恢復。未完成或失敗局面可以重試，同實驗禁止同時執行兩份工作。\n- [x] 修改教師或篩選條件建立新快照；部分資料不能冒充完成資料進入正式學習，實際不足額明確顯示。\n- [x] 以高層執行／保存／重開流程及可控制時鐘驗證上限、停止、崩潰、保存失敗、重試及去重；保留 UCI 外部替身邊界，其餘使用真實保存邏輯。\n- [x] 由 Agent 透過 UI 事件整合測試或實際操作，中途停止、關閉、重開續跑並核對已完成量。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n\n\n## 實作與驗證證據（2026-10-24）\n\n實作提交 `3b74fb8` 已合併至 `codex/ml-small-trial`（`ba8fcba`）；GitHub #30 已由專案結案命令同步關閉並讀回確認。\n\n- `create_labeling` 凍結來源副本、教師完整身份、已選節點預算、評分選取政策與篩選版本；只有身份及完整歷史相同的已選預算先導紀錄才重用。執行前重新比對執行檔雜湊、識別及 UCI 條件；條件不符時保留錯誤並要求另建先導／標記。\n- `run_labeling` 單次八小時共用所有分組，持有實驗獨占鎖；每局面原子提交原始輸出、白方分數、最佳手、排除原因與穩定工作身份。停止及錯誤均退出，由使用者手動續跑；只跳過已提交局面。進度使用記憶體中的已提交資料，重開時才從逐筆紀錄重建，摘要落後不重複計入。\n- `load_labeled_dataset` 僅接受所有局面已提交的快照，回傳有效局面；mate、最佳手吃子／升變、bound-only、殘局庫特殊分數／命中均保留原因後篩除，未知分數保存錯誤而不轉成 cp。有效盤數、局面數、階段分布與原資料排除及不足額均可在 UI 查看。\n- 6 個高層標記案例與 1 個 pygame 事件案例驗證固定條件與先導重用、八小時與停止、完整資料閘門、未知輸出／崩潰／逐筆保存失敗重試、摘要保存落後、已完成量去重、獨占執行，以及實際 UI 中途停止、關閉重開續跑。UCI 使用外部程序，其餘採真實資料與原子保存；時間及 `os.replace` 僅作外部邊界故障注入。補上摘要寫入失敗後 UI 不能用舊背景狀態覆寫已恢復計數的回歸。\n- 最終完整測試：`python -m unittest discover -s tests -t . -q` 共 376 項通過（237.911 秒），完整輸出存於 `C:/Users/User/.codex/ml-small-trial-m04-acceptance/full-tests.log`；`git diff --check` 通過。\n- 真實 Stockfish 19 短流程由 UI 事件完成資料建立、100×兩預算先導、選定 50k、標記、停止、關閉重開與續跑。資料採 Lichess 2013-01 原順序前 60 盤節錄，來源為 CC0，原月檔官方 SHA256 已核對；節錄 SHA256 `a1de66c0d8519e40b317f19e84a96190b7c6a38550bf5c10e77419603db3eb63`，來源證明見 `C:/Users/User/.codex/ml-small-trial-tools/lichess-2013-01-first-60.provenance.json`。UI 如實顯示來源不足 440 盤。\n- 真實結果共 706 筆，先導重用 100 筆；於 106/706 中途停止，重開仍為 106 筆，續跑只補剩餘 600 筆並核對原 106 份檔案完全不變。最終有效 456／排除 250／失敗 0；訓練 42 盤 320 局面、驗證 9 盤 70 局面、測試 9 盤 66 局面。原因可重疊：吃子 223、mate 32、升變 2、bound-only 1。續跑含保存約 78.062 秒，與完整回歸並行，不作效能基準。\n- 實際畫面 `C:/Users/User/.codex/ml-small-trial-m04-acceptance/labels-stopped.png`、`labels-reopened.png`、`labels-completed.png`，事件腳本 `C:/Users/User/.codex/ml-small-trial-m04-ui-acceptance.py`；已檢查停止及完成進階畫面無溢位。`evidence.json` 保存條件、分布與不變量；正式可讀的短流程標記位於同目錄 `data/learning/3d3311263e41496296416c4e104db369/teacher-labels/2c4b44f4d43240ea9d0db1c5fac3ca56`。\n\n限制：50k 選擇只驗證軟體流程與保存，不代替使用者的研究預算選擇；60 盤短流程不是完整月檔研究、不證明教師品質或棋力提升。本票未實作校準／學習及後續報告。\n\n人工重現：首頁「學習實驗」建立或開啟資料 →「教師先導」完成並選定預算 →「教師標記」→「建立新標記」→ 中途「停止」並記下完成量 → 關閉重開同一資料及「教師標記」→ 核對完成量不變 →「續跑／重試」至剩餘 0；展開進階條件查看固定預算與資料排除數。修改教師另建先導及新標記，不覆寫原實驗。\n",
+      "closedAt": "2026-10-24T02:09:05Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:08:53Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 30,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M04：逐局面教師標記、篩選與八小時停止續跑",
+      "updatedAt": "2026-10-24T02:09:24Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/30"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZBKQ",
+            "number": 30,
+            "state": "CLOSED",
+            "title": "M04：逐局面教師標記、篩選與八小時停止續跑",
+            "url": "https://github.com/chad30877/chess-ai/issues/30"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZYy-Q",
+            "number": 27,
+            "state": "CLOSED",
+            "title": "M01：從 UI 辨識、選用與另存單群組設定",
+            "url": "https://github.com/chad30877/chess-ai/issues/27"
+          }
+        ],
+        "totalCount": 2
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZKxA",
+            "number": 32,
+            "state": "CLOSED",
+            "title": "M06：五個單群組共用預算學習與完整結果比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/32"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# M05：完成單群組校準、學習、獨立誤差評估與另存\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n先以棋子位置群組從 UI 走通完整學習流程：校準教師、訓練三個候選、驗證挑選、凍結後測試、查看原始與新權重並另存可用設定。這是最小可驗收的 ML 成果。\n\n## 驗收條件\n\n- [x] 只從訓練組依固定 stable 評分計算逐盤等權、無截距的共用倍率，保存參照、殘差及穩定性診斷；零分母、非正／非有限值或診斷異常不能產生誤導的成功排序。\n- [x] 特徵精確對應正式評分器及相同階段混合；固定棋子價值、子力倍率與開關，僅學所選群組的非負中殘局權重。\n- [x] 使用逐盤等權非負最小平方與標準化偏離原始權重懲罰，固定弱／中／強三種強度；強度、尺度、版本、容差與選擇順序在開始前保存。零權重採正絕對尺度，不設統一百分比硬上限。\n- [x] 驗證組選定後凍結完整候選，測試組只評估一次；重開顯示已保存結果。逐盤平均 MAE 與各階段分層並列純子力、原始同組、學習同組及 stable；空組顯示無資料而非零誤差。\n- [x] UI 可查看原始／新權重及誤差、另存完整合法設定，既有比較與回放可載入；學習無改善也是有效結果，不強制宣稱成功提升棋力。\n- [x] 以完成候選保存進度，單次訓練最多八小時；停止／到時中止未完成求解並清理程序，重開只重跑未完成候選，不把部分解宣告完成。\n- [x] 從 UI／實驗入口用可手算資料驗證校準、非負約束、固定子力、評分一致、驗證挑選、測試凍結與停止續跑；不測內部矩陣或求解器呼叫形式。\n- [x] 由 Agent 透過 UI 事件整合測試或實際操作，完成一組學習、另存並載入對戰。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n\n## 實作與驗證證據（2026-10-24）\n\n主實作提交 `574f43d`。完整回歸 `python -m unittest discover -s tests -t .` 共 384 項／298.421 秒通過；後續摘要恢復斷言及進階診斷顯示另由公開訓練流程與 UI 事件兩項驗證。已合併至整合分支 `codex/ml-small-trial`（`66d3bc1`）；GitHub #31 已由專案結案命令同步關閉並讀回確認。新增 `engine.learning.training` 的公開實驗入口及獨立學習畫面，標記完成後可由 UI 建立棋子位置學習、停止／重開續跑、看原始與新權重、另存完整設定並載入真人對戰。校準只用訓練組，固定 stable 原始參照；每盤等權、無截距，保存殘差與固定排序奇偶盤診斷。三種非負求解候選以驗證挑選、先凍結再保存測試報告。已完成候選及報告不會在重開時重算；資料及規則改動另建實驗，保存標記／資料身份與先前相同測試資料的實驗來源。\n\n- 數值契約與高層流程：`tests.test_weight_training` 以手算 .99／2.02 stable 分數、不同盤局面數驗證校準倍率 .01006 與 MAE .012；少量正式局面驗證 MG／EG 特徵與正式評分一致。非負下界 0、無百分比上限的最適權重 15、零初始權重變正均以真實 NNLS 求解。零分母、非正、非有限及子集不穩定如實失敗或警示，不產生可靠排名。\n- 真實 spawn：完成第一候選後，在第二候選程序啟動時停止，核對程序清理、只保存一個候選；以控制時鐘測八小時到時，再重開完成剩餘候選，第一個提交的位元組不變。資料準備、候選求解及誤差評估都檢查同次期限，未完成解不提交。\n- `tests.ui.test_weight_training` 透過 UI 事件完成學習、切換階段／進階條件、關閉重開、另存及載入真人對戰，核對實際對戰設定與凍結設定相同；既有教師／標記相關 8 項回歸通過。\n- Agent 真實軟體短流程：使用 M04 已保存的 Lichess 官方月份 60 盤節錄及 Stockfish 19／50,000 節點標記，複製至獨立外部驗收目錄，訓練有效 320 局面／42 盤、驗證 70／9、測試 66／9。從 UI 完成新建學習、另存、真人對戰載入及重開；報告位元組不變。主倍率 .006111529012068489，既定奇偶盤最大相對偏差 .1160093565，原始／學習驗證 MAE=1.1336446893／1.1538163435、測試=.9464234275／.9982716676；學習未改善，未標為優先對戰觀察，也未改規則追求好看結果。\n- 重現腳本 `C:/Users/User/.codex/ml-small-trial-m05-acceptance.py`；證據 `C:/Users/User/.codex/ml-small-trial-m05-acceptance/acceptance.json`，實驗 `data/learning/3d3311263e41496296416c4e104db369/teacher-labels/2c4b44f4d43240ea9d0db1c5fac3ca56/training/a8a6ec39ae5749e6af565ee36cb860a8`。`training-results.png`／`training-advanced.png`／`battle-loaded.png` 為實際軟體畫面；已檢查結果畫面及來源提示沒有重疊。第二次工程重現明示前次相同測試資料曝光，不宣稱全新未見測試。\n\n限制：上述為必要軟體短流程，不是 500 盤完整研究、完整棋力對戰或八小時實際長跑。測試組殘局只保留 1 局面／1 盤，無法代表殘局表現；原始及學習誤差均如實保留。五個單群組與組合沿用本票數值／保存契約於 #32、#33 擴充。完整資料與正式研究由使用者交付後分次執行。\n\n人工重現：首頁「學習實驗」→ 已完成資料 → 教師先導 → 教師標記 → 棋子位置學習 → 新建並學習；完成後切換各階段及進階條件，另存完整設定、載入真人對戰。訓練中可停止，關閉重開後按續跑，只補未完成候選；改條件選新建，保留來源與測試使用脈絡。\n",
+      "closedAt": "2026-10-24T02:24:45Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:08:57Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 31,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M05：完成單群組校準、學習、獨立誤差評估與另存",
+      "updatedAt": "2026-10-24T02:25:06Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/31"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZGFw",
+            "number": 31,
+            "state": "CLOSED",
+            "title": "M05：完成單群組校準、學習、獨立誤差評估與另存",
+            "url": "https://github.com/chad30877/chess-ai/issues/31"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZepw",
+            "number": 36,
+            "state": "CLOSED",
+            "title": "M10：學習結果接入深度三共同開局驗證與研究報告",
+            "url": "https://github.com/chad30877/chess-ai/issues/36"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZQhw",
+            "number": 33,
+            "state": "CLOSED",
+            "title": "M07：自選群組直接組合、聯合訓練與搭配效果比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/33"
+          }
+        ],
+        "totalCount": 2
+      },
+      "body": "# M06：五個單群組共用預算學習與完整結果比較\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n讓使用者一次選擇五個單群組，沿用相同資料與教師尺度，分組完成訓練、續跑與誤差比較，選取需要的學習設定。\n\n## 驗收條件\n\n- [x] 棋子位置、兵形、活動力、王安全、協調均可獨立學習，合計涵蓋 32 個現有位置權重；未選群組保持關閉，零初始權重仍能變正。\n- [x] 各組共用同一資料分組、教師標記與校準倍率，不因切換群組重估；原始單群組與學習設定具有相同階段規則。\n- [x] 所有選定群組及三種強度共用整次八小時預算；完成候選逐個保存，停止、關閉及到時後只重跑未完成部分，不能每組重開八小時計時。\n- [x] 結果按群組並列原始／學習的驗證與測試 MAE、相對純子力與 stable 的差異、各階段與有效樣本量，顯示已完成／失敗／未完成，不將排序宣稱最強。\n- [x] 驗證與測試皆改善者可標示為優先對戰觀察，不設改善百分比硬門檻；未勝過 stable 不禁止保存或進入組合，無改善也可輸出完整結果。\n- [x] 使用者可從結果選取候選、查看權重差異、另存與重新載入。各組測試結果遵守凍結後一次評估，改條件另建實驗並保留來源關係。\n- [x] 高層流程測試涵蓋多群組共用預算、跨群組續跑、零權重學習、群組隔離及部分失敗；不用增加單純常數測試。\n- [x] 由 Agent 透過 UI 事件整合測試或實際操作，跑兩組後停止並續跑其餘組，確認結果不重複。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n\n## 實作與驗證證據（2026-10-24）\n\n新增 `engine.learning.group_training` 與五組學習 UI。每份實驗保存唯一資料副本、stable 參照、數值規則、所選群組及各組原始設定；沿用 M05 的真實特徵、非負求解與逐盤誤差服務。五組共 32 個中局／殘局欄位，各組三強度共用一次訓練組校準及整次八小時期限。候選、驗證選定、凍結與測試報告逐層原子提交；重開以已提交檔案恢復，完成結果不再求解或測試。單組失敗可重試，其他組的結果仍可選用。\n\n完整回歸 `D:/Python/chess-ai/.venv/Scripts/python.exe -m unittest discover -s tests -t . -q`：389 項／395.060 秒通過，日誌 `C:/Users/User/.codex/ml-small-trial-m06-full-tests.log`。新增優先觀察與差值斷言後，公開五組流程另通過 1 項／20.380 秒；UI 事件單項先行通過 23.661 秒。實際 UI 驗收腳本兩次正常完成，第二次保留前次曝光來源。`git diff --check` 通過；本地驗收完成，由主整合代理合併並同步關票。\n\n- 高層流程以真實資料、求解程序及保存驗證五組／15 候選、同校準身份、各組階段規則與非選定項不變、完整設定另存讀回。完成後再執行，全部 JSON 位元組不變；M05、M06 互相保留相同測試資料的既有曝光來源。\n- 可控制時鐘在第二組完成後到達 28,800 秒：停止於 6 候選／2 組，重開只補其餘，已提交候選／報告及校準位元組不變。檔案系統注入單一候選原子替換失敗，保留 14 候選／4 組且失敗組不生成報告；重試補齊，原 14 候選與 4 報告不變。\n- 數值契約使用正式中局／殘局局面，驗證全部 32 欄重建分數與正式評分一致；王安全零初始殘局權重可經真實 NNLS 變正，其他群組不變。結果斷言優先觀察僅於診斷正常且驗證／測試皆改善，差值等於對應基準的誤差差。\n- `tests.ui.test_group_training` 以 pygame 事件建立五組，完成兩組後停止、關閉重開、續跑至五組，核對已提交檔案不變；切換階段、活動力權重分頁與進階條件，另存並載入真人對戰，實際設定等於凍結設定。\n- 真實短流程沿用 M04／M05 的 Lichess 官方月份 60 盤節錄、Stockfish 19／50,000 節點標記：訓練 320 局面／42 盤，驗證 70／9，測試 66／9。由 UI 完成兩組停止、重開續跑至 15 候選／5 組，原 8 個候選／報告及校準檔位元組不變；倍率 `.006111529012068489`，診斷正常。棋子位置、兵形、活動力、王安全、協調的學習驗證／測試 MAE 分別為 `1.1538/.9983`、`1.1087/.9822`、`1.0545/.8737`、`1.0754/.9876`、`1.1288/.9677`；只有兵形、活動力、王安全標示優先觀察。未改規則追求改善，也不要求勝過 stable 才能另存。\n- 外部重現腳本 `C:/Users/User/.codex/ml-small-trial-m06-acceptance.py`，證據 `C:/Users/User/.codex/ml-small-trial-m06-acceptance/acceptance.json`。最新實驗為該驗收目錄下 `data/learning/3d3311263e41496296416c4e104db369/teacher-labels/2c4b44f4d43240ea9d0db1c5fac3ca56/group-training/dcc703845b3e41daae2b45228a005525`；`groups-stopped.png`、`groups-reopened.png`、`groups-completed.png`、`group-weights.png`、`battle-loaded.png` 為實際畫面，已檢查結果與權重畫面無重疊。\n\n限制：上述是軟體短流程及工程重現，沿用已曝光測試資料（最新實驗明示三份來源），不是 500 盤完整研究、棋力驗證或八小時實際長跑；測試殘局只有 1 局面／1 盤。後續 #33 與 #36 可透過 `load_group_candidate(path, group)` 取得完整設定及凍結／資料／校準身份，未完成組別會被阻擋。本票已合入整合分支，GitHub #32 已關閉並讀回確認。\n\n人工重現：首頁「學習實驗」→ 已完成資料 → 教師先導 → 教師標記 → 五個單群組 → 選組後新建並學習；完成兩組後停止，關閉重開再按續跑，完成後選取群組、切換階段及權重、另存完整設定並載入真人對戰。改選群組另建實驗，已完成報告與測試曝光來源保留。\n",
+      "closedAt": "2026-10-24T02:39:35Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:09:02Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 32,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M06：五個單群組共用預算學習與完整結果比較",
+      "updatedAt": "2026-10-24T02:39:48Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/32"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZKxA",
+            "number": 32,
+            "state": "CLOSED",
+            "title": "M06：五個單群組共用預算學習與完整結果比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/32"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZk5A",
+            "number": 37,
+            "state": "CLOSED",
+            "title": "M11：交付附實際截圖的離線教學並完成端到端驗收",
+            "url": "https://github.com/chad30877/chess-ai/issues/37"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# M07：自選群組直接組合、聯合訓練與搭配效果比較\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n使用者可勾選多個群組，先建立單組學習權重的直接組合，再進行聯合訓練，分別查看與另存結果；預設提供活動力＋王安全的四設定搭配驗證。\n\n## 驗收條件\n\n- [x] UI 可明確勾選群組，預覽實際開關、權重與候選數，不自動展開全部組合；不接受不相容資料／尺度的單組結果默默混合。\n- [x] 直接組合保留各單組已學權重；聯合訓練同時調整所選群組，另建候選身份及結果。兩者都可另存完整合法設定。\n- [x] 固定權重比較純子力、加活動力、加王安全、兩者皆加，呈現兩種背景下王安全的誤差增量；四設定使用相同資料及階段規則，不把分別重訓結果冒充固定權重對照。\n- [x] 活動力＋王安全不因王安全單組排名低取消。任意選定組合沿用校準、非負訓練、驗證挑選、測試凍結、八小時總預算與續跑規則。\n- [x] 新組合若沿用已查看的測試組，清楚保留資料使用脈絡，不宣稱全新未見驗證；不使用測試分數反覆選訓練參數。\n- [x] 結果區分直接組合、固定權重增量及聯合重訓，不宣稱加法評分器新增交互特徵；保留可用於既有比較的完整設定。\n- [x] 高層 UI／訓練／保存測試驗證所選群組、直接組合值、聯合訓練只改選定權重與中斷重開；由 Agent 走通活動力＋王安全的組合流程並記錄證據。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n\n\n## 實作與驗證證據（2026-10-24）\n\n新增 `engine.learning.combination_training` 與獨立 `ui.combination_view`。先核對同源單組的資料、標記、校準、規則、stable、階段與固定子力，將實際所選群組、完整來源候選、直接組合、原始懲罰中心、三強度及欄位尺度凍結。直接組合逐項複製 MG／EG 學習權重（含零），聯合 NNLS 只調所選項；兩者身份、凍結報告與完整合法輸出分開保存。固定四設定直接沿用同套學習權重，只切開關，另列兩種王安全誤差增量；沒有新增交互特徵。開始至準備、評估與所有候選共用一次八小時，真實 spawn 可停止清理並手動續跑未完成單元。\n\n- 高層測試以真實 UCI 邊界替身建立標記、真實求解與保存，核對 direct 精確值、只有所選群組可變、非負、validation 選定、兩種完整設定另存與重開不重算。異資料／校準／測試身份拒絕；來源本身及前次組合列入測試曝光來源，搬移已保存來源後亦保留脈絡。\n- 手算全殘局案例：固定子力3、活動力 .2、王安全1.5，教師目標4；四種 MAE 為1／.8／.5／.7，兩種背景下加入王安全的誤差增量為-.5／-.1，空階段 null。四設定保存相同 phase 及各自完整 config。\n- 真實 solver 第二個候選開始時取消，保留第一個候選、direct 報告與固定比較；確認子程序清理。可控制時鐘再到28,800秒中止，重開補齊剩餘候選，先前檔案位元組不變。UI 事件另驗勾選預覽、新建、兩種另存、重開與真人對戰載入；完成後改選群組會預覽新組合且阻止把舊輸出誤作新選擇。\n- 新增4項測試初版共49.905秒通過；來源搬移追溯追加斷言後公開流程1項15.341秒通過；改選保護經紅→綠後UI1項17.844秒通過。含讀取準備的期限起點調整後，取消／期限／續跑流程另通過1項18.074秒；完整回歸 `python -m unittest discover -s tests -t . -q` 通過393項／436.637秒，日誌 `C:/Users/User/.codex/ml-small-trial-m07-full-tests.log`；後續來源搬移、UI改選與期限調整以上述針對性回歸分別驗證；`git diff --check` 通過。\n- Agent 以 M06 已完成的真實 Lichess 60盤節錄／Stockfish19 50,000節點標記，經 UI 預設活動力＋王安全→新建→1候選後停止→關閉重開→續跑3候選→查看direct／四設定／joint→兩種另存→joint載入真人對戰。6份已提交JSON（含來源快照、資料、direct凍結／報告、固定比較、首候選）位元組不變；共用倍率 `.006111529012068489`、子集偏差 `.1160`／門檻 `.5`，診斷正常。\n- 最新實驗 `C:/Users/User/.codex/ml-small-trial-m07-acceptance/data/learning/3d3311263e41496296416c4e104db369/teacher-labels/2c4b44f4d43240ea9d0db1c5fac3ca56/combinations/22be4dbc7fd846aa98db60be42291eba`。direct驗證／測試 MAE `1.0125470634/.8541073867`；joint `1.0168893022/.8663584286`，驗證選 weak。固定四設定驗證依序 `1.1185988501/1.0545175298/1.0754363829/1.0125470634`，測試 `0.9909591619/0.8736708708/0.9876063673/0.8541073867`。兩背景的王安全 Δ驗／測分別 `-.0431624672/-.0033527946` 與 `-.0419704664/-.0195634842`；不以測試改三強度或其他規則。\n- 外部腳本 `C:/Users/User/.codex/ml-small-trial-m07-acceptance.py`；證據 `C:/Users/User/.codex/ml-small-trial-m07-acceptance/acceptance.json`；`combination-preview.png`、`combination-stopped.png`、`combination-reopened.png`、`combination-direct.png`、`combination-controls.png`、`combination-controls-opening.png`、`combination-joint.png`、`combination-weights.png`、`combination-advanced.png` 與 `battle-loaded.png`。結果、預覽、固定比較及進階畫面已檢查無重疊。重開取圖腳本另核對所有已保存JSON位元組不變。\n\n限制：訓練320局面／42盤、驗證70／9、測試66／9；測試殘局僅1局面／1盤。這是已曝光資料的軟體短流程與工程重現（最新實驗保留5份曝光來源），不是500盤正式研究、八小時實際長跑或棋力證明。兩次工程重現使用同參數，結果相同；未為追求改善調規則。共同開局比較接點使用 `load_combination_candidate(path, kind)` 的完整 config／來源／誤差契約，M10獨立實作，未把尚未整合的比較按鈕當本票對戰驗收。已合入整合分支，GitHub #33 已關閉並讀回確認。\n\n人工重現：五個單群組完成所需群組後按「組合」→勾選並查看實際權重→新建→可停止、關閉重開續跑→切直接組合／固定四設定／聯合訓練及階段→另存或載入真人對戰。改選群組須另建；預設活動力＋王安全不依單組排名取消。\n",
+      "closedAt": "2026-10-24T02:55:18Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:09:07Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 33,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M07：自選群組直接組合、聯合訓練與搭配效果比較",
+      "updatedAt": "2026-10-24T02:55:28Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/33"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZaAQ",
+            "number": 35,
+            "state": "CLOSED",
+            "title": "M09：固定共同開局線的成對比較、續跑與完整歷史回放",
+            "url": "https://github.com/chad30877/chess-ai/issues/35"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# M08：一般與真人對戰可選開局庫並在離庫後搜尋\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n在一般對戰與真人對 AI 的 Alpha-Beta 路徑提供開局庫開關、手數上限與可重現保存；收錄走法用完後繼續正常搜尋。不依賴 ML 即可單獨驗收。\n\n## 驗收條件\n\n- [x] 取得並固定 Lichess 具名開局資料版本、雜湊及 CC0 授權，驗證完整合法序列；UI 可選擇啟用，資料缺失／損壞可見，不靜默換來源。\n- [x] 從目前局面不同合法收錄走法等機率選擇；同一走法出現於多個開局名稱不增加權重，不假造勝率資料。\n- [x] 預設最多 12 手、UI 可調；首次查無走法或達上限後該局永久離庫，之後使用 Alpha-Beta。真人落子也更新離庫狀態，新局才重置。\n- [x] 保存來源、種子、實際開局走法與離庫狀態，搜尋棋盤保持完整歷史，記錄可回放；未啟用開局庫時保持既有行為。\n- [x] 單局及一般批次使用相同政策；停止或重新開始不讓舊工作結果落入新局，保持既有逐手進度。\n- [x] 從對戰／UI 入口驗證去重、種子重現、手數界線、離庫後不回庫、真人偏離、保存回放與停止；不以少量抽樣頻率硬斷言機率。\n- [x] 透過 UI 事件整合測試或實際操作，驗證開啟開局庫並超過上限後接續搜尋；既有使用者操作確認可作為證據。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 實作與驗證狀態（2026-10-23）\n\n程式實作已完成，提交 `c87fe17`。固定 Lichess CC0 來源與雜湊，提供真人／一般批次共用開局政策、可調半回合上限、永久離庫與回放資料。\n\n驗證：完整測試 `python -m unittest discover -s tests -t .` 共 323 項通過；規範及需求審查通過，實際渲染截圖已核對設定畫面。\n\n使用者已確認完成人工操作驗收；全部驗收條件完成。人工核對方式：真人模式選 Alpha-Beta、啟用開局庫並設定上限 2，確認超過兩個半回合後接續搜尋，再停止並回放。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n",
+      "closedAt": "2026-10-23T14:58:58Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:09:11Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 34,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M08：一般與真人對戰可選開局庫並在離庫後搜尋",
+      "updatedAt": "2026-10-23T15:43:02Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/34"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZVbg",
+            "number": 34,
+            "state": "CLOSED",
+            "title": "M08：一般與真人對戰可選開局庫並在離庫後搜尋",
+            "url": "https://github.com/chad30877/chess-ai/issues/34"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZepw",
+            "number": 36,
+            "state": "CLOSED",
+            "title": "M10：學習結果接入深度三共同開局驗證與研究報告",
+            "url": "https://github.com/chad30877/chess-ai/issues/36"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# M09：固定共同開局線的成對比較、續跑與完整歷史回放\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n使用者可由固定開局資料建立 32 條共同開局線，預覽後以現有任意設定比較、交換黑白、停止續跑與回放；整條流程保留走棋歷史，不只傳入中局 FEN。\n\n## 驗收條件\n\n- [x] UI 先產生並凍結 32 條不同開局線，分散開局類型，依最多 12 手的實際合法前綴去重，顯示清單及每候選對單一基準 64 局；不足線數明確處理，不重複湊數。\n- [x] 同一線對所有候選及交換黑白配對一致，重播後才開始搜尋；比較不在每一局臨時隨機抽不同開局。\n- [x] 起始 FEN 與完整 UCI 前綴串接到搜尋、判和、序列化派工、保存、穩定工作識別、重開續跑與回放；非法或已終局線在開跑前處理。\n- [x] 新版保存契約保留開局來源、前綴與歷史；既有 FEN 輸入作空前綴，舊比較與棋譜可讀，不能為缺少的歷史補造資訊。\n- [x] 續跑從凍結清單及完整歷史重建未完成對局，完成局不重複計數；手數與回放包含開局前綴，保持進行中逐手顯示。\n- [x] 高層比較／保存／續跑／回放測試覆蓋三次重複相關歷史、易位／吃過路兵、配對一致、截短與未完成統計，少量真實 spawn 驗證跨程序歷史與停止清理。\n- [x] 由 Agent 透過 UI 事件整合測試或實際操作，用兩個既有設定跑短共同開局比較並重開續跑。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 實作與驗證狀態（2026-10-24）\n\n實作提交 `2f11af7`，相同數值設定檔的候選識別修正為 `66929ba`，驗收文件提交 `e6d95d3`。正式 Issue #35 已由專案結案命令關閉並讀回確認。UI 可由固定來源凍結 32 條開局線，按 ECO 類型分散、依實際合法前綴去重，每候選與基準交換黑白共 64 局。來源不足拒絕湊數，非法或依對局規則已終局的前綴在建立批次前拒絕。\n\n驗證證據：\n\n- `tests.self_play.test_common_openings` 經比較、保存及回放驗證三次重複歷史、易位、吃過路兵、固定前綴、截短未完成統計及不同歷史的工作識別；既有設定檔修改後仍從快照續跑，原棋譜不變、再次續跑不增加局數。兩個同數值但不同檔名的候選亦各有獨立工作與結果。\n- 少量真實 spawn：同時兩組配對、每局兩個搜尋 worker，保留 6 手歷史後選出可申請三次重複的走法，兩候選各完成兩局和棋；另驗證搜尋中停止與程序清理。\n- `test_common_openings_preview_stop_reopen_resume_and_replay` 透過 pygame UI 事件選兩份既有設定，產生／分頁預覽 32 線，以深度 1、總手數上限 12 執行短比較，保存後停止、關閉應用程式、重建 UI，從對局紀錄續跑並回放。這是 Agent 事件整合驗收，並未宣稱為使用者人工操作。預覽畫面另經實際渲染檢查。\n- 實驗快照 v2、比較歷史契約 `history_version=1` 與棋譜 v3 保存來源、起始 FEN、完整前綴和後續走法；既有快照、FEN 比較與舊棋譜回歸保留。FEN 不補造歷史。\n- 完整回歸於專用暫存目錄執行 `python -m unittest discover -s tests -t .`，349 項全部通過（173.167 秒）；先前全域暫存目錄的慢掃描已中止，不列為通過紀錄。\n- 規範及需求雙軸審查各 0 項未修正問題；編譯檢查與 `git diff --check` 通過。專案未配置靜態型別檢查器。\n\n限制：短比較及截短局只驗證操作、資料與恢復流程；沒有執行正式深度 3 長比較，也不據此宣稱棋力提升。手數包含開局前綴，若執行上限小於前綴，仍完整重播前綴後截短，不再搜尋。\n\n人工重現：批次自動對戰 → 評分比較 → 選基準及候選 → 產生 32 條共同開局線 → 下一頁查看 → 返回設定，設深度 1、手數上限 12 → 開始，待保存後停止 → 關閉重開 → 對局紀錄選該比較 → 續跑實驗 → 查看棋譜，確認前綴與手數一致。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n",
+      "closedAt": "2026-10-24T01:20:02Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:09:15Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 35,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M09：固定共同開局線的成對比較、續跑與完整歷史回放",
+      "updatedAt": "2026-10-24T01:20:16Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/35"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZKxA",
+            "number": 32,
+            "state": "CLOSED",
+            "title": "M06：五個單群組共用預算學習與完整結果比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/32"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZaAQ",
+            "number": 35,
+            "state": "CLOSED",
+            "title": "M09：固定共同開局線的成對比較、續跑與完整歷史回放",
+            "url": "https://github.com/chad30877/chess-ai/issues/35"
+          }
+        ],
+        "totalCount": 2
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZk5A",
+            "number": 37,
+            "state": "CLOSED",
+            "title": "M11：交付附實際截圖的離線教學並完成端到端驗收",
+            "url": "https://github.com/chad30877/chess-ai/issues/37"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# M10：學習結果接入深度三共同開局驗證與研究報告\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n使用者從學習結果選擇候選，預覽完整對戰條件後送入共同開局比較，查看逐開局對戰結果、回放及獨立於教師誤差的研究結論。單群組先可使用，組合輸出沿用相同設定契約。\n\n## 驗收條件\n\n- [x] 結果入口可選原始／學習候選與純子力主基準，另以既有 stable 作參考比較；保存來源實驗及完整設定，直接組合／聯合訓練可透過相同合法設定契約接入。\n- [x] 預覽並固定深度 3／q4、同時 4 局、每局 1 搜尋 worker、TT 4,096 筆，雙方一致。現有判和政策與手數上限保存於快照，不改成深度 5。\n- [x] 使用 32 條共同線，每候選對每個選定基準 64 局；額外 stable 比較明確增加總工作量，各基準統計分開，不誤用分母。\n- [x] 保留逐手進度、逐場保存、完整配對統計、停止／重開續跑、回放與另存；原始／學習設定身份不可因排序或顯示名稱混淆。\n- [x] 報告整體及逐開局勝和敗、完整配對／未完成量、耗時及條件，並列教師驗證／測試誤差但不混成同一指標。不把中斷算和棋，不以有限勝率宣告棋力保證。\n- [x] 高層學習結果到比較、保存及重開測試驗證設定相同、額外參考工作量、候選來源及統計；使用小型合法開局檢查流程，不在日常測試跑完整 64 局。\n- [x] 由 Agent 透過 UI 事件整合測試或實際操作，從學習結果進入短比較並查看回放；提供完整對戰可分次執行的操作方式。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 補充說明\n\n#33 不阻擋此票：組合使用相同完整評分設定契約；完整交付時再一起驗收其接入。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n\n## 實作與驗證證據（2026-10-24）\n\n完整回歸 `D:/Python/chess-ai/.venv/Scripts/python.exe -m unittest discover -s tests -t . -q`：392項／402.985秒通過，日誌 `C:/Users/User/.codex/ml-small-trial-m10-full-tests.log`。相關比較／續跑／共同開局20項先行通過39.415秒；最後 UI 分頁與短局穩定性調整後，新 UI 單項5.848秒及真實深度三單項1.185秒通過。`git diff --check` 通過。本票已合入整合分支，GitHub #36 已關閉並讀回確認。\n\n合入 M07 及 #33 結案的最新整合 `9aef6c6` 後，組合、組合 UI、學習比較、比較 UI、共同開局與續跑相關19項／113.711秒通過，日誌 `C:/Users/User/.codex/ml-small-trial-m10-combined-tests.log`。組合 UI 測試另以直接／聯合兩種實際輸出各按「共同開局比較」並凍結，核對完整來源 payload、候選設定及每種計畫128局一致；LearningView 保留組合與比較各自路由。README、測試導覽及目前計畫已同時保留兩票成果。\n\n新增 `engine.learning.comparison` 與獨立 `LearnedComparisonView`，從群組結果進入原始／學習候選預覽；組合沿用 `LearningView.open_comparison(candidate)` 公開完整候選契約。比較計畫原子保存完整來源、原始／學習設定、教師驗證／測試報告及各基準完整實驗定義，來源檔後續修改不影響快照。候選 ID 包含來源與 role，即使數值相同也不合併；純子力與 stable 各自建立可停止／續跑的既有比較批次，一次最多一批執行。\n\n固定 32 條 CC0 來源共同開局，每條保留起始 FEN 與完整合法 UCI 前綴；每候選每基準 64 局。搜尋固定 3／q4、外層4／內層1、TT4096、不申請和棋、無手數上限，均保存於快照。補足既有通用實驗的 workers 保存、讀回及實際條件核對；舊實驗缺欄位仍沿原本單程序預設。結果從已核對的比較摘要建立整體／逐開局統計，待執行、有效未完成與歷史中斷分開；教師逐盤 MAE 及盤／局面數另列，不合成對戰總分。\n\n- 公開流程測試：正式 32 線預覽的兩角色 × 純子力／stable 為 256 局，各基準 128 局；完整設定相同、同數值角色 ID 不同，改呼叫端來源不改快照。以兩條合法短局、真實深度三 Alpha-Beta 與四個 spawn 程序驗證停止、續跑、逐開局與 MAE 報告、棋譜不變；workers 被改成1時會在建立批次前拒絕。\n- UI 事件測試：選 stable、凍結預覽、完整設定分頁、背景停止、新應用程式重開、續跑，均維持四程序與相同來源；未以日常測試跑完整64局。\n- 真實 UI：外部腳本 `C:/Users/User/.codex/ml-small-trial-m10-acceptance.py` 使用實際可見 pygame 視窗與按鈕事件，沿 M06 真實 Lichess 60 盤節錄／Stockfish19 50k 標記的兵形候選，從群組結果進入比較。最新計畫 `C:/Users/User/.codex/ml-small-trial-m10-acceptance/data/learning-comparisons/cda6ba442e2e4b048c7e3d9e2c7b856c`，material 批次 `data/batches/20261024_0003`。正式32線／兩候選／兩基準共256局預覽後啟動 material；第一條前綴1手，觀察真實搜尋走到第2手，要求／實際均4程序。停止保存4份棋譜，再關閉程式、從紀錄研究報告重開、續跑、停止；原4份棋譜位元組不變。保存雙方實際 settings 均為3／q4、1搜尋worker及TT4096，開局與候選來源不變；逐局紀錄可回放離庫後走法。\n- 另由 UI 新建只選學習角色的計畫 `a3efb6803c534ed49a65f37a45ab18fb`（含 stable 共128局），於批次 `20261024_0004` 實際觀察離庫搜尋後停止。核對搜尋使用的完整設定等於 M06 凍結學習設定、與原始設定不同；UI 另存 `configs/evaluation/comparison-learned-3b48285dbbb5.json` 讀回相同。`learned-search.png`／`learned-report.png` 保存實際畫面，仍未跑滿64局。\n- 最新證據 `C:/Users/User/.codex/ml-small-trial-m10-acceptance/acceptance.json`；真實截圖含 `comparison-preview.png`、`comparison-frozen.png`、`comparison-search.png`、`comparison-opening-detail.png`、`comparison-reopened.png`、`comparison-resumed-report.png`、`comparison-replay.png`。已檢查研究報告與前綴詳情畫面，狀態中文、切換文字無缺字，內容無重疊。\n\n限制：短流程只驗證軟體串接，material 的原始角色留下8次中斷、64局仍待執行，學習角色亦64局待執行；stable 尚未開始，完整配對為0，沒有勝和敗證據。資料沿用已曝光的60盤節錄，不是500盤正式研究，不宣稱棋力提升。組合程式由 #33 並行交付，共用完整 config／source／report 契約，M11 再串接驗收。\n\n人工重現：學習實驗 → 已完成標記 → 五個單群組 → 選已完成群組 → 共同開局比較 → 選原始／學習及可選 stable → 凍結預覽 → 選基準開始。可停止並保存，從逐局紀錄的「學習研究報告」或重開同一群組的既有計畫續跑；選 stable 分別執行額外64局／候選。報告可切換候選／基準、逐開局頁面及前綴詳情，進入紀錄回放或另存完整設定。完整研究可以分次跑完，保留中斷與未完成量。\n",
+      "closedAt": "2026-10-24T02:59:17Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:09:19Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 36,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M10：學習結果接入深度三共同開局驗證與研究報告",
+      "updatedAt": "2026-10-24T02:59:30Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/36"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZepw",
+            "number": 36,
+            "state": "CLOSED",
+            "title": "M10：學習結果接入深度三共同開局驗證與研究報告",
+            "url": "https://github.com/chad30877/chess-ai/issues/36"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABZZZQhw",
+            "number": 33,
+            "state": "CLOSED",
+            "title": "M07：自選群組直接組合、聯合訓練與搭配效果比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/33"
+          }
+        ],
+        "totalCount": 2
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "# M11：交付附實際截圖的離線教學並完成端到端驗收\n\n## 父規格\n\n[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)\n\n## 要建置的內容\n\n交付使用者可離線閱讀的 HTML 教學，從目的找到對應控制項，並用實際應用程式完成單群組、組合、停止續跑及共同開局驗證。不是在最後一票才補必要 UI；各切片應已可操作。\n\n## 驗收條件\n\n- [x] HTML 與所需資源可離線開啟，包含實際版本截圖及編號重點標示，不用模擬畫面冒充已完成操作。\n- [x] 教學涵蓋資料、教師先導與預算選擇、標記篩選、校準、單群組、活動力＋王安全、直接組合／聯合訓練、誤差解讀、另存、對戰及停止續跑。\n- [x] 提供「想調什麼 → 使用哪個控制項」的查找方式，說明改動方向、代價與結果位置；清楚區分評分項群組、搜尋演算法、教師節點預算、對戰深度、同時場數、搜尋 worker 及 TT 表項數。\n- [x] 由 Agent 使用真實 UI 串接實際來源與 Stockfish，以短流程完成至少一組學習與組合輸出後送入共同開局比較；核對停止／關閉續跑、原始快照、逐手進度、結果及回放一致。短流程與完整實驗的證據分開記錄。\n- [x] 交付可依八小時政策分次執行正式資料／標記／五組及預定組合、每候選 64 局實驗的功能與操作說明；完整研究由使用者交付後執行，不是本票關閉前必須跑滿的工作。未執行的實驗如實列出，不能用短局驗收宣稱完整研究完成或棋力提升。\n- [x] 不增加深度 5、有償算力或自動重啟範圍；發現問題在對應行為修復並做必要回歸，不為靜態文案、截圖數量或常數新增測試。\n- [x] 更新簡短測試說明及目前開發計畫，保存驗證證據與限制。\n- [x] 完成實作與文件的繁體中文 Git commit。\n\n## 執行與結案\n\n一般 `/implement` 由 Agent 完成必要驗證並記錄證據，接著依專案 tracker 流程同步 GitHub 與本機票、索引及開發計畫，提交並關閉本票，最後讀回核對。供使用者重現的操作方式不是另一次必要人工驗收；不例行等待使用者操作或再次同意關票。真實失敗或缺少必要資源時先修復，無法完成才保留未勾選、開啟狀態並說明阻礙。\n\n軟體驗收使用足以涵蓋行為的短流程；八小時停止以可控制時鐘驗證。正式完整資料與長時間對戰由使用者於交付後分次執行，不能把短流程結果宣稱為完整研究或棋力提升。\n\n## 實作與驗證證據（2026-10-24）\n\n由 integration `595c010` 建立本票，最新 GitHub #37 無留言，原生阻擋 #33、#36 均已結案。交付 `docs/ML試驗教學.html` 與單一 `docs/ml-guide/` 資源目錄：實際版本截圖、HTML 編號控制項標註、目的→控制項→方向／成本→結果查找表、教師尺度與參照偏差、測試曝光、五組與直接／聯合組合、固定四設定、共同開局、停止續跑及正式研究步驟。README 提供入口；開發計畫與批次索引已整體縮減為目前狀態、後續研究及限制，不保留逐票測試數歷史。\n\n### 真實 UI 完整短流程\n\n使用真實應用程式 pygame 事件與背景 executor、SDL dummy 顯示表面隔離視窗；只有應用資料根目錄改為外部驗收目錄，沒有替換資料處理、Stockfish、求解、對戰搜尋或保存。截圖來自實際軟體渲染，HTML 僅疊編號，原圖不重繪。\n\n- Fresh 來源：Lichess 官方 2013-01 月份前 60 盤節錄，SHA256 `a1de66c0d8519e40b317f19e84a96190b7c6a38550bf5c10e77419603db3eb63`，另存 provenance（CC0、原始順序與官方完整檔 SHA256）。由 UI 重新建立 60 盤、706 局面，整盤 42／9／9 分組；不足 440 盤如實顯示，本機節錄不冒充官方全月雜湊。\n- 真實 Stockfish 19：執行檔 SHA256 `45bc8e4969147db9c2eb533810637994619bff0eacc81ccfd9854394901bcbd0`；UI 新建先導完成 100 訓練局面×兩預算＝200 筆，61.140 秒；50k／200k 可比較 62 局面、38 不可比較，平均絕對分差 31.016cp。選 50k 保存凍結選擇，僅為軟體短流程。\n- UI 新標記至 106／706 停止，重開核對數量並續跑；所有原 106 份 raw 提交位元組不變。完成有效 456、排除 250；訓練 320 局面／42 盤、驗證 70／9、測試 66／9，篩除、階段、原始條件與先導重用均保存。\n- 五組學習完成兩組／6 候選停止、關閉重開，續跑至 5 組／15 候選；原 8 份候選／報告與共同校準位元組不變。倍率 `.006111529012068489`、診斷正常；選中活動力查看權重、另存完整設定，再送單組比較。原始與學習對純子力＋stable 的完整預覽共 256 局，實際只開始純子力短批次。\n- 活動力＋王安全由 UI 新建直接組合、固定權重四設定及聯合三候選，兩種來源各另存完整設定、送比較凍結。直接組合各項值等於來源已學值；聯合來源保留同校準身份，兩者各有來源及報告，不混淆固定增量與重訓結果。\n- single、direct、joint 三個候選來源均透過 UI 真正開始 32 條共同線／深度 3／q4／同時 4 局／每局 1 worker／TT4096 比較，觀察到至少一盤第 13 手，超過全部開局前綴最多 12 手，證明離庫後實際搜尋。單組額外 stable 僅預覽未開跑；每個基準與角色身份、原始／學習完整 config 均與來源一致。\n- joint 比較停止保存、關閉重開紀錄後按續跑，繼續觀察搜尋並再停止；原計畫 JSON 位元組、manifest 的完整 experiment 設定及既有 12 份棋譜位元組不變。畫面要求／實際 4 程序，第四盤可換頁；報告待執行 128 局、16 次中斷嘗試、無完整配對，勝／和／敗均為 0，中斷未算和棋。逐開局報告、實際 13 手保存棋譜回放及獨立重播最後 FEN 一致。\n\n外部總證據 `C:/Users/User/.codex/ml-small-trial-m11-verified/manifest.json`（含原始快照 SHA256、來源路徑、進度、畫面控制項座標及比對結果），腳本 `C:/Users/User/.codex/ml-small-trial-m11-acceptance.py`、`ml-small-trial-m11-finish.py`、`ml-small-trial-m11-extra-comparisons.py`。第一支完成 fresh 來源到比較與回放時，驗收腳本誤用不存在的 `.board` 屬性；修正為公開 `current_fen()` 後，以同份已保存實驗重開續跑並完成比對，未改產品數據。教材內的 `ml-guide/evidence.json` 提供可攜式摘要。\n\n### Windows 保存競態修復與回歸\n\nFresh UI 兩次遇到 `status.json.tmp` 原子替換 `status.json` 的 WinError 5。診斷假說依序為短暫讀取共享鎖、永久目錄權限、雙寫入暫存撞名；以同一目錄、單寫入者將目標檔保持開啟可穩定重現 WinError5，關閉讀者後立即成功，確認為 Windows 讀鎖。記錄見外部 `ml-small-trial-m11-final.log`；另一失敗與成功資料／先導紀錄保留，沒有拿失敗圖冒充完成。\n\n先新增公開資料建立流程測試，在外部 Path.replace 邊界注入一次 winerror32；原版未發布 dataset.json，讀回失敗（red）。`write_json_atomic` 只對 Windows 5／32／33 錯誤進行最多 5 次、每次 10ms 有限等待後重試原子替換，總等待最多 50ms；非相符錯誤與持續拒絕仍 raise。時間計在真實執行時鐘內，不重設期限、不自動重啟。修復後單次共享鎖正常完成、持續鎖定仍失敗（green），資料流程 10 項／10.234 秒及最後故障個案 1 項／.192 秒通過；fresh 原始 UI 流程重跑成功。提交 `4f2feff`。比較角色勾選符號在現有字型顯示方框，改為既有 `[x]`／`[ ]`，實際畫面重擷取，UI 比較事件 1 項／3.839 秒通過；不為文字符號新增測試。\n\n共用 writer 修復後完整回歸 `python -m unittest discover -s tests -t . -q`：397 項／438.976 秒通過，日誌 `C:/Users/User/.codex/ml-small-trial-m11-full-tests.log`。最後只有顯示標記與文件調整，相關 UI 事件已補跑。無新增無限重試或自動工作；既有永久故障測試仍通過。\n\n### 離線教材核對與限制\n\n所有相對 src／href 與內部 anchor 均核對存在，沒有遠端必要資源、CDN、字型或 JS。由本機 Edge headless 文件渲染器直接開啟 file URL，檢查首頁查找表與相同 HTML 的編號截圖片段，確認本機圖片與圈號位置正常；可用瀏覽器工具庫為空，未宣稱透過瀏覽器人工點擊。原圖、結果、權重、進度與回放皆逐一檢視；不為截圖張數或靜態文案加測試。渲染證據 `C:/Users/User/.codex/ml-small-trial-m11-guide-preview.png`、`ml-small-trial-m11-guide-figure2.png`。`git diff --check` 通過。\n\n未執行：正式 500 盤完整標記、全套單組／預定組合研究、每候選每基準 64 局及八小時實際長跑；已有全月 500 盤資料準備不等於這些研究完成。新建快照未讓已使用的棋譜成為未見資料，測試殘局僅 1 局面／1 盤。短流程與中斷棋譜不支持棋力結論；教材如實列未跑項目及交付後分次操作。本票已合入整合分支，GitHub #37 已關閉並讀回確認；整批雙軸審查及修正亦已完成。\n\n人工重現：離線開啟 `docs/ML試驗教學.html` 並保留相鄰 `ml-guide/`；按查找表從首頁學習實驗輸入來源與 Stockfish、先導選擇、標記停止重開、五組／組合另存，再凍結共同開局計畫。開始後觀察超過前綴的逐手進度，停止保存、關閉重開紀錄續跑，查看研究報告與回放。正式研究按教學分次完成，不需一次跑滿。\n",
+      "closedAt": "2026-10-24T03:15:25Z",
+      "comments": [],
+      "createdAt": "2026-10-23T14:09:24Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 37,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABZZYwBQ",
+        "number": 26,
+        "state": "CLOSED",
+        "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",
+        "url": "https://github.com/chad30877/chess-ai/issues/26"
+      },
+      "state": "CLOSED",
+      "stateReason": "COMPLETED",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "M11：交付附實際截圖的離線教學並完成端到端驗收",
+      "updatedAt": "2026-10-24T03:26:59Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/37"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "# 規格：組合研究與設定棋力分數\n\n## 問題陳述\n\n研究者已有五個評分項群組的學習結果與部分共同開局對局，但難以一次盤點所有組合、先篩出值得對局的設定，並以一致基準比較棋力。現有對局結果與測試資料的曝光也容易被誤解為獨立驗證。設定選擇處沒有依實際對局計算的設定棋力分數，難以理解設定差異。\n\n## 解決方案\n\n以既有教師標記及共同校準，保存單群組和所有多群組的直接組合、聯合訓練結果；按驗證教師誤差列出十個初步候選，先交由使用者查看，再決定後續處理。可在不同於完整比較的開局線上進行短對局篩選，之後對使用者選定的最多五個候選完成共同開局比較。以固定條件下對 stable 的完整對局計算設定棋力分數，在設定選擇與比較結果中查看來源、實際勝和敗及限制。未曝光測試資料留待候選凍結後評估。\n\n## 使用者故事\n\n1. 作為研究者，我希望看到資料來源、教師條件及校準身份，以便確認結果能否相互比較。\n2. 作為研究者，我希望沿用條件相符的既有結果，以便避免重做相同的學習。\n3. 作為研究者，我希望看到尚缺哪些群組組合，以便知道盤點是否完整。\n4. 作為研究者，我希望探索五個單群組及 26 個多群組組合，以便比較不同評分項群組。\n5. 作為研究者，我希望多群組分別保存直接組合與聯合訓練，以便比較兩種產生方式。\n6. 作為研究者，我希望直接組合保留單群組已凍結的權重，以便知道它沒有重新訓練。\n7. 作為研究者，我希望聯合訓練以共同資料同時調整選定群組，以便檢查共同擬合的效果。\n8. 作為研究者，我希望知道組合訓練的來源與測試曝光，以便不把舊測試視為未見資料。\n9. 作為研究者，我希望在長工作時停止並保留已完成項目，以便分次執行。\n10. 作為研究者，我希望重開後只補未完成工作，以便不用覆蓋已完成結果。\n11. 作為研究者，我希望每次執行遵守共同時間預算，以便控制本機資源。\n12. 作為研究者，我希望查看每個設定的驗證誤差及有效樣本量，以便篩選候選。\n13. 作為研究者，我希望查看前十個不同設定及其來源，以便決定是否進入對局。\n14. 作為研究者，我希望十個候選出來後先停下來查看，以便決定如何處理它們。\n15. 作為研究者，我希望保留活動力與王安全的固定權重增量，以便理解組合效果。\n16. 作為研究者，我希望選定短對局候選，而非在列出十個後立即自動開跑，以便掌控研究。\n17. 作為研究者，我希望短對局對 stable 使用八條共同開局及交換黑白，以便初步比較。\n18. 作為研究者，我希望短對局顯示 16 局的實際勝和敗與暫估分數，以便觀察設定。\n19. 作為研究者，我希望短對局得分不超過兩分的候選標示淘汰，以便節省完整對局時間。\n20. 作為研究者，我希望短對局與完整比較不共用相同走法序列，以便分開解讀結果。\n21. 作為研究者，我希望查看十個候選及其短對局結果後再決定最多五個候選，以便不預設最後排序規則。\n22. 作為研究者，我希望少於五個候選時不必湊數，以便保留真實篩選結果。\n23. 作為研究者，我希望沒有候選通過時停下檢討，以便不自動擴大研究。\n24. 作為研究者，我希望完整比較的每個候選對 stable 和純子力各有 64 局，以便分開比較兩種基準。\n25. 作為研究者，我希望完整比較沿用條件相符的既有配對，以便避免重跑同一對局。\n26. 作為研究者，我希望中斷後看到已保存對局並能續跑，以便不丟失進度。\n27. 作為研究者，我希望對局不完整或失敗時不被算成勝和敗，以便避免錯誤分數。\n28. 作為使用者，我希望設定棋力分數以 stable 1500 為參照，以便直接比較設定。\n29. 作為使用者，我希望分數按實際勝和敗及真實和棋計算，以便理解分數來源。\n30. 作為使用者，我希望全勝或全敗仍能得到有限估計，以便查看極端結果。\n31. 作為使用者，我希望勝和敗維持真實數量，以便不把平滑量當成對局。\n32. 作為使用者，我希望完成完整比較後自動更新設定分數，以便不用手動同步。\n33. 作為使用者，我希望未完成的批次只顯示暫估、不覆寫正式分數，以便區分進度與結果。\n34. 作為使用者，我希望不同搜尋條件的分數分開，以便不混用不同棋力環境。\n35. 作為使用者，我希望設定內容相同時共用分數、內容改變時重新評估，以便檔名不影響結果。\n36. 作為使用者，我希望設定選擇處顯示分數和對局數，以便選擇設定。\n37. 作為使用者，我希望查看實際勝和敗、來源及估計不確定性，以便理解分數的限制。\n38. 作為研究者，我希望候選凍結後能使用未曝光資料評估教師誤差，以便保留獨立的最終評估。\n39. 作為研究者，我希望資料不足或結果接近時可記為證據不足，以便不強迫宣稱棋力提升。\n40. 作為研究者，我希望沿用已曝光資料的歷史清楚標示，以便不把探索結果當成最終驗證。\n\n## 實作決策\n\n- 使用現有正式資料、標記、群組學習、組合、比較與回放的公開流程及凍結來源身份；來源、規則或尺度不同的結果不得混用。已保存的 26 種多群組結果可檢查後沿用；這些實驗自動產生的舊測試報告均為已曝光資料。\n- 積木為五個單群組、26 個至少含兩群組的組合，以及純子力共同參照；多群組分別保存直接組合與聯合訓練，共 57 個非空候選設定。相同設定內容不重複佔十個名額。直接組合沿用凍結單組權重；聯合訓練沿用既有非負最小平方、三種懲罰、驗證挑選及共同校準，不新增交互特徵。\n- 第一輪以相同資料條件下的驗證組逐盤平均絕對教師誤差排序；列出前十及樣本、階段與來源。既有測試結果只作探索參考。活動力＋王安全的固定權重四設定增量、直接組合與聯合訓練保留可查看，不保證進前十。候選報告完成後必須停下，不自動啟動對局；查看十個後再由使用者決定處理及最多五個最終候選的選法。\n- 可依使用者明確選擇對候選進行短對局：相同八條合法開局線，各交換黑白共 16 局，對手 stable；完成後實際得分為勝加半和，得分不超過 2 分標示淘汰。停止、失敗、截斷及不完整配對不可當勝和敗或觸發淘汰。沒有通過者不自動增加或替換候選。\n- 供完整比較的 32 條開局線的確切起始局面與走法序列不得與短對局八條重複；共同前綴並不保證棋局統計獨立。每個候選每個基準各 64 局、交換黑白；stable 與純子力的分母和報告分開。固定 Alpha-Beta 深度 3、q4、四個同時對局、每局一個搜尋 worker、置換表 4,096 筆，保留條件、逐開局配對、對局及回放。停止續跑與可沿用結果應以完整來源及實際條件核對；完全相同的確定性對局不能重複計入。\n- 以 stable 在各自對局條件下固定 1500 分。相對 Elo 採勝 1、真實和 0.5、敗 0 分的得分率，加入半勝半敗平滑：p = (勝 + 和／2 + 0.5)／(完整有效局數 + 1)；相對差為 400 × log10(p／(1-p))，設定棋力分數為 1500 加此差。真實勝和敗、局數均不加入虛擬對局；無正式對局顯示尚未評分。短對局只顯示暫估，不計入正式分數。\n- 正式分數只使用匹配 stable 內容及對局條件、已完成的完整比較中的完整有效配對；排除純子力、短對局、失敗、截斷、停止及不完整配對。每批 64 局完整後自動重新計算；新增相符且不同的已完成配對可累積。未完成批次可顯示暫估及進度，不能覆寫先前正式分數。無匹配紀錄及不可信紀錄不得偽造分數。\n- 分數與設定檔內容分開保存，以評分設定內容身份及對局條件區分，不以檔名或分數欄位作身份；相同內容共用、修改評分內容後需重新評估。設定選擇可查看分數、條件、實際勝和敗、局數、結果來源及未評分狀態。分數隨結果可上升或下降，無額外差距門檻；不因數字增加就宣稱有統計證據。相對 Elo 報告以共同開局配對為單位呈現適用的不確定區間；樣本或變化不足以估算時明示無法估算。區間須說明固定開局及重抽樣的限制，不當成普遍棋力保證。\n- 候選與用途先凍結，再使用未曝光的資料及教師標記作最終教師誤差評估；不在這份資料上挑選或調整候選。須核對資料與曝光來源，不沿用先前已曝光測試作未見資料。測試樣本不足、校準不健康、棋力差距不明確均如實報告，不強制宣稱提升。\n- 執行流程沿用逐局／逐候選保存、停止、重開與相容性檢查；教師標記及訓練各次最多八小時，整次共用預算，停止後由使用者檢視並手動續跑，不自動接續多個八小時。可分次進行對局，不自動執行使用者尚未選擇的階段。\n\n## 測試決策\n\n- 好的測試驗證外部可觀察的選擇、保存、重開、報告、設定身份及 UI 行為，而非檢查函式呼叫、靜態文字或內部結構；避免替常數或元件存在與否新增測試。\n- 優先從既有學習實驗、共同開局比較、保存重開及應用程式事件入口測試完整流程；單次資料建立／訓練／對局保持已存在的公開流程，不以私有實作當唯一驗收。\n- 使用小型可控資料及真實保存流程，核對單群組來源一致性、26 組覆蓋、重開與不自動開始、排名、曝光、不同開局、16 局淘汰邊界、少於五個候選、停止與未完成配對。\n- 用手算勝和敗核對平滑 Elo、全勝／全敗、和棋、正式／暫估、資料累積去重、基準與搜尋條件隔離、既有結果及相同／修改內容的設定。使用者介面透過事件驗證選擇、分數與明細及缺資料狀態。\n- 參照既有組合訓練、學習比較、比較續跑及設定選擇事件測試；重大數值與保存回歸須有必要測試，不跑正式長研究作為例行自動測試。人工操作方式另列，不能冒充已實際執行的驗收。\n\n## 不在範圍\n\n- 向人類等級分或其他引擎排行榜校準絕對分數；新評分特徵或交互特徵；深度 5 正式研究；有償算力；自動接續多個八小時。\n- 把 16 局篩選或教師誤差當成已證實棋力提升；自動進行使用者尚未決定的十候選後續工作；將新測試組用於挑選或調參。\n\n## 補充\n\n本規格描述可操作的研究流程與分數功能；軟體驗收不要求實際跑滿正式資料、八小時或全部正式對局。已存在的真實研究資料與誤執行產生的組合報告應保存，不能將舊測試曝光當作未見資料，也不能把短對局中斷的空批次當成完成。\n",
+      "closedAt": null,
+      "comments": [],
+      "createdAt": "2026-10-28T09:27:07Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 40,
+      "parent": null,
+      "state": "OPEN",
+      "stateReason": "",
+      "subIssues": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaisyaQ",
+            "number": 41,
+            "state": "OPEN",
+            "title": "R01：盤點組合並展示十個候選",
+            "url": "https://github.com/chad30877/chess-ai/issues/41"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABais6ZQ",
+            "number": 42,
+            "state": "OPEN",
+            "title": "R02：補齊組合學習並保存續跑",
+            "url": "https://github.com/chad30877/chess-ai/issues/42"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitBdA",
+            "number": 43,
+            "state": "OPEN",
+            "title": "R03：從完整對局計算設定棋力分數",
+            "url": "https://github.com/chad30877/chess-ai/issues/43"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitJOw",
+            "number": 44,
+            "state": "OPEN",
+            "title": "R04：在設定選擇處查看棋力分數",
+            "url": "https://github.com/chad30877/chess-ai/issues/44"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitPQg",
+            "number": 45,
+            "state": "OPEN",
+            "title": "R05：選定候選並執行短對局篩選",
+            "url": "https://github.com/chad30877/chess-ai/issues/45"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitYPQ",
+            "number": 46,
+            "state": "OPEN",
+            "title": "R06：對選定候選完成雙基準比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/46"
+          },
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitglQ",
+            "number": 47,
+            "state": "OPEN",
+            "title": "R07：以未曝光資料評估凍結候選",
+            "url": "https://github.com/chad30877/chess-ai/issues/47"
+          }
+        ],
+        "totalCount": 7
+      },
+      "title": "規格：組合研究與設定棋力分數",
+      "updatedAt": "2026-10-28T09:27:07Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/40"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitPQg",
+            "number": 45,
+            "state": "OPEN",
+            "title": "R05：選定候選並執行短對局篩選",
+            "url": "https://github.com/chad30877/chess-ai/issues/45"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# 01：盤點組合並展示十個候選\n\n## 上層規格\n\n#40：組合研究與設定棋力分數。\n\n## 要交付的行為\n\n研究者可從已保存的同源單群組及多群組結果查看探索狀態，依驗證教師誤差列出最多十個不同設定，檢視來源及資料曝光後再決定如何處理；列出候選不啟動對局。\n\n## 驗收條件\n\n- [ ] 透過公開研究入口盤點五個單群組及 26 種多群組，分別呈現直接組合、聯合訓練、缺漏與失敗，並可沿用條件相符的既有結果；以保存及重開驗證。\n- [ ] 從條件相符的 57 個非空候選中按驗證組逐盤平均教師絕對誤差列出最多十個不同設定，保留群組、產生方式、誤差及有效樣本量；以小型可控結果驗證排序與同內容去重。\n- [ ] 候選清單可查看資料、校準及測試曝光來源，未完成或不相容的結果不偽裝成完整排名；以不相容及缺漏情境驗證。\n- [ ] 十個候選呈現後不自動開始短對局，活動力＋王安全的四設定增量與兩種組合結果仍可查；以應用程式事件驗證。\n\n## 阻擋\n\n無，可立即開始。依賴既有已保存結果時不要求重新執行長研究。\n",
+      "closedAt": null,
+      "comments": [],
+      "createdAt": "2026-10-28T09:27:22Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 41,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABaisjIg",
+        "number": 40,
+        "state": "OPEN",
+        "title": "規格：組合研究與設定棋力分數",
+        "url": "https://github.com/chad30877/chess-ai/issues/40"
+      },
+      "state": "OPEN",
+      "stateReason": "",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "R01：盤點組合並展示十個候選",
+      "updatedAt": "2026-10-28T09:27:22Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/41"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "# 02：補齊組合學習並保存續跑\n\n## 上層規格\n\n#40：組合研究與設定棋力分數。\n\n## 要交付的行為\n\n研究者可選擇需要補齊的多群組組合，產生並保存直接組合和聯合訓練，停止後重開續跑，並可看見資料及測試曝光。\n\n## 驗收條件\n\n- [ ] 使用同源的五個單群組，可建立 26 種多群組組合的直接與聯合結果；以可控資料核對完整覆蓋及來源相容性。\n- [ ] 直接組合保留各單組凍結權重，聯合訓練沿用既有共同校準、非負權重與驗證挑選；以公開結果核對兩種設定及來源。\n- [ ] 停止或整次八小時期限到達時保留已完成結果，重新開啟只補未完成項，且不自動接續下一次八小時；以可控時鐘及重開驗證。\n- [ ] 既有相容結果可沿用而不覆寫，舊測試資料曝光及不相容來源可辨識；以保存、重開與拒絕情境驗證。\n\n## 阻擋\n\n無，可立即開始。\n",
+      "closedAt": null,
+      "comments": [],
+      "createdAt": "2026-10-28T09:27:30Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 42,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABaisjIg",
+        "number": 40,
+        "state": "OPEN",
+        "title": "規格：組合研究與設定棋力分數",
+        "url": "https://github.com/chad30877/chess-ai/issues/40"
+      },
+      "state": "OPEN",
+      "stateReason": "",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "R02：補齊組合學習並保存續跑",
+      "updatedAt": "2026-10-28T09:27:30Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/42"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitJOw",
+            "number": 44,
+            "state": "OPEN",
+            "title": "R04：在設定選擇處查看棋力分數",
+            "url": "https://github.com/chad30877/chess-ai/issues/44"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# 03：從完整對局計算設定棋力分數\n\n## 上層規格\n\n#40：組合研究與設定棋力分數。\n\n## 要交付的行為\n\n研究者能在比較結果查看設定相對 stable 的分數、實際勝和敗及來源；批次完整後自動更新，歷史相容結果也可計入。\n\n## 驗收條件\n\n- [ ] 完整對局報告以 stable 1500 分為參照，依實際勝和敗及半勝半敗平滑換算設定棋力分數；以手算資料驗證和棋、全勝與全敗。\n- [ ] 報告顯示真實勝和敗、有效局數、設定及對局條件，未計入虛擬對局；以公開報告核對。\n- [ ] 條件相符的既有完整批次及後續新完成配對可累積，完全重複確定性對局不重複計入；以保存、重開及重複紀錄驗證。\n- [ ] 短對局、純子力基準、不同設定內容或搜尋條件的對局不混入正式分數；以跨來源資料驗證。\n- [ ] 停止、失敗、截斷及不完整配對不算有效勝和敗，未完成批次不覆寫先前正式分數；以中斷續跑驗證。\n- [ ] 報告可區分無資料、暫估與正式分數，並說明相對 Elo 和固定開局的不確定性；以資料不足情境驗證。\n\n## 阻擋\n\n無，可立即開始；使用既有可操作的比較報告入口及保存紀錄。\n",
+      "closedAt": null,
+      "comments": [],
+      "createdAt": "2026-10-28T09:27:38Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 43,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABaisjIg",
+        "number": 40,
+        "state": "OPEN",
+        "title": "規格：組合研究與設定棋力分數",
+        "url": "https://github.com/chad30877/chess-ai/issues/40"
+      },
+      "state": "OPEN",
+      "stateReason": "",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "R03：從完整對局計算設定棋力分數",
+      "updatedAt": "2026-10-28T09:27:38Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/43"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitBdA",
+            "number": 43,
+            "state": "OPEN",
+            "title": "R03：從完整對局計算設定棋力分數",
+            "url": "https://github.com/chad30877/chess-ai/issues/43"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "# 04：在設定選擇處查看棋力分數\n\n## 上層規格\n\n#40：組合研究與設定棋力分數。\n\n## 要交付的行為\n\n使用者選擇評分設定檔時，可查看符合目前對局條件的棋力分數及實際對局依據，未評分的設定清楚標示狀態。\n\n## 驗收條件\n\n- [ ] 透過實際設定選擇流程可查看正式分數、對局條件及未評分狀態；以應用程式事件驗證。\n- [ ] 可查看分數對應的真實勝和敗、局數及來源；以已保存比較結果驗證。\n- [ ] 相同評分內容的不同檔名共用分數，變更評分內容後不沿用舊分數；以另存及編輯後重新選擇驗證。\n- [ ] 分數更新不修改評分設定檔，舊檔及損壞紀錄不妨礙其餘設定選擇；以保存重開及錯誤情境驗證。\n\n## 阻擋\n\n- #43：從完整對局計算設定棋力分數。\n",
+      "closedAt": null,
+      "comments": [],
+      "createdAt": "2026-10-28T09:27:46Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 44,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABaisjIg",
+        "number": 40,
+        "state": "OPEN",
+        "title": "規格：組合研究與設定棋力分數",
+        "url": "https://github.com/chad30877/chess-ai/issues/40"
+      },
+      "state": "OPEN",
+      "stateReason": "",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "R04：在設定選擇處查看棋力分數",
+      "updatedAt": "2026-10-28T09:27:46Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/44"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaisyaQ",
+            "number": 41,
+            "state": "OPEN",
+            "title": "R01：盤點組合並展示十個候選",
+            "url": "https://github.com/chad30877/chess-ai/issues/41"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitYPQ",
+            "number": 46,
+            "state": "OPEN",
+            "title": "R06：對選定候選完成雙基準比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/46"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# 05：選定候選並執行短對局篩選\n\n## 上層規格\n\n#40：組合研究與設定棋力分數。\n\n## 要交付的行為\n\n研究者看過十個候選後，能明確選擇候選進行對 stable 的短對局，查看暫估與淘汰結果，再決定最多五個候選；對局不中途自動展開下一階段。\n\n## 驗收條件\n\n- [ ] 由候選清單明確選擇後才建立短對局，各設定對 stable 以相同八條合法開局線交換黑白各一局；以實際流程及凍結設定驗證。\n- [ ] 短對局線與完整比較的 32 條線沒有相同的起始局面及完整走法序列；以來源與序列比對驗證。\n- [ ] 完成 16 局後依勝加半和計分，得分不超過 2 分標示淘汰，並顯示真實勝和敗及暫估分數；以手算及邊界資料驗證。\n- [ ] 未完成配對或停止、失敗、截斷不觸發淘汰、不更新正式分數；以停止重開及缺局情境驗證。\n- [ ] 短對局結果可供使用者查看並手動決定最多五個候選，少於五個或沒有候選時不自動補足及開跑；以應用程式事件驗證。\n\n## 阻擋\n\n- #41：盤點組合並展示十個候選。\n",
+      "closedAt": null,
+      "comments": [],
+      "createdAt": "2026-10-28T09:27:52Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 45,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABaisjIg",
+        "number": 40,
+        "state": "OPEN",
+        "title": "規格：組合研究與設定棋力分數",
+        "url": "https://github.com/chad30877/chess-ai/issues/40"
+      },
+      "state": "OPEN",
+      "stateReason": "",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "R05：選定候選並執行短對局篩選",
+      "updatedAt": "2026-10-28T09:27:52Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/45"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitPQg",
+            "number": 45,
+            "state": "OPEN",
+            "title": "R05：選定候選並執行短對局篩選",
+            "url": "https://github.com/chad30877/chess-ai/issues/45"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitglQ",
+            "number": 47,
+            "state": "OPEN",
+            "title": "R07：以未曝光資料評估凍結候選",
+            "url": "https://github.com/chad30877/chess-ai/issues/47"
+          }
+        ],
+        "totalCount": 1
+      },
+      "body": "# 06：對選定候選完成雙基準比較\n\n## 上層規格\n\n#40：組合研究與設定棋力分數。\n\n## 要交付的行為\n\n研究者在短對局後決定最多五個候選，能分開對 stable 和純子力進行完整共同開局比較，並查看、沿用或續跑已保存結果。\n\n## 驗收條件\n\n- [ ] 使用者可凍結最多五個候選並分別預覽各候選對兩個基準、每基準 32 條開局線與 64 局；以公開流程驗證。\n- [ ] 每個完整比較保留固定搜尋條件、交換黑白、逐開局配對與回放，兩個基準的分母分開；以短型測試資料驗證保存及報告。\n- [ ] 對完全相符的既有結果可追溯並沿用，條件或設定不同不混入；以既有及不相符紀錄驗證。\n- [ ] 停止後可重開續跑未完成對局，保留已提交棋局及未完成量；以中斷與重開驗證。\n\n## 阻擋\n\n- #45：選定候選並執行短對局篩選。\n",
+      "closedAt": null,
+      "comments": [],
+      "createdAt": "2026-10-28T09:28:02Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 46,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABaisjIg",
+        "number": 40,
+        "state": "OPEN",
+        "title": "規格：組合研究與設定棋力分數",
+        "url": "https://github.com/chad30877/chess-ai/issues/40"
+      },
+      "state": "OPEN",
+      "stateReason": "",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "R06：對選定候選完成雙基準比較",
+      "updatedAt": "2026-10-28T09:28:02Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/46"
+    },
+    {
+      "author": {
+        "id": "U_kgDOBksgaA",
+        "is_bot": false,
+        "login": "chad30877",
+        "name": ""
+      },
+      "blockedBy": {
+        "nodes": [
+          {
+            "id": "I_kwDOU_Tk9c8AAAABaitYPQ",
+            "number": 46,
+            "state": "OPEN",
+            "title": "R06：對選定候選完成雙基準比較",
+            "url": "https://github.com/chad30877/chess-ai/issues/46"
+          }
+        ],
+        "totalCount": 1
+      },
+      "blocking": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "body": "# 07：以未曝光資料評估凍結候選\n\n## 上層規格\n\n#40：組合研究與設定棋力分數。\n\n## 要交付的行為\n\n研究者在選定並凍結候選後，能使用未曝光的資料與教師標記評估教師誤差，並辨識資料來源及不足，不以最終測試結果重新挑選。\n\n## 驗收條件\n\n- [ ] 候選與評估用途先凍結，未曝光資料及教師來源可追溯並與既有已曝光測試區分；以新舊資料身份驗證。\n- [ ] 以凍結設定評估教師誤差，報告包含有效盤數、局面數及階段分布；以小型可控資料及手算驗證。\n- [ ] 測試結果不自動重新訓練、挑選或改寫候選；以重開及資料變更情境驗證。\n- [ ] 資料不足、來源不相容或測試已曝光時顯示限制，不冒稱獨立驗證；以缺漏及錯誤來源驗證。\n\n## 阻擋\n\n- #46：對選定候選完成雙基準比較；由該流程凍結要評估的候選，不要求使用者在軟體驗收時跑滿正式對局。\n",
+      "closedAt": null,
+      "comments": [],
+      "createdAt": "2026-10-28T09:28:11Z",
+      "labels": [
+        {
+          "id": "LA_kwDOU_Tk9c8AAAAC89ul3Q",
+          "name": "ready-for-agent",
+          "description": "",
+          "color": "ededed"
+        }
+      ],
+      "number": 47,
+      "parent": {
+        "id": "I_kwDOU_Tk9c8AAAABaisjIg",
+        "number": 40,
+        "state": "OPEN",
+        "title": "規格：組合研究與設定棋力分數",
+        "url": "https://github.com/chad30877/chess-ai/issues/40"
+      },
+      "state": "OPEN",
+      "stateReason": "",
+      "subIssues": {
+        "nodes": [],
+        "totalCount": 0
+      },
+      "title": "R07：以未曝光資料評估凍結候選",
+      "updatedAt": "2026-10-28T09:28:11Z",
+      "url": "https://github.com/chad30877/chess-ai/issues/47"
+    }
+  ]
+}
