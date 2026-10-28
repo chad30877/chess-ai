@@ -2,7 +2,7 @@
 
 ## 父規格
 
-[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](https://github.com/chad30877/chess-ai/issues/26)
+[規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證](../../github-issue-archive/issues/026.md)
 
 ## 要建置的內容
 

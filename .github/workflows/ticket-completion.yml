@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  issues: read
 
 jobs:
   ticket-completion:
@@ -25,7 +24,3 @@ jobs:
           python-version: '3.12'
       - name: 驗證結案檢查行為
         run: python -m unittest tests.test_ticket_completion tests.test_complete_ticket
-      - name: 核對已關閉工作票的驗收與本機內容
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python scripts/check_ticket_completion.py --manifest .scratch/ml-small-trial/publication.json

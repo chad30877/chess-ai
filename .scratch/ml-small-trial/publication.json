@@ -1,6 +1,6 @@
 {
   "repository": "chad30877/chess-ai",
-  "status": "verified",
+  "status": "archived-local",
   "spec": {
     "number": 26,
     "title": "規格：可操作、可續跑的 ML 小規模權重試驗與共同開局驗證",

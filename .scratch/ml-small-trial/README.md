@@ -1,8 +1,8 @@
 # ML 小規模試驗：規格與工作票索引
 
-規格 #26 與 #27–#37 均已驗收結案；完整短流程與離線教學已交付，整批雙軸審查與修正已完成。正式研究尚未完成，勿將軟體短流程當棋力證據。最新票況以 GitHub 為準；本目錄保存同步需求及各票證據，實作歷史由 Git 保存。
+規格 #26 與 #27–#37 均已驗收結案；完整短流程與離線教學已交付，整批雙軸審查與修正已完成。正式研究尚未完成，勿將軟體短流程當棋力證據。本目錄保存規格及各票證據，歷史 GitHub 紀錄已封存於本機。
 
-- [父規格 #26](https://github.com/chad30877/chess-ai/issues/26)／[本機規格](spec.md)
+- [父規格 #26](../github-issue-archive/issues/026.md)／[本機規格](spec.md)
 - [離線操作教學](../../docs/ML試驗教學.html)／[目前狀態與接續研究](../../docs/開發計畫.md)
 - [發布編號與依賴對照](publication.json)：發布時雜湊不是最新驗收紀錄，不覆寫歷史宣稱重新驗證。
 
@@ -10,17 +10,17 @@
 
 | 代號 | 工作票 | 阻擋來源 | 可獨立展示的成果 |
 | --- | --- | --- | --- |
-| M01 | [#27 辨識、選用與另存單群組設定](https://github.com/chad30877/chess-ai/issues/27)（[同步文件](issues/01-readable-presets.md)） | 無 | UI 看懂六個基本設定、另存並用於既有對戰 |
-| M02 | [#28 建立資料分組與局面預覽](https://github.com/chad30877/chess-ai/issues/28)（[同步文件](issues/02-dataset-preview.md)） | 無 | 選棋譜、分盤抽樣去重、查看統計、保存重開 |
-| M03 | [#29 教師先導量測與預算選擇](https://github.com/chad30877/chess-ai/issues/29)（[同步文件](issues/03-teacher-pilot.md)） | M02 | UI 比較教師兩種節點預算並凍結選擇 |
-| M04 | [#30 教師標記、篩選與停止續跑](https://github.com/chad30877/chess-ai/issues/30)（[同步文件](issues/04-resumable-labeling.md)） | M03 | 逐局面標記、八小時停止、重開只補未完成 |
-| M05 | [#31 單群組校準、學習、評估與另存](https://github.com/chad30877/chess-ai/issues/31)（[同步文件](issues/05-single-group-learning.md)） | M01、M04 | 棋子位置走通三強度訓練、獨立評估、另存 |
-| M06 | [#32 五個單群組學習與結果比較](https://github.com/chad30877/chess-ai/issues/32)（[同步文件](issues/06-five-group-report.md)） | M05 | 共用資料、尺度及整次預算，分組結果可選用 |
-| M07 | [#33 直接組合、聯合訓練與搭配比較](https://github.com/chad30877/chess-ai/issues/33)（[同步文件](issues/07-combinations.md)） | M06 | 自選群組，活動力＋王安全的固定權重與重訓分開 |
-| M08 | [#34 一般與真人對戰開局庫](https://github.com/chad30877/chess-ai/issues/34)（[同步文件](issues/08-live-opening-book.md)） | 無 | 啟用開局庫、調整上限、離庫後搜尋、保存回放 |
-| M09 | [#35 共同開局線的比較、續跑與歷史](https://github.com/chad30877/chess-ai/issues/35)（[同步文件](issues/09-common-opening-lines.md)） | M08 | 任意既有設定使用固定 32 線交換黑白，保留完整歷史 |
-| M10 | [#36 學習結果接入深度三對戰報告](https://github.com/chad30877/chess-ai/issues/36)（[同步文件](issues/10-learned-comparison.md)） | M06、M09 | 學習候選進入共同開局比較，查看逐開局結果與回放 |
-| M11 | [#37 離線截圖教學與完整流程驗收](https://github.com/chad30877/chess-ai/issues/37)（[同步文件](issues/11-offline-guide-acceptance.md)） | M07、M10 | 照實際畫面教學操作，核對重開續跑與研究證據 |
+| M01 | [#27 辨識、選用與另存單群組設定](../github-issue-archive/issues/027.md)（[同步文件](issues/01-readable-presets.md)） | 無 | UI 看懂六個基本設定、另存並用於既有對戰 |
+| M02 | [#28 建立資料分組與局面預覽](../github-issue-archive/issues/028.md)（[同步文件](issues/02-dataset-preview.md)） | 無 | 選棋譜、分盤抽樣去重、查看統計、保存重開 |
+| M03 | [#29 教師先導量測與預算選擇](../github-issue-archive/issues/029.md)（[同步文件](issues/03-teacher-pilot.md)） | M02 | UI 比較教師兩種節點預算並凍結選擇 |
+| M04 | [#30 教師標記、篩選與停止續跑](../github-issue-archive/issues/030.md)（[同步文件](issues/04-resumable-labeling.md)） | M03 | 逐局面標記、八小時停止、重開只補未完成 |
+| M05 | [#31 單群組校準、學習、評估與另存](../github-issue-archive/issues/031.md)（[同步文件](issues/05-single-group-learning.md)） | M01、M04 | 棋子位置走通三強度訓練、獨立評估、另存 |
+| M06 | [#32 五個單群組學習與結果比較](../github-issue-archive/issues/032.md)（[同步文件](issues/06-five-group-report.md)） | M05 | 共用資料、尺度及整次預算，分組結果可選用 |
+| M07 | [#33 直接組合、聯合訓練與搭配比較](../github-issue-archive/issues/033.md)（[同步文件](issues/07-combinations.md)） | M06 | 自選群組，活動力＋王安全的固定權重與重訓分開 |
+| M08 | [#34 一般與真人對戰開局庫](../github-issue-archive/issues/034.md)（[同步文件](issues/08-live-opening-book.md)） | 無 | 啟用開局庫、調整上限、離庫後搜尋、保存回放 |
+| M09 | [#35 共同開局線的比較、續跑與歷史](../github-issue-archive/issues/035.md)（[同步文件](issues/09-common-opening-lines.md)） | M08 | 任意既有設定使用固定 32 線交換黑白，保留完整歷史 |
+| M10 | [#36 學習結果接入深度三對戰報告](../github-issue-archive/issues/036.md)（[同步文件](issues/10-learned-comparison.md)） | M06、M09 | 學習候選進入共同開局比較，查看逐開局結果與回放 |
+| M11 | [#37 離線截圖教學與完整流程驗收](../github-issue-archive/issues/037.md)（[同步文件](issues/11-offline-guide-acceptance.md)） | M07、M10 | 照實際畫面教學操作，核對重開續跑與研究證據 |
 
 
 ## 整批審查證據
@@ -39,4 +39,4 @@ Spec 審查無缺失，驗收稽核通過；Standards 無明文規範違反，�
 
 ## 同步與結案
 
-依 [tracker](../../docs/agents/issue-tracker.md) 完成證據、GitHub／本機票勾選、索引與計畫同步、提交及讀回稽核；一般代理操作驗收不要求使用者再做一次。原生阻擋關係未解除的票不提前宣稱完成；不連帶關閉父規格。
+後續工作依 [tracker](../../docs/agents/issue-tracker.md) 完成本機驗收、索引與計畫同步、提交及讀回核對；本批歷史發布索引不再作為目前狀態來源。

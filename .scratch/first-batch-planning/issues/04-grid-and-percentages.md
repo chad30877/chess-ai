@@ -2,7 +2,7 @@
 
 ## 所屬規格
 
-https://github.com/chad30877/chess-ai/issues/19
+../../github-issue-archive/issues/019.md
 
 ## 要交付的行為
 
