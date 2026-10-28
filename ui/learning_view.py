@@ -14,6 +14,7 @@ from ui.learned_comparison_view import LearnedComparisonView
 from ui.combination_view import CombinationView
 from ui.candidate_inventory_view import InventoryView
 from ui.screening_view import ScreeningView
+from ui.heldout_view import HeldoutView
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
@@ -46,6 +47,7 @@ class LearningView:
         self.combination = CombinationView(root)
         self.inventory = InventoryView()
         self.screening = ScreeningView(root)
+        self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
 
     def open_comparison(self, candidate):
@@ -124,7 +126,15 @@ class LearningView:
                     self.combination.message = str(exc)
             else: self.inventory.action(action)
             return
+        if self.page == 'heldout':
+            self.heldout.action(action, app)
+            return
         if self.page == 'screening':
+            if action == 'learning_screening_heldout':
+                try:
+                    self.heldout.open(self.screening.final_path); self.page = 'heldout'
+                except (OSError, ValueError, KeyError, TypeError) as exc: self.screening.message = str(exc)
+                return
             self.screening.action(action, app)
             return
         if action == 'learning_inventory' and self.page == 'combination' and not self.active():
@@ -230,6 +240,9 @@ class LearningView:
     def render(self, app):
         if self.page == 'inventory':
             self.inventory.render(app)
+            return
+        if self.page == 'heldout':
+            self.heldout.render(app)
             return
         if self.page == 'screening':
             self.screening.render(app)

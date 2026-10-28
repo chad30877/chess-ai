@@ -101,3 +101,4 @@ class ScreeningView:
             app.button('learning_screening_final_next', f'候選 {self.final_index + 1}/{len(final["candidates"])}', (350, 550, 170, 36))
             app.button('learning_screening_final_open', '預覽雙基準比較', (540, 550, 260, 36))
         app.text(self.message or '候選由研究者決定；不會自動啟動完整比較。', 50, 610, width=790)
+        app.button('learning_screening_heldout','最終教師評估',(50, 660, 280, 36),enabled=bool(self.final_path))
