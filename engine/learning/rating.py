@@ -14,6 +14,11 @@ ROOT = Path(__file__).resolve().parents[2]
 LIMITATION = '相對 stable 1500 的估計；固定開局配對重抽樣不保證普遍棋力。'
 
 
+def valid_comparison_game(game):
+    return (game.get('status') == 'completed' and game.get('candidate_outcome') in ('win', 'draw', 'loss')
+            and game.get('termination') not in ('user_stop', 'max_plies'))
+
+
 def rating_from_counts(wins, draws, losses):
     n = wins + draws + losses
     if not n:
@@ -96,12 +101,11 @@ def profile_rating(root, config, *, search=None, claim_draw=False, max_plies=Non
                         raise ValueError('開局來源不符')
                     games = pair['games']
                     if (len(games) == 2 and {g['candidate_color'] for g in games} == {'white', 'black'}
-                        and all(g['status'] == 'completed' and g['candidate_outcome'] in ('win','draw','loss')
-                                and g['termination'] not in ('user_stop', 'max_plies') for g in games)):
+                        and all(valid_comparison_game(g) for g in games)):
                         pairs[position] = tuple(g['candidate_outcome'] for g in games)
                 target = unique if full and summary.status == 'completed' and len(pairs) == 32 else provisional
                 for position, outcomes in pairs.items():
-                    key = digest([line_keys[position - 1], definition['base_seed'] + position - 1])
+                    key = digest(line_keys[position - 1])
                     target.setdefault(key, (outcomes, str(batch)))
         except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError):
             continue

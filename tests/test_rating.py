@@ -88,7 +88,7 @@ class RatingReportTest(unittest.TestCase):
             self.assertEqual(rating['games'], 64)
             self.assertEqual(rating['wins'] + rating['draws'] + rating['losses'], 64)
             self.assertAlmostEqual(rating['rating'], rating_from_counts(rating['wins'], rating['draws'], rating['losses']))
-            duplicate = create_comparison(root, candidate(), roles=('learned',), stable=True, opening_lines=lines)
+            duplicate = create_comparison(root, candidate(), roles=('learned',), stable=True, opening_lines=list(reversed(lines)))
             run_evaluation_comparison(**comparison_options(duplicate, 'stable'))
             again = comparison_report(duplicate)['baselines']['stable']['candidates'][0]['rating']
             self.assertEqual(again['games'], 64)

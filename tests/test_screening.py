@@ -74,6 +74,14 @@ class ScreeningUiTest(unittest.TestCase):
             from engine.learning.screening import screening_report
             report = screening_report(path)
             report.update(complete=True, eliminated=False, games=16, wins=3, draws=0, losses=13, score=3)
+            eliminated = dict(report, eliminated=True, wins=2, losses=14, score=2)
+            with patch('ui.screening_view.screening_report', return_value=eliminated):
+                app.render()
+                button = next(b for b in app.buttons if b.action == 'learning_screening_select')
+                self.assertFalse(button.enabled)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                self.assertEqual(app.learning.screening.selected, [])
+                self.assertFalse(next(b for b in app.buttons if b.action == 'learning_screening_final_freeze').enabled)
             with patch('ui.screening_view.screening_report', return_value=report):
                 click('learning_screening_select')
                 self.assertEqual(len(app.learning.screening.selected), 1)

@@ -70,6 +70,8 @@ class ScreeningView:
                 existing = next((i for i, item in enumerate(self.selected) if digest(item['config']) == identity), None)
                 if existing is not None:
                     self.selected.pop(existing)
+                elif not self.report['complete'] or self.report['eliminated']:
+                    raise ValueError('僅能選定通過篩選的候選')
                 elif len(self.selected) < 5:
                     self.selected.append(source)
                 else:
@@ -93,7 +95,7 @@ class ScreeningView:
         app.button('learning_screening_start', '開始／續跑短對局', (50, 435, 290, 40), enabled=not active and not result['complete'], primary=True)
         identity = digest(result['plan']['source']['config'])
         is_selected = any(digest(item['config']) == identity for item in self.selected)
-        app.button('learning_screening_select', ('取消選定' if is_selected else '選定作完整比較候選') + f' · {len(self.selected)}/5', (50, 500, 390, 40), enabled=result['complete'])
+        app.button('learning_screening_select', ('取消選定' if is_selected else '選定作完整比較候選') + f' · {len(self.selected)}/5', (50, 500, 390, 40), enabled=is_selected or (result['complete'] and not result['eliminated']))
         app.button('learning_screening_final_freeze', '凍結完整比較候選', (50, 550, 280, 36), enabled=bool(self.selected))
         if self.final_path:
             final = load_final_comparison(self.final_path)

@@ -16,10 +16,8 @@ def load_screening(path):
 def screening_outcome(pairs, status):
     """僅計算成對的完整有效棋局；未完成時不判定淘汰。"""
     from collections import Counter
-    from engine.learning.rating import rating_from_counts
-    valid = [pair for pair in pairs if len(pair) == 2 and all(
-        game.get('status') == 'completed' and game.get('candidate_outcome') in ('win', 'draw', 'loss')
-        and game.get('termination') not in ('user_stop', 'max_plies') for game in pair)]
+    from engine.learning.rating import rating_from_counts, valid_comparison_game
+    valid = [pair for pair in pairs if len(pair) == 2 and all(valid_comparison_game(game) for game in pair)]
     counts = Counter(game['candidate_outcome'] for pair in valid for game in pair)
     wins, draws, losses = (counts[k] for k in ('win', 'draw', 'loss'))
     score = wins + draws / 2
