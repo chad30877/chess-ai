@@ -2,8 +2,12 @@
 
 from collections import Counter
 from copy import deepcopy
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+from contextlib import ExitStack
 import hashlib
 import json
+import math
+import os
 from pathlib import Path
 from queue import Queue, Empty
 import subprocess
@@ -24,6 +28,7 @@ OPTIONS = {'Threads': 1, 'Hash': 16, 'MultiPV': 1, 'Ponder': False,
            'Skill Level': 20, 'UCI_LimitStrength': False, 'SyzygyPath': '', 'SyzygyProbeLimit': 0}
 RESET_POLICY = 'ucinewgame-clear-hash-isready-before-each-position-v1'
 SCORE_POLICY = 'latest-exact-pv-matches-bestmove-else-final-score-v1'
+SAMPLE_FIELDS = ('game_id', 'split', 'stage', 'initial_fen', 'moves_uci', 'fen')
 SOURCE = {'url': 'https://github.com/official-stockfish/Stockfish/releases/tag/sf_19',
           'source_url': 'https://github.com/official-stockfish/Stockfish/archive/refs/tags/sf_19.zip',
           'license': 'GPL-3.0', 'tag': 'sf_19'}
@@ -33,8 +38,144 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
 
 
+def teacher_record_matches(record, sample, nodes, score_policy):
+    return (record.get('sample_id') == sample['position_id'] and
+            record.get('requested_nodes') == nodes and record.get('score_policy') == score_policy and
+            all(record.get(key) == sample[key] for key in SAMPLE_FIELDS))
+
+
+def reusable_pilot_records(data, pilot, nodes):
+    """估時與標記建立共用同一重用條件；篩除結果也已完成教師分析。"""
+    by_id = {sample['position_id']: sample for sample in data['positions']}
+    policy = pilot['snapshot']['teacher']['score_policy']
+    reusable = {}
+    for record in pilot['records']:
+        sample = by_id.get(record.get('sample_id'))
+        if sample and teacher_record_matches(record, sample, nodes, policy):
+            reusable[sample['position_id']] = record
+    return reusable
+
+
+def _labeling_estimates(pilot):
+    estimates = {str(nodes): dict(seconds=None, measured_seconds=None, completed=0,
+                                 remaining=None, reused=0) for nodes in BUDGETS}
+    snapshot = pilot.get('snapshot')
+    if not snapshot:
+        return estimates
+    try:
+        data = load_dataset(snapshot['dataset_path'])
+    except (OSError, ValueError, KeyError, TypeError):
+        return estimates
+    if digest(data) != snapshot['dataset_sha256']:
+        return estimates
+    measurements = pilot.get('budget_measurements')
+    if not isinstance(measurements, dict): measurements = {}
+    for nodes in BUDGETS:
+        estimate = estimates[str(nodes)]
+        reused = len(reusable_pilot_records(data, pilot, nodes))
+        estimate.update(remaining=len(data['positions']) - reused, reused=reused)
+        measurement = measurements.get(str(nodes), {})
+        if not isinstance(measurement, dict): continue
+        elapsed, completed = measurement.get('elapsed_seconds'), measurement.get('completed')
+        if (measurement.get('workers') != snapshot.get('workers', 1) or
+                isinstance(completed, bool) or not isinstance(completed, int) or
+                not 0 < completed <= snapshot['sample_count'] or
+                isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)) or
+                not math.isfinite(elapsed) or elapsed <= 0):
+            continue
+        estimate.update(measured_seconds=elapsed, completed=completed)
+        if pilot['status'] == 'completed':
+            estimate['seconds'] = estimate['remaining'] * elapsed / completed
+    return estimates
+
+
 class TeacherStopped(Exception):
     pass
+
+
+def default_teacher_workers():
+    return max(1, min(4, getattr(os, 'process_cpu_count', os.cpu_count)() or 1))
+
+
+def validate_workers(workers):
+    if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
+        raise ValueError('同時分析局面數必須是正整數')
+    return workers
+
+
+class TeacherWorkFailed(Exception):
+    def __init__(self, sample, error, raw_output):
+        super().__init__(str(error))
+        self.sample, self.raw_output = sample, list(raw_output)
+
+
+class TeacherPool:
+    """每個程序一次只收一個局面；主執行緒逐筆提交，退出時取消所有在途工作。"""
+    def __init__(self, executable, workers, *, metadata=None, stop=None, deadline=None,
+                 now=monotonic, timeout=30):
+        self.executable, self.workers = executable, validate_workers(workers)
+        self.expected, self.stop = metadata, stop
+        self.options = dict(deadline=deadline, now=now, timeout=timeout)
+        self.cancelled = Event()
+        self.resources = ExitStack()
+        self.teachers = []
+        self.executor = None
+
+    def is_set(self):
+        return self.cancelled.is_set() or (self.stop is not None and self.stop.is_set())
+
+    def __enter__(self):
+        try:
+            for _ in range(self.workers):
+                teacher = self.resources.enter_context(UciTeacher(self.executable, stop=self, **self.options))
+                if self.expected is not None and teacher.metadata != self.expected:
+                    raise ValueError('教師執行檔或 UCI 條件與凍結快照不同；請建立新先導及標記實驗')
+                self.expected = teacher.metadata
+                self.teachers.append(teacher)
+            self.executor = ThreadPoolExecutor(max_workers=self.workers)
+            return self
+        except BaseException:
+            self.resources.close()
+            raise
+
+    @property
+    def metadata(self):
+        return self.expected
+
+    def check(self):
+        self.teachers[0].check()
+
+    def analyse(self, samples, nodes):
+        pending, remaining = {}, iter(samples)
+
+        def submit(teacher):
+            self.check()
+            sample = next(remaining, None)
+            if sample is not None:
+                pending[self.executor.submit(teacher.analyse, sample, nodes)] = (teacher, sample)
+
+        for teacher in self.teachers:
+            submit(teacher)
+        while pending:
+            self.check()
+            done, _ = wait(pending, timeout=.05, return_when=FIRST_COMPLETED)
+            for future in done:
+                teacher, sample = pending.pop(future)
+                self.check()
+                try:
+                    record = future.result()
+                except TeacherStopped:
+                    raise
+                except Exception as exc:
+                    raise TeacherWorkFailed(sample, exc, teacher.last_output) from exc
+                yield sample, record
+                submit(teacher)
+
+    def __exit__(self, *args):
+        self.cancelled.set()
+        if self.executor is not None:
+            self.executor.shutdown(wait=True, cancel_futures=True)
+        self.resources.close()
 
 
 class UciTeacher:
@@ -234,8 +375,9 @@ def _summary(snapshot, records):
             reasons=dict(Counter(reason for r in records if r['requested_nodes'] == n for reason in r['exclusion_reasons']))) for n in BUDGETS})
 
 
-def run_pilot(dataset_path, executable, *, stop=None, progress=lambda state: None, now=monotonic, timeout=30, run_path=None):
+def run_pilot(dataset_path, executable, *, workers=1, stop=None, progress=lambda state: None, now=monotonic, timeout=30, run_path=None):
     """新建先導；只從訓練來源固定選最多100局面，成功紀錄逐筆提交。"""
+    workers = validate_workers(workers)
     dataset_path = Path(dataset_path)
     data = load_dataset(dataset_path)
     path = Path(run_path) if run_path else dataset_path / 'teacher-pilots' / uuid4().hex
@@ -243,7 +385,7 @@ def run_pilot(dataset_path, executable, *, stop=None, progress=lambda state: Non
         raise ValueError('先導條件不可變；請建立新先導')
     path.mkdir(parents=True, exist_ok=run_path is not None)
     started = now()
-    state = dict(status='running', path=str(path), completed=0, total=0, elapsed_seconds=0, error='')
+    state = dict(status='running', path=str(path), completed=0, total=0, elapsed_seconds=0, error='', budget_measurements={})
     records = []
     def report(**update):
         state.update(update, elapsed_seconds=now() - started)
@@ -258,23 +400,31 @@ def run_pilot(dataset_path, executable, *, stop=None, progress=lambda state: Non
                 raise ValueError('訓練組沒有可用局面')
             for sample in samples: sample['id'] = sample['position_id']
             state['total'] = 2 * len(samples)
-            with UciTeacher(executable, stop=stop, deadline=started + MAX_SECONDS, now=now, timeout=timeout) as teacher:
+            with TeacherPool(executable, min(workers, len(samples)), stop=stop,
+                             deadline=started + MAX_SECONDS, now=now, timeout=timeout) as teacher:
                 snapshot = dict(format_version=1, processing_version=TEACHER_VERSION,
                     dataset_sha256=digest(data), dataset_path=str(dataset_path.resolve()), dataset_source=data['source'],
-                    teacher=teacher.metadata, sample_count=len(samples), samples=samples, budgets=list(BUDGETS),
+                    teacher=teacher.metadata, workers=workers, sample_count=len(samples), samples=samples, budgets=list(BUDGETS),
                     selection='train-only-sha256-seed-pilot-v1-lowest-100', max_seconds=MAX_SECONDS,
                     filter_version=1, cp_special_threshold=20000)
                 write_json_atomic(path / 'snapshot.json', snapshot)
                 (path / 'records').mkdir()
-                for sample in samples:
-                    for nodes in BUDGETS:
-                        record = teacher.analyse(sample, nodes)
-                        teacher.check()
-                        write_json_atomic(path / 'records' / f'{sample["id"]}-{nodes}.json', record)
-                        records.append(record)
-                        report(completed=len(records), summary=_summary(snapshot, records),
-                               last_score=dict(white_cp=record['white_cp'], depth=record['score_depth'],
-                                               actual_nodes=record['actual_nodes'], kind=record['raw_score']['kind']))
+                for nodes in BUDGETS:
+                    measured_start = now()
+                    measurement = dict(completed=0, elapsed_seconds=0, workers=workers)
+                    state['budget_measurements'][str(nodes)] = measurement
+                    try:
+                        for sample, record in teacher.analyse(samples, nodes):
+                            teacher.check()
+                            write_json_atomic(path / 'records' / f'{sample["id"]}-{nodes}.json', record)
+                            records.append(record)
+                            measurement.update(completed=measurement['completed'] + 1,
+                                               elapsed_seconds=now() - measured_start)
+                            report(completed=len(records), summary=_summary(snapshot, records),
+                                   last_score=dict(white_cp=record['white_cp'], depth=record['score_depth'],
+                                                   actual_nodes=record['actual_nodes'], kind=record['raw_score']['kind']))
+                    finally:
+                        measurement['elapsed_seconds'] = now() - measured_start
                 report(status='completed')
     except TeacherStopped as exc:
         report(status='stopped', error=str(exc))
@@ -295,6 +445,7 @@ def load_pilot(path):
         state['summary'] = _summary(state['snapshot'], state['records'])
         state['completed'] = len(state['records'])
     state['choice'] = json.loads((path / 'choice.json').read_text(encoding='utf-8')) if (path / 'choice.json').exists() else None
+    state['labeling_estimates'] = _labeling_estimates(state)
     return state
 
 
@@ -315,6 +466,8 @@ def choose_budget(path, nodes):
         choice = dict(format_version=1, nodes=nodes, dataset_sha256=snapshot['dataset_sha256'],
             teacher=deepcopy(snapshot['teacher']), filter_version=snapshot['filter_version'],
             cp_special_threshold=snapshot['cp_special_threshold'], pilot_snapshot_sha256=digest(snapshot))
+        if 'workers' in snapshot:
+            choice['workers'] = snapshot['workers']
         choice['identity'] = digest(choice)
         write_json_atomic(path / 'choice.json', choice)
         return choice

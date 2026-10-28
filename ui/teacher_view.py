@@ -1,13 +1,23 @@
 """教師先導與固定預算選擇的簡短 UI。"""
 from pathlib import Path
 import pygame
-from engine.learning.teacher import PilotRun, choose_budget, load_pilot
+from engine.learning.teacher import PilotRun, choose_budget, load_pilot, default_teacher_workers, validate_workers
+
+
+def _duration(seconds):
+    if 0 < seconds < .1: return '< 0.1 秒'
+    if seconds < 60: return f'{seconds:.1f} 秒'
+    if seconds < 3600: return f'{seconds / 60:.1f} 分'
+    return f'{seconds / 3600:.1f} 小時'
 
 
 class TeacherView:
-    def __init__(self):
+    def __init__(self, root=None):
         self.dataset = None
-        self.command = ''
+        self.workers = default_teacher_workers()
+        self.project_root = Path(root) if root is not None else Path(__file__).resolve().parents[1]
+        self.default_command = str(self.project_root / 'tools/stockfish/stockfish-windows-x86-64-universal.exe')
+        self.command = self.default_command
         self.focus = False
         self.draft = ''
         self.run = None
@@ -30,6 +40,8 @@ class TeacherView:
         self.dataset = Path(dataset)
         self.run, self._loaded_run = None, None
         self.state, self.path, self.message, self.index = {}, None, '', 0
+        self.workers = default_teacher_workers()
+        self.command = self.default_command
         entries = self.entries()
         if entries: self.load(entries[0].parent)
 
@@ -38,6 +50,7 @@ class TeacherView:
         self.path = Path(path)
         snapshot = self.state.get('snapshot')
         if snapshot:
+            self.workers = snapshot.get('workers', 1)
             command = snapshot['teacher']['command']
             self.command = command[0] if len(command) == 1 else command
 
@@ -52,7 +65,9 @@ class TeacherView:
                 value = pygame.scrap.get(pygame.SCRAP_TEXT)
                 if value: self.draft += value.decode('utf-8').rstrip('\x00')
             except (pygame.error, UnicodeError): self.message = '無法貼上，請輸入路徑'
-        elif event.key == pygame.K_RETURN: self.commit()
+        elif event.key == pygame.K_RETURN:
+            try: self.commit()
+            except ValueError as exc: self.message = str(exc)
         elif event.key == pygame.K_ESCAPE:
             self.focus = False
             pygame.key.stop_text_input()
@@ -60,23 +75,35 @@ class TeacherView:
 
     def commit(self):
         if self.focus:
-            self.command = self.draft.strip().strip('"')
+            if self.focus == 'workers':
+                try: workers = int(self.draft.strip())
+                except ValueError: raise ValueError('同時分析局面數必須是正整數') from None
+                self.workers = validate_workers(workers)
+            else:
+                self.command = self.draft.strip().strip('"')
             self.focus = False
             pygame.key.stop_text_input()
 
     def action(self, action, app):
-        self.commit()
         try:
+            # 無效輸入仍能重新取得焦點修正。
+            if action != 'learning_teacher_workers' or self.focus != 'workers': self.commit()
             if action == 'learning_pilot_stop' and self.active():
                 self.run.stop()
                 return
             if self.active(): return
             if action == 'learning_engine':
-                self.focus = True
+                self.focus = 'engine'
                 self.draft = str(self.command)
                 pygame.key.start_text_input()
+            elif action == 'learning_teacher_workers':
+                self.focus = 'workers'
+                self.draft = str(self.workers)
+                pygame.key.start_text_input()
+            elif action == 'learning_engine_pick':
+                self.pick_engine()
             elif action == 'learning_pilot_start':
-                self.run = PilotRun(self.dataset, self.command, app.executor)
+                self.run = PilotRun(self.dataset, self.command, app.executor, workers=self.workers)
                 self.index = 0
                 self.message = ''
             elif action.startswith('learning_budget:'):
@@ -89,6 +116,27 @@ class TeacherView:
                 self.load(entries[self.index].parent)
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.message = str(exc)
+
+    def pick_engine(self):
+        import tkinter
+        from tkinter import filedialog
+        window = None
+        try:
+            window = tkinter.Tk()
+            window.withdraw()
+            window.attributes('-topmost', True)
+            current = Path(self.command) if isinstance(self.command, str) else self.project_root
+            chosen = filedialog.askopenfilename(parent=window, title='選取 Stockfish 執行檔',
+                initialdir=str(current.parent if current.parent.is_dir() else self.project_root),
+                filetypes=[('執行檔', '*.exe'), ('所有檔案', '*')])
+            if chosen:
+                self.command = chosen
+                self.message = ''
+        except (tkinter.TclError, OSError) as exc:
+            self.message = f'無法開啟檔案選擇器：{exc}'
+        finally:
+            if window is not None:
+                window.destroy()
 
     def render(self, app):
         active = self.active()
@@ -109,23 +157,34 @@ class TeacherView:
         app.text('學習實驗 · 教師先導', 50, 78, large=True)
         app.button('learning_data', '資料', (50, 122, 130, 34), enabled=not active)
         app.button('learning_labels', '教師標記', (195, 122, 190, 34), enabled=bool(state.get('choice')) and not active)
-        app.button('learning_engine', self.draft + ' |' if self.focus else str(self.command or '輸入／貼上 Stockfish 19 執行檔路徑'),
-                   (50, 174, 790, 38), enabled=not active)
+        app.button('learning_engine', self.draft + ' |' if self.focus == 'engine' else str(self.command or '輸入／貼上 Stockfish 19 執行檔路徑'),
+                   (50, 174, 630, 38), enabled=not active)
+        app.button('learning_engine_pick', '選取檔案', (695, 174, 145, 38), enabled=not active)
         app.button('learning_pilot_start', '建立新先導', (50, 230, 235, 36), enabled=not active, primary=True)
         app.button('learning_pilot_stop', '停止', (310, 230, 130, 36), enabled=active)
+        workers = self.draft + ' |' if self.focus == 'workers' else str(self.workers)
+        app.button('learning_teacher_workers', f'同時分析局面數：{workers}', (455, 230, 385, 36), enabled=not active)
         status = {'queued': '排隊', 'running': '量測中', 'completed': '量測完成', 'stopped': '已停止', 'failed': '失敗',
                   'interrupted': '未完成，請建立新先導'}
         if state:
             display_status = 'interrupted' if state['status'] in ('running', 'queued') and not active else state['status']
+            saved_workers = f' · 實測 {state["snapshot"].get("workers", 1)} 程序' if state.get('snapshot') else ''
             app.text(f'{status.get(display_status, "未完成")} · {state.get("completed", 0)}/{state.get("total", 0)}'
-                     f' · {state.get("elapsed_seconds", 0):.1f} 秒', 50, 285, width=790)
+                     f' · {state.get("elapsed_seconds", 0):.1f} 秒{saved_workers}', 50, 285, width=790)
         if self.message or state.get('error'):
             app.text(self.message or state['error'], 50, 321, width=790)
         summary = state.get('summary')
         if summary:
             for index, nodes in enumerate((50000, 200000)):
                 group = summary['budgets'][str(nodes)]
-                app.text(f'{nodes:,} 節點：{group["elapsed_seconds"]:.2f} 秒 · 已完成 {group["completed"]} · 將篩除 {group["excluded"]}',
+                estimate = state.get('labeling_estimates', {}).get(str(nodes), {})
+                if estimate:
+                    elapsed = estimate.get('measured_seconds')
+                else:
+                    elapsed = state.get('budget_measurements', {}).get(str(nodes), {}).get('elapsed_seconds')
+                measured = _duration(elapsed) if elapsed is not None else '未取得'
+                expected = '約 ' + _duration(estimate['seconds']) if estimate.get('seconds') is not None else '無法估計'
+                app.text(f'{nodes:,} 節點 · 實測 {measured} · 後續標記 {expected} · 篩除 {group["excluded"]}',
                          50, 365 + index * 32, width=790)
             difference = summary['mean_absolute_difference_cp']
             text = f'{difference:.2f} cp' if difference is not None else '無有效配對'

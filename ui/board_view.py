@@ -103,6 +103,18 @@ class BoardView:
                 rect = pygame.Rect(self.origin_x + col * self.square_size, self.origin_y + row * self.square_size, self.square_size, self.square_size)
                 pygame.draw.rect(self.screen, color, rect)
 
+    def draw_last_move(self, board: chess.Board, is_flipped: bool) -> None:
+        """以走棋前後的棋子差異標示最後一手，包含特殊走法。"""
+        if not board.move_stack:
+            return
+        previous = board.copy(stack=1)
+        previous.pop()
+        overlay = pygame.Surface((self.square_size, self.square_size), pygame.SRCALPHA)
+        overlay.fill((45, 190, 75, 125))
+        for square in chess.SQUARES:
+            if previous.piece_at(square) != board.piece_at(square):
+                self.screen.blit(overlay, self._square_to_screen(square, is_flipped))
+
     def draw_coordinates(self, is_flipped: bool) -> None:
         files = list("abcdefgh")
         ranks = list("87654321")
@@ -163,6 +175,7 @@ class BoardView:
     ) -> None:
         self.screen.fill(TEXT_BACKGROUND)
         self.draw_board()
+        self.draw_last_move(board, is_flipped)
         self.draw_coordinates(is_flipped)
         self.draw_pieces(board, is_flipped)
         self.draw_selection(selected, destinations or set(), is_flipped)
