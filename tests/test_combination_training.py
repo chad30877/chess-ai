@@ -117,3 +117,45 @@ class FixedWeightContractTest(unittest.TestCase):
         self.assertAlmostEqual(result['king_increments']['without_mobility']['mae'], -.5)
         self.assertAlmostEqual(result['king_increments']['with_mobility']['mae'], -.1)
         self.assertIsNone(result['king_increments']['with_mobility']['stages']['opening'])
+
+class CombinationBatchFlowTest(unittest.TestCase):
+    setUp = fixtures.TrainingFlowTest.setUp
+
+    def test_reuses_completed_combination_and_resumes_after_shared_deadline(self):
+        from engine.learning.combination_batch import create_combination_batch, load_combination_batch, run_combination_batch
+        source = create_group_training(self.labels, ['mobility', 'king-safety', 'pawn'])
+        run_group_training(source)
+        existing = create_combination(source, ['mobility', 'king-safety'])
+        run_combination(existing)
+        before = {str(p.relative_to(existing)): p.read_bytes() for p in existing.rglob('*.json')}
+        batch = create_combination_batch(source, [['mobility', 'king-safety'], ['pawn', 'mobility']])
+        clock = [0]
+        def progress(state):
+            if state.get('completed') == 1: clock[0] = 28800
+        run_combination_batch(batch, now=lambda: clock[0], progress=progress)
+        saved = load_combination_batch(batch)
+        self.assertEqual(saved['status'], 'stopped')
+        self.assertEqual(saved['items'][0]['path'], str(existing.resolve()))
+        self.assertEqual(saved['completed'], 1)
+        self.assertEqual({str(p.relative_to(existing)): p.read_bytes() for p in existing.rglob('*.json')}, before)
+        run_combination_batch(batch)
+        saved = load_combination_batch(batch)
+        self.assertEqual(saved['status'], 'completed', saved['error'])
+        self.assertEqual(saved['completed'], 2)
+        self.assertIn('曝光', saved['items'][1]['data_use'])
+        self.assertEqual({str(p.relative_to(existing)): p.read_bytes() for p in existing.rglob('*.json')}, before)
+
+    def test_default_batch_covers_all_combinations_and_rejects_duplicate_selection(self):
+        from engine.learning.combination_batch import create_combination_batch, load_combination_batch
+        from engine.learning.group_training import GROUPS
+        source = create_group_training(self.labels)
+        run_group_training(source)
+        batch = create_combination_batch(source)
+        saved = load_combination_batch(batch)
+        self.assertEqual(saved['total'], 26)
+        self.assertEqual(saved['status'], 'ready')
+        self.assertEqual(len({tuple(item['groups']) for item in saved['items']}), 26)
+        self.assertEqual(set(saved['items'][-1]['groups']), set(GROUPS))
+        self.assertTrue(all(item['status'] == 'pending' for item in saved['items']))
+        with self.assertRaisesRegex(ValueError, '重複'):
+            create_combination_batch(source, [['pawn', 'mobility'], ['mobility', 'pawn']])
