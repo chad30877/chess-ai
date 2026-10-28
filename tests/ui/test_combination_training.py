@@ -66,3 +66,23 @@ class CombinationUiTest(unittest.TestCase):
             self.assertEqual(app.live.settings.black_evaluation.to_dict(),load_combination_candidate(path,'direct')['config'])
             app.close()
 
+    def test_batch_selection_runs_and_reopens_through_application_events(self):
+        source = create_group_training(self.labels, ['mobility', 'king-safety']); run_group_training(source)
+        pygame.init(); self.addCleanup(pygame.quit)
+        with patch('apps.chess_application.PROJECT_ROOT', self.root), ThreadPoolExecutor(1) as executor:
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            def click(action):
+                app.render(); button = next(b for b in app.buttons if b.action == action)
+                self.assertTrue(button.enabled, action)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            click('mode:learning'); app.learning.open(self.labels.parents[1])
+            click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
+            view = app.learning.combination
+            click('learning_combination_batch')
+            view.run.future.result(timeout=45); app.render()
+            self.assertEqual(view.batch_state['status'], 'completed', view.message)
+            path = view.batch_path
+            view.open(source)
+            self.assertEqual(view.batch_path, path)
+            self.assertEqual(view.batch_state['completed'], 1)
+            app.close()

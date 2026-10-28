@@ -1,11 +1,13 @@
 """自選群組的實際權重預覽、固定對照及聯合結果。"""
 import json
+from itertools import combinations
 from pathlib import Path
 from uuid import uuid4
 from engine.evaluation.config import EvaluationConfig
 from engine.learning.group_training import GROUPS, load_group_training, load_group_candidate
 from engine.learning.combination_training import (CombinationRun, preview_combination, load_combination,
     load_combination_candidate, save_combination_config)
+from engine.learning.combination_batch import (CombinationBatchRun, create_combination_batch, load_combination_batch)
 from ui.replay_evaluation_editor import TERM_LABELS
 
 
@@ -17,6 +19,7 @@ class CombinationView:
         self.root = Path(root); self.source_path = self.path = self.run = self._loaded_run = None
         self.selected = {'mobility','king-safety'}; self.sources = {}; self.preview = {}; self.state = {}
         self.entries = []; self.index = self.stage = self.weight_page = 0
+        self.batch_path = None; self.batch_state = {}; self.batch_active = False
         self.kind = 'direct'; self.weights = self.advanced = False; self.saved = None; self.message = ''
     def active(self): return self.run is not None and not self.run.future.done()
     def selection_changed(self):
@@ -27,6 +30,14 @@ class CombinationView:
         self.sources = {g:load_group_candidate(source_path,g) for g,r in groups['groups'].items() if r['report']}
         self.selected = {'mobility','king-safety'}; self.path = self.run = self._loaded_run = None
         self.state = {}; self.index = 0; self.saved = None; self.message = ''; self.update_preview()
+        self.batch_path = None; self.batch_state = {}; self.batch_active = False
+        for entry in sorted((self.source_path.parents[1]/'combination-batches').glob('*/snapshot.json'), key=lambda p:p.stat().st_mtime, reverse=True):
+            try:
+                batch = load_combination_batch(entry.parent)
+                if batch['snapshot']['source_identity'] == groups['snapshot']['identity']:
+                    self.batch_path = entry.parent; self.batch_state = batch; break
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
         self.entries = []
         for entry in sorted((self.source_path.parents[1]/'combinations').glob('*/snapshot.json'),key=lambda p:p.stat().st_mtime,reverse=True):
             snapshot = json.loads(entry.read_text(encoding='utf-8'))
@@ -57,12 +68,19 @@ class CombinationView:
                 else: self.selected.add(group)
                 self.update_preview(); self.weights = True; self.weight_page = 0
                 if self.preview and self.selection_changed(): self.message = '選組已變更；預覽新組合，按新建套用'
+            elif action == 'learning_combination_batch' and len(self.selected) >= 2 and self.preview:
+                selected = [g for g in GROUPS if g in self.selected]
+                selections = [list(c) for n in range(2, len(selected)+1) for c in combinations(selected,n)]
+                if not self.batch_path or self.batch_state.get('snapshot', {}).get('selections') != selections:
+                    self.batch_path = create_combination_batch(self.source_path, selections)
+                self.batch_active = True; self.message = ''
+                self.run = CombinationBatchRun(self.batch_path, app.executor)
             elif action == 'learning_combination_new' and self.preview:
                 self.path = self.source_path.parents[1]/'combinations'/uuid4().hex
                 self.state = {}; self.saved = None; self.message = ''
-                self.run = CombinationRun(self.path,app.executor,source_path=self.source_path,groups=self.preview['groups'])
+                self.batch_active = False; self.run = CombinationRun(self.path,app.executor,source_path=self.source_path,groups=self.preview['groups'])
             elif action == 'learning_combination_resume' and self.path:
-                self.run = CombinationRun(self.path,app.executor)
+                self.batch_active = False; self.run = CombinationRun(self.path,app.executor)
             elif action in ('learning_combination_prev','learning_combination_next'):
                 self.index = (self.index+(1 if action.endswith('next') else -1))%len(self.entries)
                 self.run = self._loaded_run = None; self.load(self.entries[self.index].parent)
@@ -84,7 +102,16 @@ class CombinationView:
         except (OSError,ValueError,KeyError,TypeError,IndexError) as exc: self.message = str(exc)
     def render(self, app):
         active = self.active()
-        if self.run:
+        if self.run and self.batch_active:
+            self.batch_state = self.run.snapshot()
+            if not active and self._loaded_run is not self.run:
+                try:
+                    self.batch_state = load_combination_batch(self.run.path)
+                    runtime = self.run.snapshot()
+                    if runtime.get('status') == 'failed': self.batch_state.update(status='failed', error=runtime.get('error',''))
+                except (OSError, ValueError) as exc: self.message = str(exc)
+                self._loaded_run = self.run
+        elif self.run:
             if active: self.state.update(self.run.snapshot())
             elif self._loaded_run is not self.run:
                 runtime = self.run.snapshot()
@@ -108,9 +135,12 @@ class CombinationView:
             app.button('learning_combination_toggle:'+g,('[x] ' if g in self.selected else '[ ] ')+label,(50+i*160,164,148,32),enabled=not active)
         app.button('learning_combination_new','新建組合＋聯合三候選',(50,210,260,36),enabled=bool(self.preview) and not active,primary=True)
         app.button('learning_combination_resume','續跑／重試',(330,210,210,36),enabled=bool(self.path) and state.get('status')!='completed' and not active)
-        app.button('learning_combination_stop','停止',(560,210,120,36),enabled=active)
+        app.button('learning_combination_stop','停止',(550,210,75,36),enabled=active)
+        app.button('learning_combination_batch','補齊選取組合',(635,210,205,36),enabled=len(self.selected)>=2 and bool(self.preview) and not active)
         statuses = dict(ready='待開始',queued='準備中',running='執行中',completed='完成',stopped='已停止',failed='失敗',interrupted='待續跑')
         app.text(f'{statuses.get(state.get("status"),"權重預覽")} · 聯合候選 {state.get("completed",0)}/3 · {state.get("elapsed_seconds",0):.1f} 秒 · {state.get("current_candidate","")}',50,259,width=790)
+        if self.batch_state:
+            app.text(f'批次 {self.batch_state.get("completed",0)}/{self.batch_state.get("total",0)} · {statuses.get(self.batch_state.get("status"),"待續跑")} · '+self.batch_state.get('error',''),50,344,width=790)
         source_id = snapshot.get('sources',[next(iter(self.sources.values()),{})])[0].get('experiment_id','')
         app.text(f'來源 {source_id[:12]} · 沿用已曝光測試資料'+(f'（{len(snapshot["prior_test_experiments"])} 份）' if snapshot else ''),50,288,muted=True,width=790)
         cal = state.get('calibration') or next(iter(self.sources.values()),{}).get('calibration')
