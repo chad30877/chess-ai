@@ -53,6 +53,29 @@ class RatingReportTest(unittest.TestCase):
             run_evaluation_comparison(**comparison_options(path,'stable'))
             self.assertEqual(comparison_report(path)['baselines']['stable']['candidates'][0]['rating']['provisional']['games'],2)
 
+    def test_failed_second_game_keeps_first_game_out_of_rating_until_resume(self):
+        from unittest.mock import patch
+        from engine.learning.comparison import create_comparison, comparison_report, comparison_options
+        from engine.sessions.evaluation_comparison import run_evaluation_comparison, play_game
+        lines=[dict(initial_fen='7k/5Q2/6K1/8/8/8/8/8 w - - 0 1',moves_uci=[],name='',source={})]
+        with tempfile.TemporaryDirectory() as root:
+            path=create_comparison(root,candidate(),roles=('learned',),stable=True,opening_lines=lines)
+            calls=[]
+            def fail_second(*args, **kwargs):
+                calls.append(1)
+                if len(calls)==2:
+                    raise RuntimeError('受控對局失敗')
+                return play_game(*args, **kwargs)
+            with patch('engine.sessions.evaluation_comparison.play_game',side_effect=fail_second):
+                with self.assertRaisesRegex(RuntimeError,'受控對局失敗'):
+                    run_evaluation_comparison(**comparison_options(path,'stable'))
+            report=comparison_report(path)['baselines']['stable']
+            self.assertEqual(report['status'],'failed')
+            self.assertEqual(report['candidates'][0]['rating']['status'],'unrated')
+            self.assertIsNone(report['candidates'][0]['rating']['provisional'])
+            run_evaluation_comparison(**comparison_options(path,'stable'))
+            self.assertEqual(comparison_report(path)['baselines']['stable']['candidates'][0]['rating']['provisional']['games'],2)
+
     def test_full_batch_produces_formal_rating_and_identical_batch_is_deduplicated(self):
         from engine.learning.comparison import create_comparison, comparison_report, comparison_options
         from engine.sessions.evaluation_comparison import run_evaluation_comparison
