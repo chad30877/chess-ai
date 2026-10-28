@@ -1,5 +1,6 @@
 """依已驗證共同開局紀錄計算設定棋力分數。"""
 from collections import Counter
+from functools import lru_cache
 import json
 import math
 from pathlib import Path
@@ -25,6 +26,7 @@ def _config(value):
     return EvaluationConfig.from_dict(value).to_dict()
 
 
+@lru_cache(maxsize=128)
 def _interval(pairs):
     if len(pairs) < 2 or len(set(pairs)) < 2:
         return None
@@ -109,7 +111,7 @@ def profile_rating(root, config, *, search=None, claim_draw=False, max_plies=Non
         wins, draws, losses = (counts[k] for k in ('win', 'draw', 'loss'))
         return dict(rating=rating_from_counts(wins, draws, losses), wins=wins, draws=draws,
                     losses=losses, games=wins+draws+losses, sources=sorted({v[1] for v in records.values()}),
-                    interval=_interval(pairs))
+                    interval=_interval(tuple(pairs)))
     if unique:
         result.update(summarize(unique), status='formal')
     if provisional:
