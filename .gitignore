@@ -43,6 +43,7 @@ data/**/*.csv
 data/**/*.jsonl
 data/batches/
 data/learning/
+data/learning-comparisons/
 data/.sequences.sqlite3*
 data/replays/[0-9]*.json
 
@@ -52,3 +53,6 @@ data/replays/game_*.json
 
 # 本機 Stockfish 執行檔與隨附資料
 /tools/stockfish/
+
+# 個人產生的評分設定
+/configs/evaluation/*.json
