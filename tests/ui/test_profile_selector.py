@@ -26,6 +26,88 @@ class ProfileSelectorTest(unittest.TestCase):
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
         self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=text))
 
+    def test_saved_rating_visible_at_profile_selection_and_tracks_content(self):
+        from unittest.mock import patch
+        from engine.learning.comparison import create_comparison, comparison_options
+        from engine.sessions.evaluation_comparison import run_evaluation_comparison
+        from tests.test_learned_comparison import candidate
+        config = EvaluationConfig.from_dict(candidate()['config'])
+        original = self.save_profile('候選原本', config)
+        duplicate = self.save_profile('候選另存', config)
+        original_bytes = original.read_bytes()
+        lines = [dict(initial_fen=f'7k/5Q2/6K1/8/8/8/8/8 w - - 0 {i}', moves_uci=[], name=str(i), source={}) for i in range(1, 33)]
+        path = create_comparison(self.project, candidate(), roles=('learned',), stable=True, opening_lines=lines)
+        run_evaluation_comparison(**comparison_options(path, 'stable'))
+        self.app.live_search_depth = 3
+        self.app.live_search_workers = 1
+        self.app.live_transposition_capacity = 4096
+        self.click('mode:human')
+        self.click('live_evaluation')
+        self.search('候選另存')
+        self.click('profile_row:0')
+        self.click('profile_rating')
+        with patch.object(self.app, 'text', wraps=self.app.text) as draw:
+            self.app.render()
+        shown = ' '.join(str(call.args[0]) for call in draw.call_args_list if call.args)
+        self.assertIn('正式', shown)
+        self.assertIn('64局', shown)
+        self.assertIn('深度 3', shown)
+        self.assertIn('q4', shown)
+        self.assertIn('4096', shown)
+        self.assertIn('勝', shown)
+        self.assertIn('和', shown)
+        self.assertIn('敗', shown)
+        self.assertIn(str(self.project / 'data/batches'), shown)
+        self.click('profile_rating')
+        self.click('profile_confirm')
+        self.assertEqual(self.app.live_evaluation_file, duplicate)
+        self.assertEqual(original.read_bytes(), original_bytes)
+        payload = config.to_dict()
+        payload['terms']['isolated_pawns']['weight'] = 2
+        duplicate.write_text(json.dumps(payload), encoding='utf-8')
+        self.click('live_evaluation')
+        self.search('候選另存')
+        self.click('profile_row:0')
+        self.click('profile_rating')
+        with patch.object(self.app, 'text', wraps=self.app.text) as draw:
+            self.app.render()
+        shown = ' '.join(str(call.args[0]) for call in draw.call_args_list if call.args)
+        self.assertIn('尚未評分', shown)
+        self.click('profile_rating')
+        self.click('profile_cancel')
+        broken = self.project / 'data/learning-comparisons/broken'
+        broken.mkdir(parents=True)
+        (broken / 'snapshot.json').write_text('{', encoding='utf-8')
+        self.app.close()
+        self.app = application_tests.ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
+        self.addCleanup(self.app.close)
+        self.app.live_search_depth = 3
+        self.app.live_search_workers = 1
+        self.app.live_transposition_capacity = 4096
+        self.click('mode:human')
+        self.click('live_evaluation')
+        self.search('候選原本')
+        self.click('profile_row:0')
+        self.click('profile_rating')
+        with patch.object(self.app, 'text', wraps=self.app.text) as draw:
+            self.app.render()
+        shown = ' '.join(str(call.args[0]) for call in draw.call_args_list if call.args)
+        self.assertIn('正式', shown)
+        self.assertIn('64局', shown)
+        self.assertEqual(original.read_bytes(), original_bytes)
+        self.click('profile_rating')
+        self.click('profile_cancel')
+        self.app.live_search_depth = 2
+        self.click('live_evaluation')
+        self.search('候選原本')
+        self.click('profile_row:0')
+        self.click('profile_rating')
+        with patch.object(self.app, 'text', wraps=self.app.text) as draw:
+            self.app.render()
+        shown = ' '.join(str(call.args[0]) for call in draw.call_args_list if call.args)
+        self.assertIn('尚未評分', shown)
+        self.assertIn('深度 2', shown)
+
     def test_live_search_confirm_applies_config_and_cancel_preserves_selection(self):
         config = EvaluationConfig.material_only()
         target = self.save_profile('中文純子力', config)
