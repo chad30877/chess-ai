@@ -1,0 +1,84 @@
+{
+  "repository": "chad30877/chess-ai",
+  "status": "verified",
+  "spec": {
+    "number": 40,
+    "title": "規格：組合研究與設定棋力分數",
+    "url": "https://github.com/chad30877/chess-ai/issues/40",
+    "file": "spec.md",
+    "body_sha256": "1b0582748db45aa73c53a080c74eb6c3f76ed587ea9186df75bafdf5dbc1b626"
+  },
+  "tickets": [
+    {
+      "number": 41,
+      "title": "R01：盤點組合並展示十個候選",
+      "url": "https://github.com/chad30877/chess-ai/issues/41",
+      "code": "R01",
+      "file": "issues/01-candidate-inventory.md",
+      "blocked_by": [],
+      "body_sha256": "0d5462286d725f229a514a0aa44fde357b373f269cb019a83d97e679c665fd83"
+    },
+    {
+      "number": 42,
+      "title": "R02：補齊組合學習並保存續跑",
+      "url": "https://github.com/chad30877/chess-ai/issues/42",
+      "code": "R02",
+      "file": "issues/02-combination-research.md",
+      "blocked_by": [],
+      "body_sha256": "519438abf5a9cfe0139ebc2ce9084301a08c67da99741067270b56d4287876bc"
+    },
+    {
+      "number": 43,
+      "title": "R03：從完整對局計算設定棋力分數",
+      "url": "https://github.com/chad30877/chess-ai/issues/43",
+      "code": "R03",
+      "file": "issues/03-rating-report.md",
+      "blocked_by": [],
+      "body_sha256": "160594eef2dd8ad0b53315c6550cd782b07e4451bcf335f2b9a61f20ddbb5f95"
+    },
+    {
+      "number": 44,
+      "title": "R04：在設定選擇處查看棋力分數",
+      "url": "https://github.com/chad30877/chess-ai/issues/44",
+      "code": "R04",
+      "file": "issues/04-profile-rating.md",
+      "blocked_by": [
+        43
+      ],
+      "body_sha256": "735274ffc9e478ce316ddcb73baf26fad84fe604be1271d9257e092d62978ae7"
+    },
+    {
+      "number": 45,
+      "title": "R05：選定候選並執行短對局篩選",
+      "url": "https://github.com/chad30877/chess-ai/issues/45",
+      "code": "R05",
+      "file": "issues/05-screening.md",
+      "blocked_by": [
+        41
+      ],
+      "body_sha256": "98c7f55dacd2d097a1f811cb50d6a4ce31cad12030c740553386b35ea278b14a"
+    },
+    {
+      "number": 46,
+      "title": "R06：對選定候選完成雙基準比較",
+      "url": "https://github.com/chad30877/chess-ai/issues/46",
+      "code": "R06",
+      "file": "issues/06-final-comparison.md",
+      "blocked_by": [
+        45
+      ],
+      "body_sha256": "a363eb13efe44d839acf06e864e533c9945499a7c3c1f61cfac410b3426dcde9"
+    },
+    {
+      "number": 47,
+      "title": "R07：以未曝光資料評估凍結候選",
+      "url": "https://github.com/chad30877/chess-ai/issues/47",
+      "code": "R07",
+      "file": "issues/07-heldout-evaluation.md",
+      "blocked_by": [
+        46
+      ],
+      "body_sha256": "989efcf6b501f12a0147cff412a268db4a85fa8d690bf430651318f885e2b790"
+    }
+  ]
+}
