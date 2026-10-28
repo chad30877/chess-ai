@@ -8,7 +8,7 @@ import pygame
 
 from engine.evaluation.config import EvaluationConfig
 from ui.evaluation_profiles import profile_button
-from ui.profile_selector import ProfileSelector
+from ui.profile_selector import ProfileSelector, rating_search
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.sessions.evaluation_comparison import ComparisonParticipant, ComparisonSearchConfig, _normalized_positions
 
@@ -45,6 +45,14 @@ class EvaluationFields:
             self.values[self.focus] = self.draft
         self.focus = None
         pygame.key.stop_text_input()
+
+    def rating_options(self):
+        try:
+            return dict(search=rating_search(self.values['depth'], self.values['search_workers'],
+                                             self.values['transposition_capacity']),
+                        max_plies=int(self.values['max_plies']) if self.values['max_plies'].strip() else None)
+        except ValueError:
+            return dict(search=dict(rating_search(1, 1, 1), depth_plies=0))
 
     def current_rule(self):
         rule = dict(field=self.weight_field, mode=self.weight_mode, values=self.values['weight_values'])
@@ -186,7 +194,7 @@ class EvaluationFields:
         elif action.startswith("comparison_file:"):
             self.commit()
             app.profile_selector = ProfileSelector(
-                self.project / 'configs/evaluation', [self.baseline], self.select_baseline)
+                self.project / 'configs/evaluation', [self.baseline], self.select_baseline, **self.rating_options())
         elif action == "comparison_files_next":
             self.file_page = (self.file_page + 1) % max(1, (len(self.candidates) + 6) // 7)
         elif action == "comparison_files_prev":
@@ -195,7 +203,7 @@ class EvaluationFields:
             self.commit()
             app.profile_selector = ProfileSelector(
                 self.project / 'configs/evaluation', self.candidates, self.select_candidates,
-                multiple=True, excluded=[self.baseline])
+                multiple=True, excluded=[self.baseline], **self.rating_options())
         elif action.startswith("comparison_candidate_select:"):
             index = int(action.split(":")[1])
             if 0 <= index < len(self.candidates):
@@ -203,7 +211,7 @@ class EvaluationFields:
                 app.profile_selector = ProfileSelector(
                     self.project / 'configs/evaluation', [current],
                     lambda paths: self.replace_candidate(index, paths[0]),
-                    excluded=[self.baseline, *(path for path in self.candidates if path != current)])
+                    excluded=[self.baseline, *(path for path in self.candidates if path != current)], **self.rating_options())
         elif action.startswith("comparison_candidate_remove:"):
             index = int(action.split(":")[1])
             if 0 <= index < len(self.candidates) and len(self.candidates) > 1:

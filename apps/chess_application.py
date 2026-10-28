@@ -22,7 +22,7 @@ from engine.sessions.batch_run import BatchSettings
 from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
 from ui.evaluation_profiles import profile_name, profile_summary, config_summary
-from ui.profile_selector import ProfileSelector
+from ui.profile_selector import ProfileSelector, rating_search
 from ui.learning_view import LearningView
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
@@ -562,7 +562,8 @@ class ChessApplication:
                 side = action.rsplit("_", 1)[1]
                 self.profile_selector = ProfileSelector(
                     PROJECT_ROOT / 'configs/evaluation', [self.batch_evaluation_files[side]],
-                    lambda paths: self.batch_evaluation_files.update({side: paths[0]}))
+                    lambda paths: self.batch_evaluation_files.update({side: paths[0]}),
+                    search=rating_search(self.batch_search_depth, self.batch_search_workers, self.batch_transposition_capacity))
                 return
         if self.mode == "auto" and action in ("interval", "count", "workers") and self.batch is None:
             self.evaluation_fields.commit()
@@ -590,7 +591,8 @@ class ChessApplication:
         elif action == "live_evaluation" and self.live is None:
             self.profile_selector = ProfileSelector(
                 PROJECT_ROOT / 'configs/evaluation', [self.live_evaluation_file],
-                lambda paths: setattr(self, 'live_evaluation_file', paths[0]))
+                lambda paths: setattr(self, 'live_evaluation_file', paths[0]),
+                search=rating_search(self.live_search_depth, self.live_search_workers, self.live_transposition_capacity))
         elif action == "live_depth" and self.live is None:
             depths = (1, 2, 3, 4, 5)
             self.live_search_depth = depths[(depths.index(self.live_search_depth) + 1) % len(depths)]
