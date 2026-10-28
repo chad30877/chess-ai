@@ -35,6 +35,13 @@ class CombinationUiTest(unittest.TestCase):
             view.run.future.result(timeout=35); app.render()
             self.assertEqual(view.state['status'],'completed',view.message)
             path = view.path
+            click('learning_inventory')
+            self.assertEqual(app.learning.page, 'inventory')
+            self.assertIsNone(app.learning.comparison.path)
+            click('learning_inventory_back')
+            click('learning_combination_kind:controls')
+            self.assertEqual(set(view.state['controls']['validation']['metrics']), {'material', 'mobility', 'king-safety', 'both'})
+            click('learning_combination_kind:direct')
             click('learning_combination_toggle:king-safety'); app.render()
             self.assertFalse(next(b for b in app.buttons if b.action == 'learning_combination_save').enabled)
             self.assertFalse(view.preview['direct']['terms']['king_pawn_shield']['enabled'])
@@ -58,3 +65,4 @@ class CombinationUiTest(unittest.TestCase):
             app.opponent = 'Greedy'; app.start_game()
             self.assertEqual(app.live.settings.black_evaluation.to_dict(),load_combination_candidate(path,'direct')['config'])
             app.close()
+
