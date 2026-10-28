@@ -47,6 +47,7 @@ class InventoryView:
                 app.text('階段：開局 '+stage('opening')+' · 中局 '+stage('middlegame')+' · 殘局 '+stage('endgame'), 50, 512, width=790)
                 app.text('來源 '+candidate['source']['experiment_id']+' · '+candidate['kind'], 50, 544, width=790)
                 app.text('來源與曝光：'+candidate['source']['test_data_identity'][:20]+' · 已曝光測試 '+str(len(candidate['source']['prior_test_experiments']))+' 份', 50, 576, width=790)
+                app.button('learning_inventory_screen', '選此候選進行短對局', (490, 650, 350, 34), primary=True)
             else: app.text('尚無有效候選', 50, 310, width=790)
             pages = max(1, (len(candidates)+4)//5)
         else:

@@ -16,7 +16,7 @@ from engine.storage.batch_storage import write_json_atomic
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def create_comparison(root, candidate, *, roles=('original','learned'), stable=False, opening_lines=None, max_plies=None):
+def create_comparison(root, candidate, *, roles=('original','learned'), stable=False, opening_lines=None, max_plies=None, screening=False):
     """預設正式32線；測試可提供小型合法線，不改搜尋及身份契約。"""
     source = deepcopy(candidate)
     for key in ('config','original','stable'): EvaluationConfig.from_dict(source[key])
@@ -32,7 +32,9 @@ def create_comparison(root, candidate, *, roles=('original','learned'), stable=F
     material = json.loads((ROOT/'configs/evaluation/learning-material.json').read_text(encoding='utf-8'))
     definitions = {}
     plan_id=uuid4().hex
-    for baseline,config in [('material',material)]+([('stable',source['stable'])] if stable else []):
+    baselines = [] if screening else [('material',material)]
+    baselines += [('stable',source['stable'])] if stable or screening else []
+    for baseline,config in baselines:
         side = lambda label,payload: ComparisonParticipant.alphabeta(label,EvaluationConfig.from_dict(payload),search=search)
         options = dict(baseline=side('純子力主基準' if baseline=='material' else 'stable 參考',config),
             candidates=[side('原始設定' if role=='original' else {'direct':'直接組合','joint':'聯合訓練'}.get(source['kind'],'學習設定'),
@@ -46,7 +48,7 @@ def create_comparison(root, candidate, *, roles=('original','learned'), stable=F
             item['id']=stable_id(dict(source=digest(source),role=role,config=item['config']))
         definition.pop('id'); definition['id']=stable_id(definition)
         definitions[baseline]=definition
-    path = Path(root)/'data/learning-comparisons'/plan_id
+    path = Path(root)/('data/learning-screening' if screening else 'data/learning-comparisons')/plan_id
     payload = dict(format_version=1,id=path.name,source=source,roles=roles,definitions=definitions,
                    planned_games=sum(d['planned_games'] for d in definitions.values()))
     payload['identity']=digest(payload)

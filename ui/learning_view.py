@@ -13,6 +13,7 @@ from ui.group_training_view import GroupTrainingView
 from ui.learned_comparison_view import LearnedComparisonView
 from ui.combination_view import CombinationView
 from ui.candidate_inventory_view import InventoryView
+from ui.screening_view import ScreeningView
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
@@ -44,6 +45,8 @@ class LearningView:
         self.comparison = LearnedComparisonView(root)
         self.combination = CombinationView(root)
         self.inventory = InventoryView()
+        self.screening = ScreeningView(root)
+        self.batch_return_page = 'comparison'
 
     def open_comparison(self, candidate):
         self.comparison.open(candidate)
@@ -112,7 +115,17 @@ class LearningView:
     def action(self, action, app):
         if self.page == 'inventory':
             if action == 'learning_inventory_back': self.page = 'combination'
+            elif action == 'learning_inventory_screen':
+                try:
+                    selected = self.inventory.report['candidates'][self.inventory.selected]
+                    self.screening.open(selected['source'], self.inventory.report['source_identity'])
+                    self.page = 'screening'
+                except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+                    self.combination.message = str(exc)
             else: self.inventory.action(action)
+            return
+        if self.page == 'screening':
+            self.screening.action(action, app)
             return
         if action == 'learning_inventory' and self.page == 'combination' and not self.active():
             try:
@@ -217,6 +230,9 @@ class LearningView:
     def render(self, app):
         if self.page == 'inventory':
             self.inventory.render(app)
+            return
+        if self.page == 'screening':
+            self.screening.render(app)
             return
         if self.page == 'comparison':
             self.comparison.render(app)

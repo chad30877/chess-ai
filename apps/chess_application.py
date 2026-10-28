@@ -517,7 +517,7 @@ class ChessApplication:
             return
         if action == 'learning_comparison_return':
             self.mode = 'learning'
-            self.learning.page = 'comparison'
+            self.learning.page = self.learning.batch_return_page
             return
         if self.mode == "records" and (action.startswith("records_") or action == "comparison_new"):
             self.records_view.action(action, self)
