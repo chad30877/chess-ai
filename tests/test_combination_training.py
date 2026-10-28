@@ -1,6 +1,7 @@
 """自選群組組合、固定對照及聯合求解的公開流程。"""
 import json
 import unittest
+from pathlib import Path
 from tests import test_weight_training as fixtures
 from engine.evaluation.config import EvaluationConfig
 from engine.learning.group_training import create_group_training, run_group_training, load_group_candidate
@@ -159,3 +160,33 @@ class CombinationBatchFlowTest(unittest.TestCase):
         self.assertTrue(all(item['status'] == 'pending' for item in saved['items']))
         with self.assertRaisesRegex(ValueError, '重複'):
             create_combination_batch(source, [['pawn', 'mobility'], ['mobility', 'pawn']])
+
+    def test_all_26_combinations_produce_same_source_direct_and_joint_results(self):
+        from engine.learning.combination_batch import create_combination_batch, load_combination_batch, run_combination_batch
+        from engine.learning.group_training import GROUPS
+        source = create_group_training(self.labels)
+        run_group_training(source)
+        singles = {group: load_group_candidate(source, group) for group in GROUPS}
+        batch = create_combination_batch(source)
+        run_combination_batch(batch)
+        saved = load_combination_batch(batch)
+        self.assertEqual(saved['status'], 'completed', saved['error'])
+        self.assertEqual(saved['completed'], 26)
+        for item in saved['items']:
+            with self.subTest(groups=item['groups']):
+                result = load_combination(item['path'])
+                self.assertEqual(result['status'], 'completed')
+                self.assertEqual(result['snapshot']['calibration_identity'], singles[item['groups'][0]]['calibration_identity'])
+                self.assertIn('曝光', result['snapshot']['data_use'])
+                direct = load_combination_candidate(item['path'], 'direct')
+                joint = load_combination_candidate(item['path'], 'joint')
+                self.assertEqual(direct['config'], preview_combination([singles[g] for g in item['groups']])['direct'])
+                self.assertEqual(joint['calibration_identity'], direct['calibration_identity'])
+                self.assertTrue(all(weight >= 0 for c in result['candidates'].values() for weight in c['solver']['weights']))
+                self.assertLessEqual(result['results']['joint']['frozen']['validation']['mae'],
+                    min(c['validation']['mae'] for c in result['candidates'].values()) + result['snapshot']['rules']['tie_tolerance'])
+        before = {item['path']: (Path(item['path'])/'joint'/'report.json').read_bytes() for item in saved['items']}
+        run_combination_batch(batch)
+        self.assertEqual(load_combination_batch(batch)['completed'], 26)
+        self.assertEqual(before, {item['path']: (Path(item['path'])/'joint'/'report.json').read_bytes() for item in saved['items']})
+
