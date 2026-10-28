@@ -114,7 +114,12 @@ def comparison_report(path):
             total={key:sum(o[key] for o in openings) for key in ('wins','draws','losses','unfinished','planned_games','pending_games','completed_pairs','incomplete_pairs','interrupted_attempts','elapsed_seconds')}
             teacher_role=role if role in plan['source']['report'].get('validation',{}) else 'learned'
             teacher={split:deepcopy(plan['source']['report'].get(split,{}).get(teacher_role)) for split in ('validation','test')}
-            rows.append(dict(id=item['id'],role=role,label=item['label'],config=item['config'],teacher=teacher,openings=openings,**total))
+            row=dict(id=item['id'],role=role,label=item['label'],config=item['config'],teacher=teacher,openings=openings,**total)
+            if baseline == 'stable':
+                from engine.learning.rating import profile_rating
+                row['rating'] = profile_rating(Path(path).parents[2], item['config'], search=definition['search'],
+                                               claim_draw=definition['claim_draw'], max_plies=definition['max_plies'])
+            rows.append(row)
         settings=manifest.get('settings',{})
         report['baselines'][baseline]=dict(status=summary.status if summary else 'not-started',path=batch,candidates=rows,
             requested_workers=settings.get('requested_workers',definition['workers']),actual_workers=settings.get('workers'),
