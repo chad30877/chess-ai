@@ -14,6 +14,7 @@ class LearnedComparisonView:
         self.roles={'original','learned'}; self.stable=False; self.baseline='material'
         self.page=0; self.candidate=0; self.config=False; self.config_page=0; self.config_side=0
         self.opening_index=None
+        self.rating_details=False; self.rating_page=0
         self.entries=[]; self.index=0
     def open(self,source):
         self.source=source; self.path=None; self.report=None; self.message=''; self.page=0; self.index=0
@@ -25,10 +26,13 @@ class LearnedComparisonView:
     def open_plan(self,path):
         self.path=Path(path); self.report=comparison_report(path); plan=self.report['plan']; self.source=plan['source']
         self.roles=set(plan['roles']); self.stable='stable' in plan['definitions']; self.baseline='material'; self.page=0; self.candidate=0
+        self.rating_details=False; self.rating_page=0
     def action(self,action,app):
         try:
             if action=='learning_compare_back': app.learning.page='groups'; return
             if action=='learning_compare_config': self.config=not self.config; self.config_page=0; return
+            if action=='learning_compare_rating': self.rating_details=not self.rating_details; self.rating_page=0; return
+            if action=='learning_compare_rating_next': self.rating_page+=1; return
             if action.startswith('learning_compare_opening:'): self.opening_index=int(action.split(':')[1]); return
             if action=='learning_compare_opening_back': self.opening_index=None; return
             if action=='learning_compare_config_next': self.config_page+=1; return
@@ -43,7 +47,7 @@ class LearnedComparisonView:
                 if role in self.roles: self.roles.remove(role)
                 else: self.roles.add(role)
             elif action.startswith('learning_compare_baseline:'):
-                self.baseline=action.split(':')[1]; self.page=0
+                self.baseline=action.split(':')[1]; self.page=0; self.rating_details=False
             elif action=='learning_compare_candidate': self.candidate+=1; self.page=0
             elif action in ('learning_compare_prev','learning_compare_next'):
                 self.page=max(0,self.page+(1 if action.endswith('next') else -1))
@@ -102,6 +106,19 @@ class LearnedComparisonView:
                 self._config(app,[definition['baseline']['config'],*[r['config'] for r in rows],
                     dict(search=definition['search'],workers=definition['workers'],claim_draw=definition['claim_draw'],max_plies=definition['max_plies'],base_seed=definition['base_seed'])],
                     ['基準',*[r['label'] for r in rows],'搜尋與規則'],top=390)
+            elif self.rating_details and self.baseline == 'stable':
+                rating=row['rating']; estimate=rating if rating['rating'] is not None else rating['provisional']
+                app.text('設定棋力來源與條件',50,390,width=790)
+                search=rating['conditions']['search']
+                app.text(f'Alpha-Beta {search["depth_plies"]}／q{search["quiescence_depth"]} · 每局 {search["search_workers"]} worker · TT {search["transposition_capacity"]}',50,423,width=790)
+                app.text('配對重抽樣以固定開局為限；樣本不足或無變化時無法估算區間。',50,455,muted=True,width=790)
+                sources=estimate['sources'] if estimate else []
+                pages=max(1,(len(sources)+2)//3); self.rating_page%=pages
+                if not sources: app.text('尚無符合條件的有效配對。',50,490,width=790)
+                for i,source in enumerate(sources[self.rating_page*3:self.rating_page*3+3]):
+                    app.text(source,50,490+i*30,width=790)
+                app.button('learning_compare_rating_next',f'來源 {self.rating_page+1}/{pages}',(50,602,240,30),enabled=pages>1)
+                app.button('learning_compare_rating','返回比較結果',(620,602,220,30))
             elif self.opening_index is not None:
                 opening=row['openings'][self.opening_index]; line=opening['line']
                 app.text(f'{opening["position_index"]}. '+line.get('name',''),50,390,width=790)
@@ -134,6 +151,7 @@ class LearnedComparisonView:
                 app.button('learning_compare_prev','上一頁',(50,602,145,30),enabled=self.page>0)
                 app.text(f'共同開局 {self.page+1}/{pages}',220,607,muted=True)
                 app.button('learning_compare_next','下一頁',(420,602,145,30),enabled=self.page+1<pages)
+                if self.baseline == 'stable': app.button('learning_compare_rating','棋力來源與條件',(620,602,220,30))
             active=app.batch is not None and not app.batch.future.done()
             app.button('learning_compare_start','開始／續跑此基準',(50,648,260,36),enabled=not active and data['status']!='completed',primary=True)
             app.button('learning_compare_records','逐局紀錄',(330,648,160,36),enabled=bool(data['path']))
