@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from engine.learning.comparison import comparison_options
+from engine.learning.final_comparison import freeze_final_comparison, load_final_comparison
 from engine.learning.screening import create_screening, load_screening, screening_report
 from engine.learning.teacher import digest
 from engine.sessions.comparison_run import ComparisonRun
@@ -16,11 +17,16 @@ class ScreeningView:
         self.message = ''
         self.selection_path = None
         self.selected = []
+        self.final_path = None
+        self.final_index = 0
 
     def open(self, candidate, source_identity):
         self.message = ''
         self.selection_path = self.root / 'data/learning-screening' / ('selection-' + source_identity + '.json')
         self.selected = json.loads(self.selection_path.read_text(encoding='utf-8')) if self.selection_path.exists() else []
+        pointer = self.selection_path.with_name(self.selection_path.stem + '-final.json')
+        self.final_path = Path(json.loads(pointer.read_text(encoding='utf-8'))['path']) if pointer.exists() else None
+        self.final_index = 0
         self.path = None
         for file in sorted((self.root / 'data/learning-screening').glob('*/snapshot.json')):
             try:
@@ -37,6 +43,21 @@ class ScreeningView:
         try:
             if action == 'learning_screening_back':
                 app.learning.page = 'inventory'
+            elif action == 'learning_screening_final_freeze':
+                self.final_path = freeze_final_comparison(self.root, self.selected)
+                write_json_atomic(self.selection_path.with_name(self.selection_path.stem + '-final.json'), {'path': str(self.final_path)})
+                self.final_index = 0
+            elif action == 'learning_screening_final_next':
+                self.final_index += 1
+            elif action == 'learning_screening_final_open':
+                final = load_final_comparison(self.final_path)
+                entry = final['candidates'][self.final_index % len(final['candidates'])]
+                app.learning.comparison.open(entry['source'])
+                app.learning.comparison.open_plan(entry['path'])
+                rows = app.learning.comparison.report['baselines']['material']['candidates']
+                app.learning.comparison.candidate = next(i for i, row in enumerate(rows) if row['role'] == 'learned')
+                app.learning.comparison.return_page = 'screening'
+                app.learning.page = 'comparison'
             elif action == 'learning_screening_start':
                 if app.batch and not app.batch.future.done():
                     raise ValueError('請先停止目前批次')
@@ -73,4 +94,10 @@ class ScreeningView:
         identity = digest(result['plan']['source']['config'])
         is_selected = any(digest(item['config']) == identity for item in self.selected)
         app.button('learning_screening_select', ('取消選定' if is_selected else '選定作完整比較候選') + f' · {len(self.selected)}/5', (50, 500, 390, 40), enabled=result['complete'])
-        app.text(self.message or '候選由研究者決定；不會自動啟動完整比較。', 50, 560, width=790)
+        app.button('learning_screening_final_freeze', '凍結完整比較候選', (50, 550, 280, 36), enabled=bool(self.selected))
+        if self.final_path:
+            final = load_final_comparison(self.final_path)
+            self.final_index %= len(final['candidates'])
+            app.button('learning_screening_final_next', f'候選 {self.final_index + 1}/{len(final["candidates"])}', (350, 550, 170, 36))
+            app.button('learning_screening_final_open', '預覽雙基準比較', (540, 550, 260, 36))
+        app.text(self.message or '候選由研究者決定；不會自動啟動完整比較。', 50, 610, width=790)

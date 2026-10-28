@@ -15,9 +15,9 @@ class LearnedComparisonView:
         self.page=0; self.candidate=0; self.config=False; self.config_page=0; self.config_side=0
         self.opening_index=None
         self.rating_details=False; self.rating_page=0
-        self.entries=[]; self.index=0
+        self.entries=[]; self.index=0; self.return_page='groups'
     def open(self,source):
-        self.source=source; self.path=None; self.report=None; self.message=''; self.page=0; self.index=0
+        self.source=source; self.path=None; self.report=None; self.message=''; self.page=0; self.index=0; self.return_page='groups'
         self.roles={'original','learned'}; self.stable=False; self.baseline='material'; self.config=False
         self.entries=[]
         for file in sorted((self.root/'data/learning-comparisons').glob('*/snapshot.json'),key=lambda p:p.stat().st_mtime,reverse=True):
@@ -29,7 +29,7 @@ class LearnedComparisonView:
         self.rating_details=False; self.rating_page=0
     def action(self,action,app):
         try:
-            if action=='learning_compare_back': app.learning.page='groups'; return
+            if action=='learning_compare_back': app.learning.page=self.return_page; return
             if action=='learning_compare_config': self.config=not self.config; self.config_page=0; return
             if action=='learning_compare_rating': self.rating_details=not self.rating_details; self.rating_page=0; return
             if action=='learning_compare_rating_next': self.rating_page+=1; return
