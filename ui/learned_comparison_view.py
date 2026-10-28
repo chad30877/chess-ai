@@ -116,7 +116,14 @@ class LearnedComparisonView:
                 def metric(split):
                     value=row['teacher'][split]
                     return f'{value["mae"]:.4f} ({value["games"]}盤/{value["positions"]}局面)' if value and value.get('mae') is not None else '無資料'
-                app.text('教師逐盤MAE：驗 '+metric('validation')+' · 測 '+metric('test'),50,423,width=790)
+                if self.baseline == 'stable':
+                    rating=row['rating']; estimate=rating if rating['rating'] is not None else rating['provisional']
+                    if estimate and estimate['rating'] is not None:
+                        label='正式' if rating['rating'] is not None else '暫估'
+                        app.text(f'{label}棋力 {estimate["rating"]:.0f} · {estimate["games"]}局 · {estimate["wins"]}勝{estimate["draws"]}和{estimate["losses"]}敗',50,423,width=790)
+                    else: app.text('棋力尚未評分 · 固定開局有限估計',50,423,width=790)
+                else:
+                    app.text('教師逐盤MAE：驗 '+metric('validation')+' · 測 '+metric('test'),50,423,width=790)
                 pages=max(1,(len(row['openings'])+2)//3); self.page=min(self.page,pages-1)
                 for index,opening in enumerate(row['openings'][self.page*3:self.page*3+3]):
                     y=462+index*44
@@ -132,7 +139,14 @@ class LearnedComparisonView:
             app.button('learning_compare_records','逐局紀錄',(330,648,160,36),enabled=bool(data['path']))
             app.button('learning_compare_replay','回放',(510,648,130,36),enabled=bool(data['replays']))
             app.button('learning_compare_save','另存候選',(660,648,180,36))
-        app.text(self.message or '教師誤差與對戰分開；有限觀察不保證棋力提升。',50,714,muted=True,width=790)
+        note='教師誤差與對戰分開；有限觀察不保證棋力提升。'
+        if self.path and self.baseline == 'stable' and not self.config and self.opening_index is None:
+            rating=row['rating']; estimate=rating if rating['rating'] is not None else rating['provisional']
+            if estimate and estimate['rating'] is not None:
+                bounds=estimate['interval']
+                interval=f'{bounds[0]:.0f}–{bounds[1]:.0f}' if bounds else '無法估算'
+                note=f'來源 {len(estimate["sources"])} 批 · 配對重抽樣區間 {interval} · 固定開局不保證普遍棋力'
+        app.text(self.message or note,50,714,muted=True,width=790)
     def _config(self,app,configs,labels,top):
         self.config_side%=len(configs); config=configs[self.config_side]
         app.button('learning_compare_config_side',labels[self.config_side]+'／切換',(50,top,230,30))
