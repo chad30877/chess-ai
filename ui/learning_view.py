@@ -12,6 +12,7 @@ from ui.training_view import TrainingView
 from ui.group_training_view import GroupTrainingView
 from ui.learned_comparison_view import LearnedComparisonView
 from ui.combination_view import CombinationView
+from ui.candidate_inventory_view import InventoryView
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
@@ -42,6 +43,7 @@ class LearningView:
         self.group_training = GroupTrainingView(root)
         self.comparison = LearnedComparisonView(root)
         self.combination = CombinationView(root)
+        self.inventory = InventoryView()
 
     def open_comparison(self, candidate):
         self.comparison.open(candidate)
@@ -108,6 +110,15 @@ class LearningView:
         self.teacher.open(path)
 
     def action(self, action, app):
+        if self.page == 'inventory':
+            if action == 'learning_inventory_back': self.page = 'combination'
+            else: self.inventory.action(action)
+            return
+        if action == 'learning_inventory' and self.page == 'combination' and not self.active():
+            try:
+                self.inventory.open(self.combination.source_path); self.page = 'inventory'
+            except (OSError, ValueError, KeyError) as exc: self.combination.message = str(exc)
+            return
         if self.page == 'comparison':
             self.comparison.action(action,app)
             return
@@ -204,6 +215,9 @@ class LearningView:
             self.message = f'無法開啟資料：{exc}'
 
     def render(self, app):
+        if self.page == 'inventory':
+            self.inventory.render(app)
+            return
         if self.page == 'comparison':
             self.comparison.render(app)
             return
