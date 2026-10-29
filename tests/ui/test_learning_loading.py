@@ -168,3 +168,47 @@ class LoadingUiTest(unittest.TestCase):
         app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
         self.assertEqual(app.learning.page, 'labeling')
         app.close()
+
+
+class RealLabelRecoveryTest(unittest.TestCase):
+    from tests import test_weight_training as fixtures
+    setUp = fixtures.TrainingFlowTest.setUp
+
+    def test_corrupt_saved_label_can_be_repaired_and_reloaded(self):
+        pygame.init(); self.addCleanup(pygame.quit)
+        import shutil
+        broken = self.labels.parent / 'broken'
+        shutil.copytree(self.labels, broken)
+        snapshot = broken / 'snapshot.json'
+        original = snapshot.read_bytes()
+        snapshot.write_text('{broken', encoding='utf-8')
+        os.utime(snapshot, (snapshot.stat().st_mtime + 5, snapshot.stat().st_mtime + 5))
+        executor = ManualExecutor()
+        app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        app.mode = 'learning'; app.learning.path = self.labels.parents[1]
+        app.learning.teacher.path = self.labels.parent.parent / 'pilot'
+        app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
+        app.learning.page = 'teacher'
+        def click(action):
+            app.render()
+            button = next(b for b in app.buttons if b.action == action)
+            self.assertTrue(button.enabled, action)
+            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+        click('learning_labels'); executor.finish(); app.render()
+        self.assertEqual(app.learning.labels.path, broken)
+        self.assertIn(str(broken), app.learning.labels.message)
+        self.assertFalse(next(b for b in app.buttons if b.action == 'learning_groups').enabled)
+        snapshot.write_bytes(original)
+        click('learning_labels_retry'); executor.finish(); app.render()
+        self.assertEqual(app.learning.labels.path, broken)
+        self.assertTrue(app.learning.labels.state['ready'])
+        snapshot.write_text('{broken', encoding='utf-8')
+        click('learning_labels_next'); executor.finish(); app.render()
+        self.assertEqual(app.learning.labels.path, self.labels)
+        self.assertTrue(app.learning.labels.state['ready'])
+        snapshot.write_bytes(original)
+        click('learning_labels_prev'); executor.finish(); app.render()
+        self.assertEqual(app.learning.labels.path, broken)
+        self.assertTrue(app.learning.labels.state['ready'])
+        self.assertTrue(next(b for b in app.buttons if b.action == 'learning_groups').enabled)
+        app.close()

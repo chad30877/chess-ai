@@ -46,7 +46,10 @@ class TeacherView:
         self.workers = default_teacher_workers()
         self.command = self.default_command
         entries = self.entries()
-        if entries: self.load(entries[0].parent)
+        if entries:
+            try: self.load(entries[0].parent)
+            except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+                raise ValueError(f'無法讀取先導 {entries[0].parent}：{exc}') from exc
 
     @staticmethod
     def _read_pilot(path):
