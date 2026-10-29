@@ -14,6 +14,8 @@ class TrainingUiTest(unittest.TestCase):
     setUp=fixtures.TrainingFlowTest.setUp
     def test_events_train_reopen_save_and_load_battle(self):
         pygame.init(); self.addCleanup(pygame.quit)
+        from engine.learning.training import create_training
+        create_training(self.labels)
         executor=ManualExecutor()
         with patch('apps.chess_application.PROJECT_ROOT',self.root):
             app=ChessApplication(pygame.display.set_mode(APP_SIZE),executor=executor)
@@ -32,8 +34,8 @@ class TrainingUiTest(unittest.TestCase):
                     app.render()
             click('mode:learning'); click('learning_nav_data')
             app.learning.open(self.labels.parents[1])
-            click('learning_teacher'); click('learning_labels'); click('learning_training')
-            click('learning_training_new'); executor.finish(); app.render()
+            click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_training')
+            click('learning_training_resume'); executor.finish(); app.render()
             view=app.learning.training
             self.assertEqual(view.state['status'],'completed',view.state.get('error'))
             path=view.path; test_report=(path/'report.json').read_bytes()
@@ -41,7 +43,7 @@ class TrainingUiTest(unittest.TestCase):
             app.close()
             app=ChessApplication(app.screen,executor=executor)
             click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
-            click('learning_teacher'); click('learning_labels'); click('learning_training')
+            click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_training')
             self.assertEqual(app.learning.training.path,path)
             self.assertEqual((path/'report.json').read_bytes(),test_report)
             click('learning_training_save')

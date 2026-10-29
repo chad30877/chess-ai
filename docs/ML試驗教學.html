@@ -37,14 +37,15 @@
 <figure id="04-labels-stop"><div class="shot"><img src="ml-guide/04-labels-stop.png" alt="標記停止，保留已提交紀錄" width="1280" height="960"><span class="mark" style="left:35.703%;top:23.229%">1</span></div><figcaption><strong>標記停止，保留已提交紀錄</strong><ul class="keys"><li><b>1</b> 只補未提交標記</li></ul></figcaption></figure>
 <figure id="05-labels-completed"><div class="shot"><img src="ml-guide/05-labels-completed.png" alt="完整標記與有效／排除分布" width="1280" height="960"><span class="mark" style="left:66.953%;top:15.938%">1</span><span class="mark" style="left:11.250%;top:71.979%">2</span></div><figcaption><strong>完整標記與有效／排除分布</strong><ul class="keys"><li><b>1</b> 五個單群組</li><li><b>2</b> 篩選與階段分布</li></ul></figcaption></figure>
 <h2 id="groups">2. 用共用尺度比較五個獨立群組</h2>
-<p>標記完成後進入「五個單群組」，選棋子位置、兵形、活動力、王安全或協調。每組都是子力加該組，未選群組保持關閉；共 16 個位置項、32 個中局／殘局係數。固定棋子價值 P/N/B/R/Q＝1/3/3/5/9、子力倍率 1 與階段規則。棋子位置是現有 PST 整組倍率，不是每格學一個值。</p>
+<p>以下操作畫面為舊版示意，按鈕位置以目前介面為準。</p>
+<p>標記完成後進入「評分權重學習」，新訓練預設全選，選棋子位置、兵形、活動力、王安全或協調。每組都是子力加該組，未選群組保持關閉；共 16 個位置項、32 個中局／殘局係數。固定棋子價值 P/N/B/R/Q＝1/3/3/5/9、子力倍率 1 與階段規則。棋子位置是現有 PST 整組倍率，不是每格學一個值。</p>
 <p>校準只用訓練組：以固定 stable 評分對教師 cp 計算逐盤等權、無截距的一個正倍率；所有選定群組共用它，不隨切組重估。stable 是參照，帶有自己的偏差，且原設定關閉分階段；它不是純子力，也不保證更強。殘差與奇偶盤子集倍率偏差用來辨識尺度不穩，異常時不作可靠排名；校準正常亦不代表教師或特徵沒有偏差。</p>
 <p>採非負擬合，加上偏離原始權重的軟性懲罰；零初始值仍能變正，不設統一百分比上限。弱／中／強三候選依逐盤驗證 MAE 選定，先凍結再對測試評估一次。版本、強度、尺度、容差與同分順序在開始前保存。五組與三候選共用整次八小時，不是每組八小時。</p>
 <figure id="06-groups-stop"><div class="shot"><img src="ml-guide/06-groups-stop.png" alt="兩組完成後停止，重開只補其餘" width="1280" height="960"><span class="mark" style="left:35.703%;top:27.396%">1</span></div><figcaption><strong>兩組完成後停止，重開只補其餘</strong><ul class="keys"><li><b>1</b> 只補未完成候選</li></ul></figcaption></figure>
 <figure id="07-groups-completed"><div class="shot"><img src="ml-guide/07-groups-completed.png" alt="原始／學習誤差與基準差異" width="1280" height="960"><span class="mark" style="left:11.250%;top:46.458%">1</span><span class="mark" style="left:31.797%;top:46.458%">2</span><span class="mark" style="left:11.250%;top:92.292%">3</span></div><figcaption><strong>原始／學習誤差與基準差異</strong><ul class="keys"><li><b>1</b> 切換階段</li><li><b>2</b> 查看權重</li><li><b>3</b> 完整設定另存</li></ul></figcaption></figure>
 <figure id="08-single-weights"><div class="shot"><img src="ml-guide/08-single-weights.png" alt="選中群組的中局／殘局權重" width="1280" height="960"><span class="mark" style="left:11.250%;top:92.292%">1</span><span class="mark" style="left:68.906%;top:92.292%">2</span></div><figcaption><strong>選中群組的中局／殘局權重</strong><ul class="keys"><li><b>1</b> 完整設定另存</li><li><b>2</b> 共同開局比較</li></ul></figcaption></figure>
 <p>MAE 是先算每盤平均絕對誤差、再各盤等權。切換開局／中局／殘局時同時查看盤數與局面數；無資料不是零誤差。相對純子力或 stable 的負差值表示誤差較小，不表示勝率。只有校準正常且驗證、測試都比原始改善才標示「優先觀察」，沒有固定改善百分比門檻，未勝過 stable 也可另存或做組合。</p>
-<p>已完成候選及報告重開不再求解或測試。改群組或條件選「新建並學習」。另建實驗仍沿用同一測試資料時，畫面保留已曝光來源；不能宣稱全新未見資料，也不要看完測試再反覆改參數。</p>
+<p>已完成候選及報告重開不再求解或測試。續跑使用原條件；改群組選「以此建立新訓練」。舊棋子位置成果可從單群組頁開啟。另建實驗仍沿用同一測試資料時，畫面保留已曝光來源；不能宣稱全新未見資料，也不要看完測試再反覆改參數。</p>
 <h2 id="combination">3. 活動力＋王安全：直接組合與聯合訓練分開看</h2>
 <p>五組頁按「組合」。預設活動力＋王安全，可明確勾選其他群組；先看實際開關、權重與候選數，按新建才套用。來源必須使用相容資料、校準與階段規則，不能默默混合不同尺度。王安全單組沒有勝出也保留這項預定搭配。</p>
 <figure id="11-combination-preview"><div class="shot"><img src="ml-guide/11-combination-preview.png" alt="明確選定組合後才建立" width="1280" height="960"><span class="mark" style="left:11.250%;top:27.396%">1</span><span class="mark" style="left:11.250%;top:55.104%">2</span></div><figcaption><strong>明確選定組合後才建立</strong><ul class="keys"><li><b>1</b> 所選組合＋聯合三候選</li><li><b>2</b> 實際權重與開關</li></ul></figcaption></figure>

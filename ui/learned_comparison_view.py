@@ -42,7 +42,11 @@ class LearnedComparisonView:
     def action(self,action,app):
         try:
             if self.refresh.error and action!='learning_compare_back': return
-            if action=='learning_compare_back': app.learning.page=self.return_page; return
+            if action=='learning_compare_back':
+                if self.return_page == 'groups':
+                    app.learning.group_training.compared = None
+                    app.learning.group_training.comparison_future = None
+                app.learning.page=self.return_page; return
             if action=='learning_compare_config': self.config=not self.config; self.config_page=0; return
             if action=='learning_compare_rating': self.rating_details=not self.rating_details; self.rating_page=0; return
             if action=='learning_compare_rating_next': self.rating_page+=1; return
