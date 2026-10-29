@@ -19,6 +19,7 @@ class LoadingUiTest(unittest.TestCase):
             (saved / 'snapshot.json').write_text('{}', encoding='utf-8')
             executor = ManualExecutor()
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.learning.saved_state_path = root / 'ui-state.json'; app.learning.saved_state = {}
             app.mode = 'learning'
             app.learning.path = root
             app.learning.teacher.path = root / 'pilot'
@@ -55,6 +56,7 @@ class LoadingUiTest(unittest.TestCase):
                 (saved / 'snapshot.json').write_text('{}', encoding='utf-8')
             executor = ManualExecutor()
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.learning.saved_state_path = root / 'ui-state.json'; app.learning.saved_state = {}
             app.mode = 'learning'
             app.learning.path = root
             app.learning.teacher.path = root / 'pilot'
@@ -89,6 +91,7 @@ class LoadingUiTest(unittest.TestCase):
             (saved / 'snapshot.json').write_text('{}', encoding='utf-8')
             executor = ManualExecutor()
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.learning.saved_state_path = root / 'ui-state.json'; app.learning.saved_state = {}
             app.mode = 'learning'; app.learning.path = root
             app.learning.teacher.path = root / 'pilot'
             app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
@@ -121,6 +124,7 @@ class LoadingUiTest(unittest.TestCase):
             (saved / 'dataset.json').write_text('{broken', encoding='utf-8')
             executor = ManualExecutor()
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.learning.saved_state_path = root / 'ui-state.json'; app.learning.saved_state = {}
             app.mode = 'learning'; app.learning.root = root
             app.render()
             button = next(b for b in app.buttons if b.action == 'learning_open:0')
@@ -141,6 +145,7 @@ class LoadingUiTest(unittest.TestCase):
                 (saved / 'status.json').write_text('{}', encoding='utf-8')
             executor = ManualExecutor()
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.learning.saved_state_path = root / 'ui-state.json'; app.learning.saved_state = {}
             app.mode = 'learning'; app.learning.page = 'teacher'
             app.learning.teacher.dataset = root
             app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
@@ -190,8 +195,9 @@ class RealLabelRecoveryTest(unittest.TestCase):
         os.utime(snapshot, (snapshot.stat().st_mtime + 5, snapshot.stat().st_mtime + 5))
         executor = ManualExecutor()
         app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        app.learning.saved_state_path = self.root / 'ui-state.json'; app.learning.saved_state = {}
         app.mode = 'learning'; app.learning.path = self.labels.parents[1]
-        app.learning.teacher.path = self.labels.parent.parent / 'pilot'
+        app.learning.teacher.path = next((self.labels.parents[1] / 'teacher-pilots').iterdir())
         app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
         app.learning.page = 'teacher'
         def click(action):
@@ -225,6 +231,7 @@ class RealLabelRecoveryTest(unittest.TestCase):
         pygame.init(); self.addCleanup(pygame.quit)
         executor = ManualExecutor()
         app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        app.learning.saved_state_path = self.root / 'ui-state.json'; app.learning.saved_state = {}
         app.mode = 'learning'; app.learning.page = 'training'
         app.learning.training.open(self.labels)
         selected = app.learning.training.entries[1].parent
@@ -250,6 +257,7 @@ class RealLabelRecoveryTest(unittest.TestCase):
         pygame.init(); self.addCleanup(pygame.quit)
         executor = ManualExecutor()
         app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        app.learning.saved_state_path = self.root / 'ui-state.json'; app.learning.saved_state = {}
         dataset = self.labels.parents[1]
         app.mode = 'learning'; app.learning.path = dataset
         app.learning.teacher.path = next((dataset / 'teacher-pilots').iterdir())
@@ -276,6 +284,7 @@ class RealLabelRecoveryTest(unittest.TestCase):
         pygame.init(); self.addCleanup(pygame.quit)
         executor = ManualExecutor()
         app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        app.learning.saved_state_path = self.root / 'ui-state.json'; app.learning.saved_state = {}
         from ui.learned_comparison_view import LearnedComparisonView
         app.learning.comparison = LearnedComparisonView(self.root)
         app.mode = 'learning'; app.learning.open_comparison(source)
@@ -299,6 +308,7 @@ class RealLabelRecoveryTest(unittest.TestCase):
         pygame.init(); self.addCleanup(pygame.quit)
         executor = ManualExecutor()
         app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        app.learning.saved_state_path = self.root / 'ui-state.json'; app.learning.saved_state = {}
         app.learning.comparison = LearnedComparisonView(self.root)
         app.mode = 'learning'; app.learning.open_comparison(source)
         with patch('ui.learned_comparison_view.comparison_report', side_effect=ValueError('報告損壞')):
@@ -317,6 +327,7 @@ class RealLabelRecoveryTest(unittest.TestCase):
         pygame.init(); self.addCleanup(pygame.quit)
         gate = Event()
         app = ChessApplication(pygame.display.set_mode(APP_SIZE))
+        app.learning.saved_state_path = self.root / 'ui-state.json'; app.learning.saved_state = {}
         self.addCleanup(app.close)
         busy = app.executor.submit(gate.wait)
         self.addCleanup(gate.set)
@@ -344,6 +355,7 @@ class RealLabelRecoveryTest(unittest.TestCase):
         executor = ManualExecutor()
         with patch('apps.chess_application.PROJECT_ROOT', self.root):
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.learning.saved_state_path = self.root / 'ui-state.json'; app.learning.saved_state = {}
             app.mode = 'learning'; app.learning.root = dataset.parent
             def click(action):
                 app.render()
