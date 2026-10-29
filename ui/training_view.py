@@ -76,7 +76,7 @@ class TrainingView:
         if s.get('snapshot'):
             source=s['snapshot']
             app.text(f'沿用標記 {source["label_identity"][:10]}… · 已有 {len(source.get("prior_test_experiments",[]))} 份實驗使用同資料測試',260,128,muted=True,width=580)
-        app.button('learning_training_new','新建並學習',(50,166,210,36),enabled=not active,primary=True)
+        app.button('learning_training_draft','以此建立新訓練',(50,166,210,36),enabled=not active,primary=True)
         app.button('learning_training_resume','續跑／重試',(280,166,210,36),enabled=bool(self.path) and not self.load_error and not report and not active)
         app.button('learning_training_stop','停止',(510,166,130,36),enabled=active)
         statuses={'queued':'準備中','running':'訓練中','completed':'完成','stopped':'已停止','failed':'失敗','interrupted':'待續跑','ready':'待開始'}
