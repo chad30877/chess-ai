@@ -41,7 +41,7 @@ class TaskNavigationTest(unittest.TestCase):
                 click('learning_pilot_start')
                 run = app.learning.teacher.run
                 original_path = app.learning.path
-                click('learning_data')
+                click('learning_nav_data')
                 self.assertEqual(app.learning.page, 'data')
                 self.assertFalse(run.future.done())
                 click('learning_open:1')

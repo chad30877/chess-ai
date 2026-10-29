@@ -368,7 +368,8 @@ class LearningView:
             self.page = 'teacher'
         elif page == 'labeling':
             if self.path and self.teacher.path and self.teacher.state.get('choice'):
-                if not self.labels.active():
+                if not self.labels.active() and not (self._labels_current() and (self.labels.path or self.labels.loading)):
+                    self._preserve_browsing_context()
                     key = f'labeling:{self.path}:{self.teacher.path}'
                     self.labels.open(self.path, self.teacher.path, app.read_executor, self.saved_state.get('selected', {}).get(key))
             self.page = 'labeling'
@@ -536,6 +537,7 @@ class LearningView:
             elif action.startswith('learning_results_open:'):
                 index = int(action.split(':')[1])
                 path = self.result_browser.entries[index].parent
+                self._preserve_browsing_context()
                 self.browse_result = True
                 self._open_page('groups', 'group_training', lambda: GroupTrainingView(self.teacher.project_root),
                                 (path.parents[1], path), 'results', app.read_executor)
@@ -610,7 +612,8 @@ class LearningView:
             return
         if action == 'learning_labels' and self.teacher.path and self.teacher.loading is None and self.teacher.state.get('choice'):
             try:
-                if not self.labels.active() and (not self.labels.run or self.labels._loaded_run is self.labels.run):
+                if not self.labels.active() and (not self.labels.run or self.labels._loaded_run is self.labels.run) and not (self._labels_current() and (self.labels.path or self.labels.loading)):
+                    self._preserve_browsing_context()
                     key = f'labeling:{self.path}:{self.teacher.path}'
                     preferred = self.saved_state.get('selected', {}).get(key)
                     self.labels.open(self.path, self.teacher.path, app.read_executor, preferred)
