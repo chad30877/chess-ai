@@ -1,12 +1,12 @@
 # UI01：載入立即回應並隔離過期結果
 
-狀態：待驗收。
+狀態：已完成。
 阻擋來源：無。
 對應決策：Q5、Q18。
 規格：[學習實驗導覽與操作改善](../spec.md)。
 索引：[本批工作票](../README.md)。
 
-本票部分實作，已完成的驗收以勾選及下方證據記錄；必要驗收未全數完成前，不宣稱解除阻擋。
+本票已完成實作、驗證與獨立審查，驗收證據見下方。
 
 ## 要交付的行為
 
@@ -37,8 +37,8 @@
 
 - [x] 更新受影響操作說明，反映本票實際交付行為。
 - [x] 記錄實際驗收證據及限制。
-- [ ] 同步本票、批次索引與開發計畫的狀態。
-- [ ] 建立繁體中文 Git commit，讀回核對提交與狀態。
+- [x] 同步本票、批次索引與開發計畫的狀態。
+- [x] 建立繁體中文 Git commit，讀回核對提交與狀態。
 
 ## 人工重現方式（尚未執行）
 
@@ -46,20 +46,22 @@
 
 ## 驗收證據與限制
 
-資料集、教師先導、教師標記、訓練、組合及候選盤點進頁已改為背景讀取；`python -m unittest tests.ui.test_learning_loading` 通過，使用手動控制背景工作驗證載入未結束可返回。此為部分實作：其他較慢讀取入口尚待全面核對；已調整相關整合測試等待背景讀取；`python -m unittest tests.ui.test_learning_loading tests.ui.test_teacher_labeling tests.ui.test_weight_training tests.ui.test_group_training tests.ui.test_labeling_estimates` 共 6 例通過（新增交錯讀取案例後單獨重跑通過）。使用既有 5,809 筆資料由 UI 事件唯讀量測，快取未控制（資料集與目錄已讀）：首次載入畫面 0.002 秒，完整驗證 2.118 秒。已核對的項目依下列證據勾選；其餘尚未完成全面驗收，依賴未解除。
+資料集、教師先導、教師標記、訓練、組合及候選盤點進頁已改為背景讀取；`python -m unittest tests.ui.test_learning_loading` 通過，使用手動控制背景工作驗證載入未結束可返回。初期切片已調整相關整合測試等待背景讀取；`python -m unittest tests.ui.test_learning_loading tests.ui.test_teacher_labeling tests.ui.test_weight_training tests.ui.test_group_training tests.ui.test_labeling_estimates` 共 6 例通過（新增交錯讀取案例後單獨重跑通過）。使用既有 5,809 筆資料由 UI 事件唯讀量測，快取未控制（資料集與目錄已讀）：首次載入畫面 0.002 秒，完整驗證 2.118 秒。其餘慢載入入口的後續驗證見以下紀錄。
 
-Agent 以 pygame 實際繪製並檢視 1280×960 教師標記載入畫面：載入提示可讀、返回可用、訓練與標記操作停用。資料與教師先導的背景讀取事件及損壞標記重試已新增測試；仍需檢查其餘慢頁與跨來源失效等完整情境。
+Agent 以 pygame 實際繪製並檢視 1280×960 教師標記載入畫面：載入提示可讀、返回可用、訓練與標記操作停用。資料與教師先導的背景讀取事件及損壞標記重試已新增測試；後續補充其餘慢頁與跨來源失效情境。
 
 回歸：`python -m unittest tests.ui.test_learning_loading tests.ui.test_teacher_pilot tests.ui.test_teacher_labeling tests.ui.test_labeling_estimates tests.ui.test_weight_training tests.ui.test_group_training tests.ui.test_chess_application` 共 63 例通過；`tests.ui.test_combination_training` 共 2 例、候選盤點完整覆蓋案例及 `tests.ui.test_heldout` 各 1 例通過。
 
 `tests.ui.test_learning_loading.RealLabelRecoveryTest` 使用真實已保存標記，損壞快照後核對來源與停用操作，修復後按重新讀取，再改選另一份並回到原來源；測試通過。
 
-`tests.ui.test_learning_loading` 透過應用程式滑鼠事件控制背景工作完成順序，驗證返回、交錯讀取、未完成時點擊開始不會建立任務，以及真實標記損壞修復。尚需核對所有較慢讀取入口及完整文件結案。
+`tests.ui.test_learning_loading` 透過應用程式滑鼠事件控制背景工作完成順序，驗證返回、交錯讀取、未完成時點擊開始不會建立任務，以及真實標記損壞修復。後續已核對其他較慢讀取入口並完成文件同步。
 
 群組、舊單組與組合成果切換改為背景讀取；`tests.ui.test_learning_loading.RealLabelRecoveryTest.test_switching_training_results_can_be_left_while_loading` 通過，驗證返回、重新選取與過期讀取不覆蓋。篩選與比較入口背景載入後，相關組合、篩選、保留及比較共 10 例通過。
 
-教師標記任務完成後重新驗證也移至背景；實際短任務完成後，在驗證工作未完成時以 UI 事件返回教師先導的測試通過。篩選與比較頁的報告重新驗證改為背景定期讀取；讀取錯誤顯示來源、停用依賴操作並可返回，之後會繼續重試。已進行合併後跨頁回歸；尚待審查及結案同步。
+教師標記任務完成後重新驗證也移至背景；實際短任務完成後，在驗證工作未完成時以 UI 事件返回教師先導的測試通過。篩選與比較頁的報告重新驗證改為背景定期讀取；讀取錯誤顯示來源、停用依賴操作並可返回，之後會繼續重試。已進行合併後跨頁回歸及獨立審查。
 
 比較紀錄切換與報告重新驗證可在背景讀取時返回；`tests.ui.test_learning_loading` 的應用程式事件案例涵蓋紀錄切換與報告損壞提示。
 
 UI03 整合後，讀取使用獨立背景執行緒，忙碌任務占用工作執行緒時仍可讀取已保存標記；新增實際應用程式測試通過。另以真實資料驗證損壞最新先導不阻擋資料集，能在先導頁改選較早正常成果。
+
+整合分支以專案虛擬環境執行載入、跨頁、教師、學習、比較、候選盤點及篩選相關 unittest，共 89 項通過。獨立審查發現執行任務時切換失效資料的來源保護問題，修正後複審確認無剩餘阻擋。人工重現方式僅供操作參考。
