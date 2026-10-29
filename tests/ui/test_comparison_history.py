@@ -163,6 +163,13 @@ class ComparisonHistoryTest(unittest.TestCase):
             self.assertTrue(any('很長的比較紀錄名稱' in str(call.args[1]) for call in buttons.call_args_list))
             self.assertEqual(app.learning.saved_state['names'][str(path)], '很長的比較紀錄名稱供辨識與再次查找')
             app.close()
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor); app.new_setup('learning')
+            click('learning_goal_compare'); executor.finish(); app.render()
+            click('learning_inventory_history'); executor.finish(); app.render()
+            self.assertEqual(app.learning.saved_state['selected']['comparison_history'], str(path))
+            with patch.object(app, 'button', wraps=app.button) as buttons: app.render()
+            self.assertTrue(any('很長的比較紀錄名稱' in str(call.args[1]) for call in buttons.call_args_list))
+            app.close()
 
     def test_bundle_rejects_duplicate_source_and_missing_candidate(self):
         from engine.learning.teacher import digest
@@ -235,3 +242,21 @@ class ComparisonHistoryTest(unittest.TestCase):
                     self.assertEqual(comparison_report(plan)['baselines']['stable']['status'], 'not-started')
             finally:
                 release.set(); app.close()
+    def test_unplayed_candidate_is_identified_as_not_compared(self):
+        from tests import test_weight_training as fixtures
+        from engine.learning.training import create_training, run_training
+        case = fixtures.TrainingFlowTest(); case.setUp()
+        try:
+            path = create_training(case.labels); run_training(path)
+            pygame.init(); self.addCleanup(pygame.quit)
+            with patch('apps.chess_application.PROJECT_ROOT', case.root):
+                executor = ManualExecutor(); app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+                app.learning.root = case.root / 'data'
+                app.new_setup('learning')
+                app.render(); button = next(b for b in app.buttons if b.action == 'learning_goal_compare')
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                executor.finish()
+                with patch.object(app, 'text', wraps=app.text) as draw: app.render()
+                self.assertTrue(any('尚未比較' in str(call.args[0]) for call in draw.call_args_list))
+                app.close()
+        finally: case.doCleanups()

@@ -20,6 +20,21 @@ class InventoryView:
     def open_first(self, root):
         self.report = load_all_candidate_inventory(root)
         self.report['all_sources'] = True
+        from pathlib import Path
+        from engine.learning.teacher import digest
+        from engine.learning.comparison import comparison_report
+        compared, uncertain = set(), False
+        project = Path(root).parent if Path(root).name == 'data' else Path(root).parents[1]
+        for folder in ('learning-screening', 'learning-comparisons'):
+            for path in (project / 'data' / folder).glob('*'):
+                if not path.is_dir(): continue
+                try:
+                    result = comparison_report(path)
+                    if any(row['wins'] + row['draws'] + row['losses'] for baseline in result['baselines'].values() for row in baseline['candidates']):
+                        compared.add(digest(result['plan']['source']))
+                except (OSError, ValueError, KeyError, TypeError, IndexError): uncertain = True
+        for item in self.report['candidates']:
+            item['comparison_status'] = '已有對戰' if digest(item['source']) in compared else ('比較狀態無法確認' if uncertain else '尚未比較')
         self.tab = 'candidates'; self.page = self.selected = 0
         self.selected_indices = set(); self.origin_filter = self.group_filter = None
 
@@ -110,7 +125,7 @@ class InventoryView:
             tick = '[x] ' if index in self.selected_indices else '[ ] '
             detail = f"{tick}{kinds[item['origin']]} · {label} · {source['experiment_id'][-8:]} · 資料 {source['dataset_identity'][:10]}"
             app.button(f'learning_inventory_candidate:{index}', detail, (50, 195 + row_index * 60, 790, 36))
-            app.text(f"教師誤差 {item['mae']:.4f} · 標記 {source['label_identity'][:10]}", 70, 232 + row_index * 60, muted=True, width=750)
+            app.text(f"教師誤差 {item['mae']:.4f} · {item['comparison_status']} · 標記 {source['label_identity'][:10]}", 70, 232 + row_index * 60, muted=True, width=750)
         errors = self.report['errors']
         if errors: app.text(f'未完成或不可用 {len(errors)} 份 · …{errors[0]["path"][-60:]} · {errors[0]["error"]}', 50, 530, width=790)
         app.button('learning_inventory_prev', '上頁', (50, 650, 130, 34), enabled=self.page > 0)

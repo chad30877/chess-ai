@@ -69,7 +69,12 @@ class LearnedComparisonView:
                 if self.return_page == 'groups':
                     app.learning.group_training.compared = None
                     app.learning.group_training.comparison_future = None
-                app.learning.page=self.return_page; return
+                if self.return_page == 'history_bundle':
+                    from ui.comparison_history_view import ComparisonBundleHistory
+                    app.learning._open_page('history_bundle', 'history_bundle', ComparisonBundleHistory,
+                                            app.learning.history_bundle.path, 'history', app.read_executor)
+                else: app.learning.page=self.return_page
+                return
             if action=='learning_compare_config': self.config=not self.config; self.config_page=0; return
             if action=='learning_compare_rating': self.rating_details=not self.rating_details; self.rating_page=0; return
             if action=='learning_compare_rating_next': self.rating_page+=1; return

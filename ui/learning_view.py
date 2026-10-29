@@ -129,6 +129,7 @@ class LearningView:
         self.inventory = InventoryView()
         self.comparison_history = ComparisonHistoryView()
         self.history_bundle = ComparisonBundleHistory()
+        self.batch_history_bundle = None
         self.screening = ScreeningView(root)
         self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
@@ -785,6 +786,7 @@ class LearningView:
                 app.batch = ComparisonBundleRun(data['work'], data['planned_games'], app.executor, bundle_path=self.history_bundle.path)
                 app.learning_batch = app.batch; app.batch_mode = 'evaluation'; app.mode = 'auto'; app.batch_games_page = 0
                 self.batch_return_page = 'history_bundle'
+                self.batch_history_bundle = self.history_bundle
             return
         if self.page == 'screening':
             if action == 'learning_screening_heldout':

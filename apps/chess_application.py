@@ -598,6 +598,8 @@ class ChessApplication:
             self.mode = 'learning'
             self.learning.page = self.learning.batch_return_page
             if self.learning.page == 'history_bundle':
+                if self.learning.batch_history_bundle is not None:
+                    self.learning.history_bundle = self.learning.batch_history_bundle
                 from ui.comparison_history_view import ComparisonBundleHistory
                 self.learning._open_page('history_bundle', 'history_bundle', ComparisonBundleHistory,
                                          self.learning.history_bundle.path, 'history', self.read_executor)
