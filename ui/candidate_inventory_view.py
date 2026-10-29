@@ -1,5 +1,5 @@
 """已保存研究結果的盤點與候選清單。"""
-from engine.learning.candidate_inventory import load_candidate_inventory
+from engine.learning.candidate_inventory import load_candidate_inventory, load_all_candidate_inventory
 from engine.learning.group_training import GROUPS
 
 
@@ -9,31 +9,49 @@ class InventoryView:
         self.tab = 'candidates'
         self.page = 0
         self.selected = 0
+        self.selected_indices = set()
+        self.origin_filter = None
+        self.group_filter = None
 
     def open(self, path):
         self.report = load_candidate_inventory(path)
         self.tab = 'candidates'; self.page = self.selected = 0
 
     def open_first(self, root):
-        for entry in sorted(root.glob('*/teacher-labels/*/group-training/*/snapshot.json'), reverse=True):
-            try:
-                report = load_candidate_inventory(entry.parent)
-                if report.get('candidates'):
-                    self.report = report
-                    return
-            except (OSError, ValueError, KeyError, TypeError):
-                continue
-        self.report = None
+        self.report = load_all_candidate_inventory(root)
+        self.report['all_sources'] = True
+        self.tab = 'candidates'; self.page = self.selected = 0
+        self.selected_indices = set(); self.origin_filter = self.group_filter = None
+
+    def filtered(self):
+        return [(index, row) for index, row in enumerate(self.report['candidates'])
+                if (self.origin_filter is None or row['origin'] == self.origin_filter)
+                and (self.group_filter is None or self.group_filter in row['groups'])]
 
     def action(self, action):
-        if action == 'learning_inventory_tab':
+        if self.report.get('all_sources') and action == 'learning_inventory_origin':
+            values = [None, 'legacy', 'group', 'combination']
+            self.origin_filter = values[(values.index(self.origin_filter) + 1) % len(values)]
+            self.page = 0
+        elif self.report.get('all_sources') and action == 'learning_inventory_group':
+            values = [None, *GROUPS]
+            self.group_filter = values[(values.index(self.group_filter) + 1) % len(values)]
+            self.page = 0
+        elif action == 'learning_inventory_tab':
             self.tab = 'coverage' if self.tab == 'candidates' else 'candidates'; self.page = 0
         elif action == 'learning_inventory_next': self.page += 1
         elif action == 'learning_inventory_prev': self.page = max(0, self.page - 1)
         elif action.startswith('learning_inventory_candidate:'):
             self.selected = int(action.split(':')[1])
+            if self.report.get('all_sources'):
+                if self.selected in self.selected_indices:
+                    self.selected_indices.remove(self.selected)
+                    if self.selected_indices: self.selected = min(self.selected_indices)
+                else: self.selected_indices.add(self.selected)
 
     def render(self, app):
+        if self.report.get('all_sources'):
+            return self.render_all(app)
         report = self.report
         app.text('組合研究 · 候選盤點', 50, 78, large=True)
         app.button('learning_inventory_back', '返回組合' if app.learning.inventory_return == 'combination' else '返回學習', (50, 120, 170, 34))
@@ -74,3 +92,28 @@ class InventoryView:
         app.button('learning_inventory_prev', '上頁', (50, 650, 130, 34), enabled=self.page>0)
         app.text(f'{self.page+1}/{pages}', 205, 658)
         app.button('learning_inventory_next', '下頁', (300, 650, 130, 34), enabled=self.page+1<pages)
+
+    def render_all(self, app):
+        rows = self.filtered()
+        pages = max(1, (len(rows) + 4) // 5)
+        self.page = min(self.page, pages - 1)
+        kinds = {'legacy': '舊棋子位置', 'group': '單群組', 'combination': '組合'}
+        app.text('比較候選', 50, 78, large=True)
+        app.button('learning_inventory_back', '返回學習', (50, 120, 170, 34))
+        app.button('learning_inventory_origin', '來源：' + kinds.get(self.origin_filter, '全部'), (240, 120, 250, 34))
+        app.button('learning_inventory_group', '群組：' + GROUPS.get(self.group_filter, '全部'), (510, 120, 330, 34))
+        if not rows: app.text('沒有符合條件的候選', 50, 200)
+        for row_index, (index, item) in enumerate(rows[self.page * 5:self.page * 5 + 5]):
+            source = item['source']
+            label = '、'.join(GROUPS.get(group, group) for group in item['groups'])
+            tick = '[x] ' if index in self.selected_indices else '[ ] '
+            detail = f"{tick}{kinds[item['origin']]} · {label} · {source['experiment_id'][-8:]} · 資料 {source['dataset_identity'][:10]}"
+            app.button(f'learning_inventory_candidate:{index}', detail, (50, 195 + row_index * 60, 790, 36))
+            app.text(f"教師誤差 {item['mae']:.4f} · 標記 {source['label_identity'][:10]}", 70, 232 + row_index * 60, muted=True, width=750)
+        errors = self.report['errors']
+        if errors: app.text(f'未完成或不可用 {len(errors)} 份 · …{errors[0]["path"][-60:]} · {errors[0]["error"]}', 50, 530, width=790)
+        app.button('learning_inventory_prev', '上頁', (50, 650, 130, 34), enabled=self.page > 0)
+        app.text(f'{self.page + 1}/{pages} · 已選 {len(self.selected_indices)}', 205, 658)
+        app.button('learning_inventory_next', '下頁', (300, 650, 130, 34), enabled=self.page + 1 < pages)
+        if self.selected_indices:
+            app.button('learning_inventory_screen', '選此候選進行短對局', (490, 650, 350, 34), primary=True)

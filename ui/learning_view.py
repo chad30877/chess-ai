@@ -648,7 +648,7 @@ class LearningView:
                 try:
                     selected = self.inventory.report['candidates'][self.inventory.selected]
                     self._open_page('screening', 'screening', lambda: ScreeningView(self.teacher.project_root),
-                                    (selected['source'], self.inventory.report['source_identity']), 'inventory', app.read_executor)
+                                    (selected['source'], self.inventory.report.get('source_identity', selected['source']['snapshot_identity'])), 'inventory', app.read_executor)
                 except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
                     self.combination.message = str(exc)
             else: self.inventory.action(action)

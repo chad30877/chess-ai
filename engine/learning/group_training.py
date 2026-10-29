@@ -72,15 +72,18 @@ def create_group_training(label_path, groups=None, *, run_path=None):
     return path
 
 
-def load_group_training(path):
+def load_group_training(path, *, only_group=None):
     """只讀已提交結果；摘要落後不覆蓋候選及各組正式報告。"""
     path = Path(path); snapshot = _verified(path / 'snapshot.json')
     if snapshot.get('format_version') != 1 or snapshot.get('kind') != 'independent-groups':
         raise ValueError('群組學習快照版本不符')
     calibration = _verified(path / 'calibration.json') if (path / 'calibration.json').exists() else None
     if calibration and calibration.get('snapshot_identity') != snapshot['identity']: raise ValueError('校準身份不符')
+    if only_group is not None and only_group not in snapshot['groups']:
+        raise ValueError('群組不屬於此學習快照')
     groups = {}
     for group in snapshot['groups']:
+        if only_group is not None and group != only_group: continue
         root = path / 'groups' / group
         candidates = {}
         for file in (root / 'candidates').glob('*.json'):
@@ -224,7 +227,7 @@ def run_group_training(path, *, stop=None, progress=lambda state: None, now=mono
 
 def load_group_candidate(path, group):
     """後續組合及對戰共用的完整候選與來源身份。"""
-    saved = load_group_training(path); result = saved['groups'][group]
+    saved = load_group_training(path, only_group=group); result = saved['groups'][group]
     if not result['report']: raise ValueError('此群組尚未完成凍結測試')
     snapshot = saved['snapshot']; frozen = result['frozen']
     return dict(kind='single', groups=[group], experiment_id=snapshot['id'], snapshot_identity=snapshot['identity'],
