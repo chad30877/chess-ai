@@ -130,6 +130,9 @@ class LearningView:
 
     def action(self, action, app):
         task = self.active_task()
+        if task and action.startswith('learning_budget:'):
+            self.teacher.message = f'目前執行中：{task[1]}，請先停止或等待完成'
+            return
         if action in START_ACTIONS:
             batch = getattr(app, 'batch', None)
             running = task[1] if task else ('比較' if batch and not batch.future.done() else None)

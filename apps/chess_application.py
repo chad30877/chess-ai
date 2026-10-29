@@ -840,6 +840,8 @@ class ChessApplication:
             self.move_view.handle_wheel(event.pos, 1 if event.button == 4 else -1, items)
 
     def button(self, action, label, rect, *, enabled=True, primary=False):
+        if action.startswith('learning_budget:') and self.learning.active_task():
+            enabled = False
         if action in START_ACTIONS and (self.learning.active_task() or
                 (self.batch and not self.batch.future.done())):
             enabled = False
