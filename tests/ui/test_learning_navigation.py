@@ -203,6 +203,7 @@ class MainEntryCoverageTest(unittest.TestCase):
                 click('learning_nav_inventory')
                 if page == 'inventory': return
                 if page in ('screening', 'heldout'):
+                    click('learning_inventory_candidate:0')
                     click('learning_inventory_screen')
                     if page == 'heldout':
                         app.learning.screening.final_path = final_path
