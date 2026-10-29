@@ -36,7 +36,7 @@ UI04、UI05 已完成；本票已依下列證據驗收。
 ## 驗證安排
 
 沿用 `tests/test_weight_training.py`、`tests/test_group_training.py` 及對應 UI 測試，使用小資料真實求解；組合公開入口只做相關回歸。
-共通測試與結案規則見[索引](../README.md#驗收與結案規則)及[專案規範](../../../docs/agents/issue-tracker.md)。
+共通測試與結案規則見[索引](../README.md#驗收與結案規則)及[專案規範](../../../../docs/agents/issue-tracker.md)。
 
 ## 文件與提交
 
