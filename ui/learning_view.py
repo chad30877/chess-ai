@@ -402,11 +402,12 @@ class LearningView:
                 if (path / 'dataset.json').exists():
                     self._open_async(path, app.read_executor)
                 else:
-                    saved = json.loads((path / 'status.json').read_text(encoding='utf-8'))
+                    self._preserve_task_context()
                     self.loading = None
                     self.path = path
                     self.data = None
                     self.run = None
+                    saved = json.loads((path / 'status.json').read_text(encoding='utf-8'))
                     self.message = f'{path}：' + saved.get('error', '資料尚未完成或不可用；請建立新實驗重試')
             elif action in ('learning_prev', 'learning_next') and self.data:
                 self.sample_index = (self.sample_index + (1 if action.endswith('next') else -1)) % max(1, len(self.data['positions']))
@@ -418,7 +419,7 @@ class LearningView:
                                      result='*', metadata={'name': '學習局面', 'game_id': sample['game_id']}), '學習資料預覽')
                 app.replay.goto_ply(len(sample['moves_uci']))
         except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
-            self.message = f'無法開啟資料：{exc}'
+            self.message = f'無法開啟資料 {self.path or self.root}：{exc}'
 
     def render(self, app):
         self._poll_loading()

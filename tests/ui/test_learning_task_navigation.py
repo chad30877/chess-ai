@@ -213,3 +213,32 @@ class TaskNavigationTest(unittest.TestCase):
                 click('learning_task_stop')
                 executor.finish(next(i for i, job in enumerate(executor.jobs) if job[0] is second.future))
                 self.assertEqual(second.snapshot()['status'], 'stopped')
+
+    def test_missing_dataset_does_not_replace_running_pilot_source(self):
+        pygame.init(); self.addCleanup(pygame.quit)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); source = root / 'games.pgn'
+            source.write_text(pgn_games(8), encoding='utf-8')
+            valid = create_dataset(root / 'data/learning', source)
+            broken = create_dataset(root / 'data/learning', source)
+            (broken / 'dataset.json').unlink()
+            executor = ManualExecutor()
+            with patch('apps.chess_application.PROJECT_ROOT', root):
+                app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+                self.addCleanup(app.close)
+                app.mode = 'learning'; app.learning.open(valid); app.learning.page = 'teacher'
+                app.learning.teacher.command = make_engine(root)
+                def click(action):
+                    app.render(); button = next(b for b in app.buttons if b.action == action)
+                    self.assertTrue(button.enabled, action)
+                    app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                click('learning_pilot_start'); run = app.learning.teacher.run
+                click('learning_data')
+                index = next(i for i, entry in enumerate(app.learning.entries()) if entry.parent == broken)
+                click(f'learning_open:{index}')
+                self.assertEqual(app.learning.path, broken)
+                self.assertIsNone(app.learning.data)
+                click('learning_task_return')
+                self.assertEqual(app.learning.path, valid)
+                self.assertIs(app.learning.teacher.run, run)
+                self.assertIsNotNone(app.learning.data)
