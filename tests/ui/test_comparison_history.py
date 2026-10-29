@@ -79,6 +79,9 @@ class ComparisonHistoryTest(unittest.TestCase):
             click('learning_compare_config'); click('learning_compare_config')
             click('learning_compare_replay'); self.assertEqual(app.mode, 'replay')
             self.assertEqual(app.replay_return, 'learning')
+            click('learning_comparison_return')
+            self.assertEqual(app.learning.page, 'comparison')
+            self.assertEqual(app.learning.comparison.path, path)
             app.close()
     def test_damaged_record_does_not_hide_valid_record(self):
         pygame.init(); self.addCleanup(pygame.quit)

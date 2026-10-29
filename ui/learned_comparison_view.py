@@ -104,7 +104,9 @@ class LearnedComparisonView:
                 if data['path']: app.show_records(batch_id=data['path'].name)
             elif action=='learning_compare_replay' and self.path:
                 data=comparison_report(self.path)['baselines'][self.baseline]
-                if data['replays']: app.open_replay(str(data['replays'][-1]),return_to='learning')
+                if data['replays']:
+                    app.learning.batch_return_page = 'comparison'
+                    app.open_replay(str(data['replays'][-1]),return_to='learning')
             elif action=='learning_compare_save' and self.path:
                 data=comparison_report(self.path)['baselines'][self.baseline]['candidates']
                 row=data[self.candidate%len(data)]

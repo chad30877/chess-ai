@@ -766,6 +766,7 @@ class LearningView:
             elif action == 'learning_history_next': self.comparison_history.page += 1
             elif action.startswith('learning_history_open:'):
                 entry = self.comparison_history.entries[int(action.split(':')[1])]
+                self._remember('comparison_history', entry['path'])
                 if entry.get('bundle'):
                     self._open_page('history_bundle', 'history_bundle', ComparisonBundleHistory, entry['path'], 'history', app.read_executor)
                 else:

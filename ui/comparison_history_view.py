@@ -10,6 +10,14 @@ from engine.learning.comparison_setup import load_saved_setup as load_bundle
 
 from engine.learning.final_comparison import load_final_comparison
 
+def _status(statuses):
+    if all(value == 'completed' for value in statuses): return 'completed'
+    if any(value == 'failed' for value in statuses): return 'failed'
+    if any(value in ('generating', 'running') for value in statuses): return 'running'
+    if all(value == 'not-started' for value in statuses): return 'not-started'
+    return 'stopped'
+
+
 class ComparisonHistoryView:
     def __init__(self):
         self.entries = []
@@ -33,7 +41,7 @@ class ComparisonHistoryView:
                     source = report['plan']['source']
                     baselines = report['baselines']
                     statuses = [value['status'] for value in baselines.values()]
-                    status = 'completed' if all(value == 'completed' for value in statuses) else ('not-started' if all(value == 'not-started' for value in statuses) else 'stopped')
+                    status = _status(statuses)
                     self.entries.append(dict(path=path, purpose=kind, source=source, status=status, error=''))
                 except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
                     self.entries.append(dict(path=path, purpose=kind, source=None, status='invalid', error=str(exc)))
@@ -42,7 +50,7 @@ class ComparisonHistoryView:
             try:
                 bundle, reports = load_bundle(path)
                 statuses = [item['status'] for item in reports]
-                status = 'completed' if all(item == 'completed' for item in statuses) else ('not-started' if all(item == 'not-started' for item in statuses) else 'stopped')
+                status = _status(statuses)
                 self.entries.append(dict(path=path, purpose=bundle['purpose'], source=bundle['sources'][0], status=status, error='', bundle=True))
             except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
                 self.entries.append(dict(path=path, purpose='comparison', source=None, status='invalid', error=str(exc), bundle=True))
@@ -53,7 +61,7 @@ class ComparisonHistoryView:
 
     def render(self, app):
         labels = {'screening':'快速篩選', 'final':'完整比較', 'comparison':'原始／學習對照'}
-        statuses = {'completed':'完成', 'not-started':'未開始', 'stopped':'未完成', 'invalid':'不可用'}
+        statuses = {'completed':'完成', 'not-started':'未開始', 'stopped':'未完成', 'failed':'失敗', 'running':'執行中', 'invalid':'不可用'}
         pages = max(1, (len(self.entries)+5)//6)
         self.page = min(self.page, pages-1)
         app.text('比較紀錄', 50, 78, large=True)
@@ -66,8 +74,10 @@ class ComparisonHistoryView:
             except OSError:
                 date = '日期不明'; entry['status'] = 'invalid'; entry['error'] = '紀錄已不存在'; entry['source'] = source = None
             name = app.learning.saved_state.get('names', {}).get(key, date + ' ' + labels[entry['purpose']])
+            if app.learning.saved_state.get('selected', {}).get('comparison_history') == key: name = '✓ ' + name
             detail = source['experiment_id'][-8:] if source else entry['error']
-            app.button('learning_history_open:'+str(index), f'{name} · {labels[entry["purpose"]]} · {statuses[entry["status"]]} · {detail}', (50, 175+i*65, 790, 42))
+            app.button('learning_history_open:'+str(index), name, (50, 175+i*65, 430, 42))
+            app.text(f'{labels[entry["purpose"]]} · {statuses[entry["status"]]} · {detail}', 495, 183+i*65, width=345)
         app.button('learning_history_prev', '上頁', (50, 620, 130, 34), enabled=self.page>0)
         app.text(f'{self.page+1}/{pages}', 210, 625)
         app.button('learning_history_next', '下頁', (300, 620, 130, 34), enabled=self.page+1<pages)
