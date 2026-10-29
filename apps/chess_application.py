@@ -863,6 +863,13 @@ class ChessApplication:
             if self.mode not in ("auto", "records", "learning"):
                 self.button("flip", "翻轉 F", (664, 10, 104, 36))
             self.button("home", "回首頁", (780, 10, 104, 36))
+        task = self.learning.active_task()
+        if task and self.mode == 'learning':
+            state = task[2].snapshot()
+            progress = f'{state.get("completed", 0)}/{state.get("total", 0)}'
+            self.text(f'{task[1]} {progress}', 190, 15, width=220)
+            self.button('learning_task_return', '返回任務', (420, 10, 110, 36))
+            self.button('learning_task_stop', '停止', (540, 10, 90, 36))
         if self.confirm_action:
             self._render_confirmation()
         elif self.promotions:

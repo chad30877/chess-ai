@@ -57,6 +57,15 @@ class LearningView:
     def active(self):
         return (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active() or self.combination.active()
 
+    def active_task(self):
+        for page, label, view in (('data', '資料準備', self), ('teacher', '教師先導', self.teacher),
+                                  ('labeling', '教師標記', self.labels), ('training', '棋子位置學習', self.training),
+                                  ('groups', '單群組學習', self.group_training), ('combination', '組合學習', self.combination)):
+            run = view.run
+            if run is not None and not run.future.done():
+                return page, label, run
+        return None
+
     def close(self, wait=False):
         for run in (self.run, self.teacher.run, self.labels.run, self.training.run, self.group_training.run, self.combination.run):
             if run and not run.future.done():
@@ -115,6 +124,26 @@ class LearningView:
         self.teacher.open(path)
 
     def action(self, action, app):
+        task = self.active_task()
+        starts = {'learning_create', 'learning_pilot_start', 'learning_labels_new', 'learning_labels_resume',
+                  'learning_training_new', 'learning_training_resume', 'learning_groups_new', 'learning_groups_resume',
+                  'learning_combination_new', 'learning_combination_resume', 'learning_combination_batch',
+                  'learning_compare_start', 'learning_screening_start'}
+        if action in starts:
+            batch = getattr(app, 'batch', None)
+            running = task[1] if task else ('比較' if batch and not batch.future.done() else None)
+            if running:
+                view = {'teacher': self.teacher, 'labeling': self.labels, 'training': self.training,
+                        'groups': self.group_training, 'combination': self.combination,
+                        'comparison': self.comparison, 'screening': self.screening}.get(self.page, self)
+                view.message = f'目前執行中：{running}，請先停止或等待完成'
+                return
+        if action == 'learning_task_return' and task:
+            self.page = task[0]
+            return
+        if action == 'learning_task_stop' and task:
+            task[2].stop()
+            return
         if self.page == 'inventory':
             if action == 'learning_inventory_back': self.page = 'combination'
             elif action == 'learning_inventory_screen':
@@ -164,7 +193,7 @@ class LearningView:
             except (OSError, ValueError, KeyError) as exc:
                 self.labels.message = str(exc)
             return
-        if action == 'learning_data' and not self.active():
+        if action == 'learning_data':
             self.teacher.commit()
             self.page = 'data'
             return
