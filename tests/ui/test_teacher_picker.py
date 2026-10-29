@@ -51,8 +51,9 @@ class TeacherPickerTest(unittest.TestCase):
             self.open_teacher(app, root)
             expected = str(root / 'tools/stockfish/stockfish-windows-x86-64-universal.exe')
             self.assertEqual(app.learning.teacher.command, expected)
-            with patch('tkinter.filedialog.askopenfilename', return_value=''):
+            with patch('tkinter.Tk') as root_window, patch('tkinter.filedialog.askopenfilename', return_value=''):
                 self.click(app, 'learning_engine_pick')
+                root_window.return_value.destroy.assert_called_once()
             self.assertEqual(app.learning.teacher.command, expected)
 
     def test_picked_unicode_path_runs_teacher_recovers_and_reopens(self):
@@ -71,8 +72,9 @@ class TeacherPickerTest(unittest.TestCase):
             engine.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{command[1]}"\n', encoding='utf-8')
             engine.chmod(0o755)
         def pick(path):
-            with patch('tkinter.filedialog.askopenfilename', return_value=str(path)):
+            with patch('tkinter.Tk') as root_window, patch('tkinter.filedialog.askopenfilename', return_value=str(path)):
                 self.click(app, 'learning_engine_pick')
+                root_window.return_value.destroy.assert_called_once()
         invalid = self.root / 'invalid.exe'
         invalid.write_text('not an executable', encoding='utf-8')
         for bad in (self.root / 'missing.exe', invalid):
