@@ -53,6 +53,7 @@ class ChessApplication:
         self.now = now
         self._owns_executor = executor is None
         self.executor = executor if executor is not None else ThreadPoolExecutor(max_workers=1)
+        self._read_executor = ThreadPoolExecutor(max_workers=2) if isinstance(self.executor, ThreadPoolExecutor) else None
         self.resize(screen)
         self.mode = "home"
         self.live: LiveSession | None = None
@@ -148,6 +149,10 @@ class ChessApplication:
         draw_text(self.screen, font, value, self.point(*pos), color,
                   round(width * self.scale) if width else None)
 
+    @property
+    def read_executor(self):
+        return self._read_executor if self._read_executor is not None else self.executor
+
     def close(self):
         self.learning.close(wait=self._owns_executor)
         if self.batch:
@@ -159,6 +164,8 @@ class ChessApplication:
             self.live.cancel_pending()
         if self._owns_executor:
             self.executor.shutdown(wait=False, cancel_futures=True)
+        if self._read_executor:
+            self._read_executor.shutdown(wait=False, cancel_futures=True)
 
     def new_setup(self, mode: str):
         if self.live:

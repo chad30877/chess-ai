@@ -1,6 +1,7 @@
 """學習實驗的資料來源、背景處理與保存預覽。"""
 
 import json
+from copy import copy
 from pathlib import Path
 
 import pygame
@@ -54,12 +55,21 @@ class LearningView:
         self.screening = ScreeningView(root)
         self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
+        self.loading = None
+        self.loading_path = None
+        self.page_loading = None
+        self.page_load_error = ''
+        self.page_load_request = None
         self._detached_task = None
         self._task_context = None
 
-    def open_comparison(self, candidate):
-        self.comparison.open(candidate)
-        self.page = 'comparison'
+    def open_comparison(self, candidate, executor=None):
+        if executor is None:
+            self.comparison.open(candidate)
+            self.page = 'comparison'
+        else:
+            self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root),
+                            candidate, self.page, executor)
 
     def active(self):
         return bool(self._detached_task and not self._detached_task[2].future.done()) or (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active() or self.combination.active()
@@ -137,7 +147,7 @@ class LearningView:
     def entries(self):
         return sorted(self.root.glob('*/status.json'), key=lambda p: p.stat().st_mtime, reverse=True)
 
-    def open(self, path):
+    def _preserve_task_context(self):
         task = self.active_task()
         if task and self._detached_task and self._detached_task[2].future.done():
             self._detached_task = self._task_context = None
@@ -151,11 +161,72 @@ class LearningView:
             self.group_training, self.combination = GroupTrainingView(root), CombinationView(root)
             self.comparison, self.inventory = LearnedComparisonView(root), InventoryView()
             self.screening, self.heldout = ScreeningView(root), HeldoutView(root)
+
+    def open(self, path):
+        self.loading = None
+        self._preserve_task_context()
         self.data = load_dataset(path)
         self.path = Path(path)
         self.sample_index = 0
         self.message = ''
         self.teacher.open(path)
+
+    @staticmethod
+    def _read_dataset(path, root):
+        try:
+            data = load_dataset(path)
+            teacher = TeacherView(root)
+            teacher.open(path)
+            return data, teacher, None
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            return None, None, str(exc)
+
+    def _open_async(self, path, executor):
+        self._preserve_task_context()
+        self.loading_path = Path(path)
+        self.path = self.loading_path
+        self.data = None
+        self.message = ''
+        self.loading = executor.submit(self._read_dataset, self.loading_path, self.teacher.project_root)
+
+    def _poll_loading(self):
+        if self.loading is None or not self.loading.done(): return
+        future, self.loading = self.loading, None
+        try:
+            data, teacher, error = future.result()
+            if error: raise ValueError(error)
+            self.data, self.teacher = data, teacher
+            self.path = self.loading_path
+            self.sample_index = 0
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            self.data = None
+            self.message = f'無法開啟資料 {self.loading_path}：{exc}'
+
+    @staticmethod
+    def _read_page(factory, path, method):
+        try:
+            view = factory()
+            args = path if isinstance(path, tuple) else (path,)
+            getattr(view, method)(*args)
+            return view, None
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            return None, str(exc)
+
+    def _open_page(self, page, attribute, factory, path, back, executor, method='open'):
+        self.page = page
+        self.page_load_error = ''
+        self.page_load_request = (page, attribute, factory, path, back, method)
+        self.page_loading = executor.submit(self._read_page, factory, path, method)
+
+    def _poll_page(self):
+        if self.page_loading is None or not self.page_loading.done(): return
+        future, self.page_loading = self.page_loading, None
+        view, error = future.result()
+        if error:
+            self.page_load_error = f'無法讀取 {self.page_load_request[3]}：{error}'
+        else:
+            setattr(self, self.page_load_request[1], view)
+            self.page_load_request = None
 
     def action(self, action, app):
         task = self.active_task()
@@ -176,18 +247,48 @@ class LearningView:
             if self._task_context and target is self._detached_task:
                 for key, value in self._task_context.items(): setattr(self, key, value)
                 self._task_context = self._detached_task = None
+            self.page_loading = self.page_load_request = None
+            self.loading = None
+            self.page_load_error = ''
             self.page = target[0]
             return
         if action == 'learning_task_stop' and task:
             task[2].stop()
             return
+        if self.page_load_request is not None:
+            if action == 'learning_loading_back':
+                self.page = self.page_load_request[4]
+                self.page_loading = self.page_load_request = None
+                self.page_load_error = ''
+            elif action == 'learning_loading_retry' and self.page_loading is None:
+                page, attribute, factory, path, back, method = self.page_load_request
+                self._open_page(page, attribute, factory, path, back, app.read_executor, method)
+            return
+        selected_pages = {'training': ('training', 'learning_training_'),
+                          'groups': ('group_training', 'learning_groups_'),
+                          'combination': ('combination', 'learning_combination_')}
+        if self.page in selected_pages:
+            attribute, prefix = selected_pages[self.page]
+            if action in (prefix + 'prev', prefix + 'next'):
+                current = getattr(self, attribute)
+                if current.active() or not current.entries: return
+                index = (current.index + (1 if action.endswith('next') else -1)) % len(current.entries)
+                entry = current.entries[index]
+                path = entry.parent
+                def selected_view():
+                    view = copy(current)
+                    view.index = index
+                    view.run = view._loaded_run = None
+                    return view
+                self._open_page(self.page, attribute, selected_view, path, self.page, app.read_executor, 'load')
+                return
         if self.page == 'inventory':
             if action == 'learning_inventory_back': self.page = 'combination'
             elif action == 'learning_inventory_screen':
                 try:
                     selected = self.inventory.report['candidates'][self.inventory.selected]
-                    self.screening.open(selected['source'], self.inventory.report['source_identity'])
-                    self.page = 'screening'
+                    self._open_page('screening', 'screening', lambda: ScreeningView(self.teacher.project_root),
+                                    (selected['source'], self.inventory.report['source_identity']), 'inventory', app.read_executor)
                 except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
                     self.combination.message = str(exc)
             else: self.inventory.action(action)
@@ -198,35 +299,46 @@ class LearningView:
         if self.page == 'screening':
             if action == 'learning_screening_heldout':
                 try:
-                    self.heldout.open(self.screening.final_path); self.page = 'heldout'
+                    self._open_page('heldout', 'heldout', lambda: HeldoutView(self.teacher.project_root), self.screening.final_path, 'screening', app.read_executor)
                 except (OSError, ValueError, KeyError, TypeError) as exc: self.screening.message = str(exc)
                 return
             self.screening.action(action, app)
             return
         if action == 'learning_inventory' and self.page == 'combination':
             try:
-                self.inventory.open(self.combination.source_path); self.page = 'inventory'
+                self._open_page('inventory', 'inventory', InventoryView, self.combination.source_path, 'combination', app.read_executor)
             except (OSError, ValueError, KeyError) as exc: self.combination.message = str(exc)
+            return
+        if self.page == 'comparison' and action in ('learning_compare_prev_plan', 'learning_compare_next_plan'):
+            current = self.comparison
+            if not current.entries: return
+            index = (current.index + (1 if action.endswith('next_plan') else -1)) % len(current.entries)
+            def selected_comparison():
+                view = copy(current)
+                view.index = index
+                return view
+            self._open_page('comparison', 'comparison', selected_comparison, current.entries[index],
+                            'comparison', app.read_executor, 'open_plan')
             return
         if self.page == 'comparison':
             self.comparison.action(action,app)
             return
         if action == 'learning_combinations' and self.group_training.path:
             try:
-                if not self.combination.active(): self.combination.open(self.group_training.path)
-                self.page = 'combination'
+                if self.combination.active(): self.page = 'combination'
+                else: self._open_page('combination', 'combination', lambda: CombinationView(self.teacher.project_root), self.group_training.path, 'groups', app.read_executor)
             except (OSError,ValueError,KeyError) as exc: self.group_training.message = str(exc)
             return
-        if action == 'learning_groups' and self.labels.path:
+        if action == 'learning_groups' and self.labels.path and self.labels.loading is None and self.labels.state.get('ready'):
             try:
-                if not self.group_training.active(): self.group_training.open(self.labels.path)
-                self.page = 'groups'
+                if self.group_training.active(): self.page = 'groups'
+                else: self._open_page('groups', 'group_training', lambda: GroupTrainingView(self.teacher.project_root), self.labels.path, 'labeling', app.read_executor)
             except (OSError,ValueError,KeyError) as exc: self.labels.message = str(exc)
             return
-        if action == 'learning_training' and self.labels.path:
+        if action == 'learning_training' and self.labels.path and self.labels.loading is None and self.labels.state.get('ready'):
             try:
-                if not self.training.active(): self.training.open(self.labels.path)
-                self.page = 'training'
+                if self.training.active(): self.page = 'training'
+                else: self._open_page('training', 'training', lambda: TrainingView(self.teacher.project_root), self.labels.path, 'labeling', app.read_executor)
             except (OSError, ValueError, KeyError) as exc:
                 self.labels.message = str(exc)
             return
@@ -234,9 +346,10 @@ class LearningView:
             self.teacher.commit()
             self.page = 'data'
             return
-        if action == 'learning_labels' and self.teacher.path:
+        if action == 'learning_labels' and self.teacher.path and self.teacher.loading is None and self.teacher.state.get('choice'):
             try:
-                if not self.labels.active(): self.labels.open(self.path, self.teacher.path)
+                if not self.labels.active() and (not self.labels.run or self.labels._loaded_run is self.labels.run):
+                    self.labels.open(self.path, self.teacher.path, app.read_executor)
                 self.page = 'labeling'
             except (OSError, ValueError, KeyError) as exc:
                 self.teacher.message = str(exc)
@@ -259,6 +372,8 @@ class LearningView:
         if self.page == 'teacher':
             self.teacher.action(action, app)
             return
+        if self.loading is not None and not action.startswith('learning_open:'):
+            return
         if not self.commit():
             return
         try:
@@ -280,17 +395,20 @@ class LearningView:
                 self.run = DatasetRun(self.root, source, int(self.seed), app.executor)
                 self.data = None
                 self.message = ''
-            elif action == 'learning_teacher' and self.path:
+            elif action == 'learning_teacher' and self.path and self.data is not None:
                 self.page = 'teacher'
             elif action.startswith('learning_open:'):
                 path = self.entries()[int(action.split(':')[1])].parent
                 if (path / 'dataset.json').exists():
-                    self.open(path)
+                    self._open_async(path, app.read_executor)
                 else:
-                    saved = json.loads((path / 'status.json').read_text(encoding='utf-8'))
+                    self._preserve_task_context()
+                    self.loading = None
+                    self.path = path
                     self.data = None
                     self.run = None
-                    self.message = saved.get('error', '資料尚未完成；請建立新實驗重試')
+                    saved = json.loads((path / 'status.json').read_text(encoding='utf-8'))
+                    self.message = f'{path}：' + saved.get('error', '資料尚未完成或不可用；請建立新實驗重試')
             elif action in ('learning_prev', 'learning_next') and self.data:
                 self.sample_index = (self.sample_index + (1 if action.endswith('next') else -1)) % max(1, len(self.data['positions']))
             elif action in ('learning_recent_prev', 'learning_recent_next'):
@@ -301,9 +419,17 @@ class LearningView:
                                      result='*', metadata={'name': '學習局面', 'game_id': sample['game_id']}), '學習資料預覽')
                 app.replay.goto_ply(len(sample['moves_uci']))
         except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
-            self.message = f'無法開啟資料：{exc}'
+            self.message = f'無法開啟資料 {self.path or self.root}：{exc}'
 
     def render(self, app):
+        self._poll_loading()
+        self._poll_page()
+        if self.page_load_request is not None:
+            app.text('學習實驗', 50, 78, large=True)
+            app.button('learning_loading_back', '返回', (50, 122, 130, 34))
+            app.text(self.page_load_error or '載入已保存成果…', 50, 190, width=790)
+            if self.page_load_error: app.button('learning_loading_retry', '重新讀取', (50, 240, 180, 34))
+            return
         if self.page == 'inventory':
             self.inventory.render(app)
             return
@@ -343,7 +469,7 @@ class LearningView:
             app.text('database.lichess.org · 下載壓縮來源後串流抽樣', 50, 178, muted=True, width=790)
         app.button('learning_field:seed', '種子：' + (self.draft + ' |' if self.focus == 'seed' else self.seed),
                    (50, 220, 270, 36), enabled=not active)
-        app.button('learning_create', '建立新實驗', (340, 220, 220, 36), enabled=not active, primary=True)
+        app.button('learning_create', '建立新實驗', (340, 220, 220, 36), enabled=not active and self.loading is None, primary=True)
         app.button('learning_stop', '停止', (580, 220, 110, 36), enabled=active)
         state = self.run.snapshot() if self.run else {}
         if state.get('status') == 'completed' and self._loaded_run is not self.run:
@@ -357,7 +483,9 @@ class LearningView:
         if state:
             app.text(f'{statuses.get(state["status"], state["status"])} · {stages.get(state["stage"], state["stage"])}'
                      f' · {state.get("bytes", 0) / 1048576:.1f} MB · {state.get("source_games", 0)} 盤 · {state.get("elapsed_seconds", 0):.1f} 秒', 50, 276, width=790)
-        if self.message or state.get('error'):
+        if self.loading is not None:
+            app.text('載入已保存資料…', 50, 310, width=790)
+        elif self.message or state.get('error'):
             app.text(self.message or state['error'], 50, 310, width=790)
         if self.data:
             data = self.data

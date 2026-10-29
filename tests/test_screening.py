@@ -61,6 +61,8 @@ class ScreeningUiTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                if action in ('learning_inventory_screen', 'learning_screening_final_open'):
+                    app.learning.page_loading.result(timeout=30); app.render()
             self.assertIsNone(app.batch)
             click('learning_inventory_screen')
             self.assertEqual(app.learning.page, 'screening')
@@ -75,7 +77,11 @@ class ScreeningUiTest(unittest.TestCase):
             report = screening_report(path)
             report.update(complete=True, eliminated=False, games=16, wins=3, draws=0, losses=13, score=3)
             eliminated = dict(report, eliminated=True, wins=2, losses=14, score=2)
+            import time
             with patch('ui.screening_view.screening_report', return_value=eliminated):
+                deadline = time.monotonic() + 5
+                while not app.learning.screening.report.get('eliminated') and time.monotonic() < deadline:
+                    app.render(); time.sleep(.02)
                 app.render()
                 button = next(b for b in app.buttons if b.action == 'learning_screening_select')
                 self.assertFalse(button.enabled)
@@ -83,6 +89,9 @@ class ScreeningUiTest(unittest.TestCase):
                 self.assertEqual(app.learning.screening.selected, [])
                 self.assertFalse(next(b for b in app.buttons if b.action == 'learning_screening_final_freeze').enabled)
             with patch('ui.screening_view.screening_report', return_value=report):
+                deadline = time.monotonic() + 5
+                while app.learning.screening.report.get('eliminated') is not False and time.monotonic() < deadline:
+                    app.render(); time.sleep(.02)
                 click('learning_screening_select')
                 self.assertEqual(len(app.learning.screening.selected), 1)
                 click('learning_screening_final_freeze')

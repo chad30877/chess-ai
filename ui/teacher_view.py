@@ -27,6 +27,8 @@ class TeacherView:
         self.advanced = False
         self.index = 0
         self._loaded_run = None
+        self.loading = None
+        self.load_error = False
 
     def active(self):
         return self.run is not None and not self.run.future.done()
@@ -37,22 +39,53 @@ class TeacherView:
                       key=lambda p: p.stat().st_mtime, reverse=True)
 
     def open(self, dataset):
+        self.loading = None
         self.dataset = Path(dataset)
         self.run, self._loaded_run = None, None
         self.state, self.path, self.message, self.index = {}, None, '', 0
         self.workers = default_teacher_workers()
         self.command = self.default_command
         entries = self.entries()
-        if entries: self.load(entries[0].parent)
+        if entries:
+            try: self.load(entries[0].parent)
+            except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+                self.path = entries[0].parent
+                self.state = {}
+                self.load_error = True
+                self.message = f'無法讀取先導 {self.path}：{exc}'
 
-    def load(self, path):
-        self.state = load_pilot(path)
-        self.path = Path(path)
+    @staticmethod
+    def _read_pilot(path):
+        try:
+            state = load_pilot(path)
+            state['status']
+            return state, None
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc: return None, str(exc)
+
+    def _apply_pilot(self, state, path):
+        self.state, self.path = state, Path(path)
         snapshot = self.state.get('snapshot')
         if snapshot:
             self.workers = snapshot.get('workers', 1)
             command = snapshot['teacher']['command']
             self.command = command[0] if len(command) == 1 else command
+
+    def load(self, path):
+        self._apply_pilot(load_pilot(path), path)
+
+    def _poll_loading(self):
+        if self.loading is None or not self.loading.done(): return
+        future, self.loading = self.loading, None
+        try:
+            state, error = future.result()
+            if error: raise ValueError(error)
+            self._apply_pilot(state, self.path)
+            self.message = ''
+            self.load_error = False
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            self.state = {}
+            self.load_error = True
+            self.message = f'無法讀取先導 {self.path}：{exc}'
 
     def input(self, event):
         if not self.focus or event.type not in (pygame.TEXTINPUT, pygame.KEYDOWN): return False
@@ -86,6 +119,12 @@ class TeacherView:
 
     def action(self, action, app):
         try:
+            self._poll_loading()
+            if action == 'learning_pilot_retry':
+                self.message = ''
+                self.loading = app.read_executor.submit(self._read_pilot, self.path)
+                return
+            if self.loading is not None and action not in ('learning_pilot_prev', 'learning_pilot_next'): return
             # 無效輸入仍能重新取得焦點修正。
             if action != 'learning_teacher_workers' or self.focus != 'workers': self.commit()
             if action == 'learning_pilot_stop' and self.active():
@@ -113,7 +152,9 @@ class TeacherView:
             elif action in ('learning_pilot_prev', 'learning_pilot_next'):
                 entries = self.entries()
                 self.index = (self.index + (1 if action.endswith('next') else -1)) % len(entries)
-                self.load(entries[self.index].parent)
+                self.path = entries[self.index].parent
+                self.state, self.message = {}, ''
+                self.loading = app.read_executor.submit(self._read_pilot, self.path)
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.message = str(exc)
 
@@ -139,6 +180,8 @@ class TeacherView:
                 window.destroy()
 
     def render(self, app):
+        self._poll_loading()
+        loading = self.loading is not None
         active = self.active()
         if self.run:
             if not self.run.future.done(): self.state = self.run.snapshot()
@@ -160,7 +203,7 @@ class TeacherView:
         app.button('learning_engine', self.draft + ' |' if self.focus == 'engine' else str(self.command or '輸入／貼上 Stockfish 19 執行檔路徑'),
                    (50, 174, 630, 38), enabled=not active)
         app.button('learning_engine_pick', '選取檔案', (695, 174, 145, 38), enabled=not active)
-        app.button('learning_pilot_start', '建立新先導', (50, 230, 235, 36), enabled=not active, primary=True)
+        app.button('learning_pilot_start', '建立新先導', (50, 230, 235, 36), enabled=not active and not loading and not self.load_error, primary=True)
         app.button('learning_pilot_stop', '停止', (310, 230, 130, 36), enabled=active)
         workers = self.draft + ' |' if self.focus == 'workers' else str(self.workers)
         app.button('learning_teacher_workers', f'同時分析局面數：{workers}', (455, 230, 385, 36), enabled=not active)
@@ -171,8 +214,11 @@ class TeacherView:
             saved_workers = f' · 實測 {state["snapshot"].get("workers", 1)} 程序' if state.get('snapshot') else ''
             app.text(f'{status.get(display_status, "未完成")} · {state.get("completed", 0)}/{state.get("total", 0)}'
                      f' · {state.get("elapsed_seconds", 0):.1f} 秒{saved_workers}', 50, 285, width=790)
-        if self.message or state.get('error'):
-            app.text(self.message or state['error'], 50, 321, width=790)
+        if loading:
+            app.text('載入已保存先導…', 50, 321, width=790)
+        elif self.message or state.get('error'):
+            app.text(self.message or state['error'], 50, 321, width=570)
+            if self.load_error and self.path: app.button('learning_pilot_retry', '重新讀取', (650, 315, 150, 34))
         summary = state.get('summary')
         if summary:
             for index, nodes in enumerate((50000, 200000)):

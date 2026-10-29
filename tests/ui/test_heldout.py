@@ -34,6 +34,7 @@ class HeldoutUiTest(unittest.TestCase):
                 app.render(); b=next(x for x in app.buttons if x.action==action)
                 self.assertTrue(b.enabled); app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,pos=b.rect.center,button=1))
             click('learning_screening_heldout')
+            app.executor.finish(); app.render()
             click('learning_heldout_freeze'); path=app.learning.heldout.path
             before=(final/'snapshot.json').read_bytes()
             click('learning_heldout_run')
