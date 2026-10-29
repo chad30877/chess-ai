@@ -19,6 +19,7 @@ from ui.candidate_inventory_view import InventoryView
 from ui.screening_view import ScreeningView
 from ui.heldout_view import HeldoutView
 from ui.comparison_setup_view import ComparisonSetupView
+from ui.comparison_history_view import ComparisonHistoryView, ComparisonBundleHistory
 from ui.controls import ui_font
 from ui.unfinished_tasks import unfinished, RecoveredWork
 
@@ -27,7 +28,7 @@ STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'
 START_ACTIONS = {'learning_create', 'learning_pilot_start', 'learning_labels_new', 'learning_labels_resume',
                  'learning_training_new', 'learning_training_resume', 'learning_groups_new', 'learning_groups_resume',
                  'learning_combination_new', 'learning_combination_resume', 'learning_combination_batch', 'learning_combination_batch_resume',
-                 'learning_compare_start', 'learning_screening_start', 'learning_setup_start'}
+                 'learning_compare_start', 'learning_screening_start', 'learning_setup_start', 'learning_bundle_resume'}
 
 EXCLUSION_LABELS = {'first_8_plies': '前八手', 'terminal': '終局', 'in_check': '受將',
                     'not_sampled': '抽樣上限', 'cross_split_duplicate': '跨組重複',
@@ -126,6 +127,9 @@ class LearningView:
         self.comparison = LearnedComparisonView(root)
         self.combination = CombinationView(root)
         self.inventory = InventoryView()
+        self.comparison_history = ComparisonHistoryView()
+        self.history_bundle = ComparisonBundleHistory()
+        self.batch_history_bundle = None
         self.screening = ScreeningView(root)
         self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
@@ -170,6 +174,8 @@ class LearningView:
         return None
 
     def _current_saved_path(self):
+        if self.page == 'history_bundle': return self.history_bundle.path
+        if self.page == 'comparison' and self.comparison.return_page in ('history', 'history_bundle'): return self.comparison.path
         context = self._saved_context()
         return context[1].path if context else None
 
@@ -483,7 +489,7 @@ class LearningView:
                         selected[context[0]] = str(context[1].path)
                     self._save_ui_state()
             else:
-                if self.page_load_request[1] == 'comparison' and self.page_load_request[4] in ('groups', 'combination', 'training'):
+                if self.page_load_request[1] == 'comparison' and self.page_load_request[4] in ('groups', 'combination', 'training', 'history_bundle'):
                     view.return_page = self.page_load_request[4]
                 setattr(self, self.page_load_request[1], view)
                 if hasattr(view, 'navigation_labels'):
@@ -536,7 +542,7 @@ class LearningView:
         parents = {'teacher': ('teacher', '教師評分'), 'labeling': ('teacher', '教師評分'),
                    'groups': ('groups', '評分權重學習'), 'results': ('groups', '評分權重學習'), 'training': ('groups', '評分權重學習'),
                    'combination': ('groups', '評分權重學習'), 'inventory': ('inventory', '比較候選'),
-                   'screening': ('inventory', '比較候選'), 'setup': ('inventory', '比較候選'), 'comparison': ('inventory', '比較候選'),
+                   'screening': ('inventory', '比較候選'), 'history': ('inventory', '比較候選'), 'history_bundle': ('inventory', '比較候選'), 'setup': ('inventory', '比較候選'), 'comparison': ('inventory', '比較候選'),
                    'heldout': ('inventory', '比較候選')}
         app.button('learning_breadcrumb_data', '學習實驗', (25, 98, 120, 27))
         if self.page in parents:
@@ -544,7 +550,7 @@ class LearningView:
             app.button('learning_breadcrumb_' + parent, label, (160, 98, 190, 27))
         titles = {'home':'首頁', 'data':'資料準備', 'teacher':'教師先導', 'labeling':'教師標記', 'training':'棋子位置學習',
                   'groups':'單群組學習', 'results':'學習成果', 'combination':'組合', 'inventory':'候選清單',
-                  'screening':'快速篩選', 'setup':'比較用途', 'comparison':'比較', 'heldout':'教師誤差評估'}
+                  'screening':'快速篩選', 'history':'比較紀錄', 'history_bundle':'比較紀錄', 'setup':'比較用途', 'comparison':'比較', 'heldout':'教師誤差評估'}
         app.text('› ' + titles.get(self.page, ''), 365 if self.page in parents else 160, 101, width=260)
         if self.path:
             teacher = ('完成' if self.teacher.state.get('choice') else '未完成') if self.teacher.dataset == self.path and self.teacher.loading is None else '尚未載入'
@@ -630,8 +636,8 @@ class LearningView:
         if action == 'learning_saved_rename':
             context = self._saved_context()
             path = self._current_saved_path()
-            if context and path:
-                self.rename_draft = self.saved_name(path, context[3])
+            if path and (context or self.page in ('history_bundle', 'comparison')):
+                self.rename_draft = self.saved_name(path, context[3] if context else '比較紀錄')
                 self.rename_focus = True; pygame.key.start_text_input()
             return
         task = self.active_task()
@@ -729,6 +735,8 @@ class LearningView:
             return
         if self.page == 'inventory':
             if action == 'learning_inventory_back': self.page = self.inventory_return
+            elif action == 'learning_inventory_history':
+                self._open_page('history', 'comparison_history', ComparisonHistoryView, (self.teacher.project_root, self.saved_state.get('selected', {}).get('comparison_history')), 'inventory', app.read_executor)
             elif action == 'learning_inventory_setup' and self.inventory.report.get('all_sources'):
                 rows = [self.inventory.report['candidates'][i] for i in sorted(self.inventory.selected_indices)]
                 if not rows: return
@@ -752,6 +760,33 @@ class LearningView:
             return
         if self.page == 'heldout':
             self.heldout.action(action, app)
+            return
+        if self.page == 'history':
+            if action == 'learning_history_back': self.page = 'inventory'
+            elif action == 'learning_history_prev': self.comparison_history.page = max(0, self.comparison_history.page - 1)
+            elif action == 'learning_history_next': self.comparison_history.page += 1
+            elif action.startswith('learning_history_open:'):
+                entry = self.comparison_history.entries[int(action.split(':')[1])]
+                self._remember('comparison_history', entry['path'])
+                if entry.get('bundle'):
+                    self._open_page('history_bundle', 'history_bundle', ComparisonBundleHistory, entry['path'], 'history', app.read_executor)
+                else:
+                    self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root), entry['path'], 'history', app.read_executor, 'open_history')
+            return
+        if self.page == 'history_bundle':
+            if action == 'learning_bundle_back': self.page = 'history'
+            elif action == 'learning_bundle_prev': self.history_bundle.page = max(0, self.history_bundle.page-1)
+            elif action == 'learning_bundle_next': self.history_bundle.page += 1
+            elif action.startswith('learning_bundle_open:'):
+                work = self.history_bundle.data['work'][int(action.split(':')[1])]
+                self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root), (work['path'], work['baseline']), 'history_bundle', app.read_executor, 'open_history')
+            elif action == 'learning_bundle_resume':
+                from engine.learning.comparison_setup import ComparisonBundleRun
+                data = self.history_bundle.data
+                app.batch = ComparisonBundleRun(data['work'], data['planned_games'], app.executor, bundle_path=self.history_bundle.path)
+                app.learning_batch = app.batch; app.batch_mode = 'evaluation'; app.mode = 'auto'; app.batch_games_page = 0
+                self.batch_return_page = 'history_bundle'
+                self.batch_history_bundle = self.history_bundle
             return
         if self.page == 'screening':
             if action == 'learning_screening_heldout':
@@ -995,6 +1030,13 @@ class LearningView:
                 return
             self.inventory.render(app)
             return
+        if self.page == 'history_bundle':
+            app.button('learning_saved_rename', self.rename_draft + ' |' if self.rename_focus else '重新命名', (500, 74, 140, 36), enabled=self.history_bundle.path is not None)
+            self.history_bundle.render(app)
+            return
+        if self.page == 'history':
+            self.comparison_history.render(app)
+            return
         if self.page == 'heldout':
             self.heldout.render(app)
             return
@@ -1005,6 +1047,8 @@ class LearningView:
             self.setup.render(app)
             return
         if self.page == 'comparison':
+            if self.comparison.return_page in ('history', 'history_bundle'):
+                app.button('learning_saved_rename', self.rename_draft + ' |' if self.rename_focus else '重新命名', (500, 74, 140, 36), enabled=self.comparison.path is not None)
             self.comparison.render(app)
             return
         if self.page == 'combination':

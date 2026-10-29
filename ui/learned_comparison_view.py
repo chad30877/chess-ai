@@ -39,8 +39,16 @@ class LearnedComparisonView:
 
     def open_plan(self,path):
         self.path=Path(path); self.report=comparison_report(path); plan=self.report['plan']; self.source=plan['source']
-        self.roles=set(plan['roles']); self.stable='stable' in plan['definitions']; self.baseline='material'; self.page=0; self.candidate=0
+        self.roles=set(plan['roles']); self.stable='stable' in plan['definitions']; self.baseline=next(iter(plan['definitions'])); self.page=0; self.candidate=0
         self.rating_details=False; self.rating_page=0
+    def open_history(self, path, baseline=None):
+        self.selected_origin = None
+        self.open_plan(path)
+        if baseline is not None:
+            if baseline not in self.report['baselines']: raise ValueError('比較基準不存在')
+            self.baseline = baseline
+        self.return_page = 'history'
+
     def open_final(self, path, index):
         from engine.learning.final_comparison import load_final_comparison
         final = load_final_comparison(path)
@@ -61,7 +69,12 @@ class LearnedComparisonView:
                 if self.return_page == 'groups':
                     app.learning.group_training.compared = None
                     app.learning.group_training.comparison_future = None
-                app.learning.page=self.return_page; return
+                if self.return_page == 'history_bundle':
+                    from ui.comparison_history_view import ComparisonBundleHistory
+                    app.learning._open_page('history_bundle', 'history_bundle', ComparisonBundleHistory,
+                                            app.learning.history_bundle.path, 'history', app.read_executor)
+                else: app.learning.page=self.return_page
+                return
             if action=='learning_compare_config': self.config=not self.config; self.config_page=0; return
             if action=='learning_compare_rating': self.rating_details=not self.rating_details; self.rating_page=0; return
             if action=='learning_compare_rating_next': self.rating_page+=1; return
@@ -96,7 +109,9 @@ class LearnedComparisonView:
                 if data['path']: app.show_records(batch_id=data['path'].name)
             elif action=='learning_compare_replay' and self.path:
                 data=comparison_report(self.path)['baselines'][self.baseline]
-                if data['replays']: app.open_replay(str(data['replays'][-1]),return_to='learning')
+                if data['replays']:
+                    app.learning.batch_return_page = 'comparison'
+                    app.open_replay(str(data['replays'][-1]),return_to='learning')
             elif action=='learning_compare_save' and self.path:
                 data=comparison_report(self.path)['baselines'][self.baseline]['candidates']
                 row=data[self.candidate%len(data)]
@@ -116,8 +131,15 @@ class LearnedComparisonView:
         if not self.source: return
         from engine.learning.group_training import GROUPS
         app.text(f'來源 {self.source["experiment_id"][:16]} · '+','.join(GROUPS.get(g,g) for g in self.source['groups'])+' · '+{'single':'單群組','direct':'直接組合','joint':'聯合訓練'}.get(self.source['kind'],self.source['kind']),50,165,width=790)
-        app.text('Alpha-Beta 3／q4 · 同時4局 · 每局1 worker · TT 4096',50,194,width=790)
-        app.text('32條共同線 × 換色2局／候選／基準 · 不申請和棋 · 無手數上限',50,223,width=790)
+        if self.path:
+            definition = self.report['plan']['definitions'][self.baseline]
+            search = definition['search']
+            app.text(f'Alpha-Beta {search["depth_plies"]}／q{search["quiescence_depth"]} · 同時{definition["workers"]}局 · 每局{search["search_workers"]} worker · TT {search["transposition_capacity"]}',50,194,width=790)
+            limit = f'{definition["max_plies"]}半手上限' if definition['max_plies'] is not None else '無手數上限'
+            app.text(f'{len(definition["opening_lines"])}條共同線 × 換色2局／候選／基準 · '+('申請和棋' if definition['claim_draw'] else '不申請和棋')+' · '+limit,50,223,width=790)
+        else:
+            app.text('Alpha-Beta 3／q4 · 同時4局 · 每局1 worker · TT 4096',50,194,width=790)
+            app.text('32條共同線 × 換色2局／候選／基準 · 不申請和棋 · 無手數上限',50,223,width=790)
         app.button('learning_compare_config','返回開局／結果' if self.config else '完整設定',(620,260,220,32))
         if not self.path:
             for index,role in enumerate(('original','learned')):
@@ -173,7 +195,7 @@ class LearnedComparisonView:
                 app.text('來源 '+str(line.get('source',{}).get('url',line.get('source',{}).get('repository','已保存來源快照'))),50,550,muted=True,width=790)
                 app.button('learning_compare_opening_back','返回逐開局報告',(50,592,300,32))
             else:
-                app.text(f'勝 {row["wins"]}／和 {row["draws"]}／敗 {row["losses"]} · 未完成 {row["unfinished"]} · 待執行 {row["pending_games"]}',310,348,width=530)
+                app.text(f'勝 {row["wins"]}／和 {row["draws"]}／敗 {row["losses"]} · 已保存 {row["planned_games"]-row["pending_games"]}/{row["planned_games"]} 局 · 待執行 {row["pending_games"]}',310,348,width=530)
                 app.text(f'完整配對 {row["completed_pairs"]}/{len(row["openings"])} · 不完整 {row["incomplete_pairs"]} · 中斷嘗試 {row["interrupted_attempts"]} · 對局 {row["elapsed_seconds"]:.1f}秒',50,390,width=790)
                 def metric(split):
                     value=row['teacher'][split]
