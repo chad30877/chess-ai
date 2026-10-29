@@ -315,13 +315,18 @@ class SavedTeacherSelectionTest(unittest.TestCase):
             click(f'learning_saved_select:{index}'); executor.finish(); app.render()
             click('learning_groups'); executor.finish(); app.render()
             click('learning_groups_new'); run = app.learning.group_training.run
-            click('learning_labels'); executor.finish(); app.render()
+            self.assertFalse(run.future.done())
+            click('learning_labels')
+            if app.learning.labels.loading is not None: executor.finish()
+            app.render()
+            self.assertFalse(run.future.done())
             click('learning_saved_list'); index = app.learning.saved_entries.index(other)
             click(f'learning_saved_select:{index}'); executor.finish(); app.render()
             self.assertEqual(app.learning.labels.path, other)
             click('learning_task_return')
             self.assertEqual(app.learning.labels.path, self.labels)
             self.assertIs(app.learning.group_training.run, run)
+            self.assertFalse(run.future.done())
             app.close()
     def test_new_dataset_receives_date_and_purpose_without_changing_snapshot(self):
         from datetime import datetime
