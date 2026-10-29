@@ -192,6 +192,7 @@ class LearningView:
     def open_comparison(self, candidate, executor=None):
         if executor is None:
             self.comparison.open(candidate)
+            if self.page in ('groups', 'combination', 'training'): self.comparison.return_page = self.page
             self.page = 'comparison'
         else:
             self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root),
@@ -403,6 +404,8 @@ class LearningView:
                         selected[context[0]] = str(context[1].path)
                     self._save_ui_state()
             else:
+                if self.page_load_request[1] == 'comparison' and self.page_load_request[5] == 'open' and self.page_load_request[4] in ('groups', 'combination', 'training'):
+                    view.return_page = self.page_load_request[4]
                 setattr(self, self.page_load_request[1], view)
                 if hasattr(view, 'navigation_labels'):
                     self.labels = view.navigation_labels
