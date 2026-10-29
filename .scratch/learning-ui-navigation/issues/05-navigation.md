@@ -60,3 +60,5 @@
 直接接續補充：以完成標記及較新未完成標記的實際保存資料驗證，目的首頁「接續學習」在背景讀取上次選擇的完成標記後直接開啟可操作學習頁，無須先造訪標記頁。
 
 複審補充：直接接續載入記住的非最新標記後，透過 UI 切換下一份並核對身分；另以應用程式派發確認缺少標記時不建立學習工作。相關導覽與任務測試 10 項通過。
+
+執行前置防護後，`tests.ui.test_group_training tests.ui.test_teacher_labeling tests.ui.test_teacher_pilot tests.ui.test_learned_comparison` 共 7 項通過。複審已確認直接接續標記索引修正；仍待合併後回歸與未勾選項的驗收。
