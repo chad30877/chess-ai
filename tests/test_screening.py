@@ -61,7 +61,7 @@ class ScreeningUiTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-                if action == 'learning_inventory_screen':
+                if action in ('learning_inventory_screen', 'learning_screening_final_open'):
                     app.learning.page_loading.result(timeout=30); app.render()
             self.assertIsNone(app.batch)
             click('learning_inventory_screen')

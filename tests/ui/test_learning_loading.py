@@ -311,3 +311,51 @@ class RealLabelRecoveryTest(unittest.TestCase):
         app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
         self.assertEqual(app.learning.page, 'groups')
         app.close()
+
+    def test_reading_saved_labels_does_not_wait_for_busy_task_worker(self):
+        from threading import Event
+        pygame.init(); self.addCleanup(pygame.quit)
+        gate = Event()
+        app = ChessApplication(pygame.display.set_mode(APP_SIZE))
+        self.addCleanup(app.close)
+        busy = app.executor.submit(gate.wait)
+        self.addCleanup(gate.set)
+        dataset = self.labels.parents[1]
+        app.mode = 'learning'; app.learning.path = dataset
+        app.learning.teacher.path = next((dataset / 'teacher-pilots').iterdir())
+        app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
+        app.learning.page = 'teacher'; app.render()
+        button = next(b for b in app.buttons if b.action == 'learning_labels')
+        app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+        app.learning.labels.loading.result(timeout=5); app.render()
+        self.assertTrue(app.learning.labels.state['ready'])
+        self.assertFalse(busy.done())
+        gate.set(); busy.result(timeout=5)
+
+    def test_corrupt_latest_pilot_does_not_hide_dataset_or_older_pilot(self):
+        import shutil
+        from unittest.mock import patch
+        dataset = self.labels.parents[1]
+        valid = next((dataset / 'teacher-pilots').iterdir())
+        broken = valid.parent / 'broken'; shutil.copytree(valid, broken)
+        status = broken / 'status.json'; status.write_text('{broken', encoding='utf-8')
+        os.utime(status, (status.stat().st_mtime + 10, status.stat().st_mtime + 10))
+        pygame.init(); self.addCleanup(pygame.quit)
+        executor = ManualExecutor()
+        with patch('apps.chess_application.PROJECT_ROOT', self.root):
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.mode = 'learning'; app.learning.root = dataset.parent
+            def click(action):
+                app.render()
+                button = next(b for b in app.buttons if b.action == action)
+                self.assertTrue(button.enabled, action)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            click('learning_open:0'); executor.finish(); app.render()
+            self.assertIsNotNone(app.learning.data)
+            click('learning_teacher')
+            self.assertEqual(app.learning.teacher.path, broken)
+            self.assertIn(str(broken), app.learning.teacher.message)
+            click('learning_pilot_next'); executor.finish(); app.render()
+            self.assertEqual(app.learning.teacher.path, valid)
+            self.assertTrue(app.learning.teacher.state['choice'])
+            app.close()

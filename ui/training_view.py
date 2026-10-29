@@ -67,7 +67,7 @@ class TrainingView:
                 self._loaded_run=self.run
         s=self.state; frozen=s.get('frozen'); report=s.get('report'); cal=s.get('calibration')
         app.text('學習實驗 · 棋子位置',50,78,large=True)
-        app.button('learning_labels','教師標記',(50,120,190,34),enabled=not active)
+        app.button('learning_labels','教師標記',(50,120,190,34))
         if s.get('snapshot'):
             source=s['snapshot']
             app.text(f'沿用標記 {source["label_identity"][:10]}… · 已有 {len(source.get("prior_test_experiments",[]))} 份實驗使用同資料測試',260,128,muted=True,width=580)

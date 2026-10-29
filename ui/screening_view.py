@@ -53,19 +53,14 @@ class ScreeningView:
             elif action == 'learning_screening_final_next':
                 self.final_index += 1
             elif action == 'learning_screening_final_open':
-                final = load_final_comparison(self.final_path)
-                entry = final['candidates'][self.final_index % len(final['candidates'])]
-                app.learning.comparison.open(entry['source'])
-                app.learning.comparison.open_plan(entry['path'])
-                rows = app.learning.comparison.report['baselines']['material']['candidates']
-                app.learning.comparison.candidate = next(i for i, row in enumerate(rows) if row['role'] == 'learned')
-                app.learning.comparison.return_page = 'screening'
-                app.learning.page = 'comparison'
+                from ui.learned_comparison_view import LearnedComparisonView
+                app.learning._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.root),
+                                        (self.final_path, self.final_index), 'screening', app.read_executor, 'open_final')
             elif action == 'learning_screening_start':
                 if app.batch and not app.batch.future.done():
                     raise ValueError('請先停止目前批次')
                 app.batch = ComparisonRun(comparison_options(self.path, 'stable'), app.executor)
-                app.batch_mode = 'evaluation'; app.mode = 'auto'; app.batch_games_page = 0
+                app.learning_batch = app.batch; app.batch_mode = 'evaluation'; app.mode = 'auto'; app.batch_games_page = 0
                 app.learning.batch_return_page = 'screening'
             elif action == 'learning_screening_select':
                 source = self.report['plan']['source']
@@ -84,7 +79,7 @@ class ScreeningView:
             self.message = str(exc)
 
     def render(self, app):
-        refreshed = self.refresh.poll(self.path, screening_report, app.executor)
+        refreshed = self.refresh.poll(self.path, screening_report, app.read_executor)
         if refreshed is not None:
             report, error = refreshed
             if error: self.message = f'無法讀取 {self.path}：{error}'

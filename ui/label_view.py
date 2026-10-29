@@ -76,7 +76,7 @@ class LabelView:
                 self.state = {}
                 self.message = ''
                 self._loading_runtime = None
-                self.loading = app.executor.submit(self._read_saved, self.dataset, self.path)
+                self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.path)
                 return
             if self.loading is not None and action not in ('learning_labels_prev', 'learning_labels_next'): return
             if action == 'learning_labels_stop' and self.active():
@@ -99,7 +99,7 @@ class LabelView:
                 self.path = entries[self.index].parent
                 self.state, self.message = {}, ''
                 self._loading_runtime = None
-                self.loading = app.executor.submit(self._read_saved, self.dataset, self.path)
+                self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.path)
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.message = str(exc)
 
@@ -112,13 +112,13 @@ class LabelView:
             elif self._loaded_run is not self.run:
                 self._loading_runtime = self.run.snapshot()
                 self.state = self._loading_runtime
-                self.loading = app.executor.submit(self._read_saved, self.dataset, self.run.path)
+                self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.run.path)
                 self._loaded_run = self.run
                 loading = True
         state = self.state
         app.text('學習實驗 · 教師標記', 50, 78, large=True)
-        app.button('learning_data', '資料', (50, 122, 130, 34), enabled=not active)
-        app.button('learning_teacher', '教師先導', (195, 122, 190, 34), enabled=not active)
+        app.button('learning_data', '資料', (50, 122, 130, 34))
+        app.button('learning_teacher', '教師先導', (195, 122, 190, 34))
         app.button('learning_training', '棋子位置學習', (400, 122, 200, 34), enabled=bool(state.get('ready')) and not active and not loading)
         app.button('learning_groups', '五個單群組', (620, 122, 220, 34), enabled=state.get('ready',False) and not active and not loading)
         app.button('learning_labels_new', '建立新標記', (50, 178, 230, 36), enabled=not active and not loading and not self.load_error, primary=True)

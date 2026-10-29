@@ -87,7 +87,7 @@ class CombinationView:
             elif action in ('learning_combination_save','learning_combination_battle','learning_combination_compare'):
                 if self.selection_changed(): raise ValueError('選組已變更；請先新建組合')
                 candidate = load_combination_candidate(self.path,self.kind)
-                if action == 'learning_combination_compare': app.learning.open_comparison(candidate, app.executor); return
+                if action == 'learning_combination_compare': app.learning.open_comparison(candidate, app.read_executor); return
                 target = self.root/'configs/evaluation'/f'learned-{self.path.name}-{self.kind}.json'
                 if target.exists():
                     if EvaluationConfig.from_dict(json.loads(target.read_text(encoding='utf-8'))).to_dict() != candidate['config']:
@@ -126,8 +126,8 @@ class CombinationView:
         result = results.get(self.kind,{}); report = result.get('report'); frozen = result.get('frozen')
         draft = self.selection_changed()
         app.text('學習實驗 · 自選群組組合',50,78,large=True)
-        app.button('learning_inventory','候選盤點',(650,74,190,36),enabled=not active)
-        app.button('learning_groups','五個單群組',(50,120,190,34),enabled=not active)
+        app.button('learning_inventory','候選盤點',(650,74,190,36))
+        app.button('learning_groups','五個單群組',(50,120,190,34))
         app.text(f'已保存 {min(self.index+1,len(self.entries))}/{len(self.entries)}',260,128,muted=True)
         app.button('learning_combination_prev','上一份',(540,120,140,32),enabled=len(self.entries)>1 and not active)
         app.button('learning_combination_next','下一份',(700,120,140,32),enabled=len(self.entries)>1 and not active)

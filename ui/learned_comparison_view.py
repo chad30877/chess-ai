@@ -29,6 +29,16 @@ class LearnedComparisonView:
         self.path=Path(path); self.report=comparison_report(path); plan=self.report['plan']; self.source=plan['source']
         self.roles=set(plan['roles']); self.stable='stable' in plan['definitions']; self.baseline='material'; self.page=0; self.candidate=0
         self.rating_details=False; self.rating_page=0
+    def open_final(self, path, index):
+        from engine.learning.final_comparison import load_final_comparison
+        final = load_final_comparison(path)
+        entry = final['candidates'][index % len(final['candidates'])]
+        self.open(entry['source'])
+        self.open_plan(entry['path'])
+        rows = self.report['baselines']['material']['candidates']
+        self.candidate = next(i for i, row in enumerate(rows) if row['role'] == 'learned')
+        self.return_page = 'screening'
+
     def action(self,action,app):
         try:
             if self.refresh.error and action!='learning_compare_back': return
@@ -60,7 +70,7 @@ class LearnedComparisonView:
             elif action=='learning_compare_start' and self.path:
                 if app.batch and not app.batch.future.done(): raise ValueError('請先停止目前批次')
                 app.batch=ComparisonRun(comparison_options(self.path,self.baseline),app.executor)
-                app.batch_mode='evaluation'; app.mode='auto'; app.batch_games_page=0
+                app.learning_batch = app.batch; app.batch_mode='evaluation'; app.mode='auto'; app.batch_games_page=0
                 app.learning.batch_return_page='comparison'
             elif action=='learning_compare_records' and self.path:
                 data=comparison_report(self.path)['baselines'][self.baseline]
@@ -97,7 +107,7 @@ class LearnedComparisonView:
             app.button('learning_compare_freeze','凍結預覽條件',(50,470,340,40),enabled=bool(self.roles),primary=True)
             if self.config: self._config(app,[self.source['original'],self.source['config'],self.source['stable']],['原始','學習／組合','stable'],top=530)
         else:
-            refreshed=self.refresh.poll(self.path,comparison_report,app.executor)
+            refreshed=self.refresh.poll(self.path,comparison_report,app.read_executor)
             if refreshed is not None:
                 report,error=refreshed
                 if error:

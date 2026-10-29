@@ -49,7 +49,10 @@ class TeacherView:
         if entries:
             try: self.load(entries[0].parent)
             except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
-                raise ValueError(f'無法讀取先導 {entries[0].parent}：{exc}') from exc
+                self.path = entries[0].parent
+                self.state = {}
+                self.load_error = True
+                self.message = f'無法讀取先導 {self.path}：{exc}'
 
     @staticmethod
     def _read_pilot(path):
@@ -119,7 +122,7 @@ class TeacherView:
             self._poll_loading()
             if action == 'learning_pilot_retry':
                 self.message = ''
-                self.loading = app.executor.submit(self._read_pilot, self.path)
+                self.loading = app.read_executor.submit(self._read_pilot, self.path)
                 return
             if self.loading is not None and action not in ('learning_pilot_prev', 'learning_pilot_next'): return
             # 無效輸入仍能重新取得焦點修正。
@@ -151,7 +154,7 @@ class TeacherView:
                 self.index = (self.index + (1 if action.endswith('next') else -1)) % len(entries)
                 self.path = entries[self.index].parent
                 self.state, self.message = {}, ''
-                self.loading = app.executor.submit(self._read_pilot, self.path)
+                self.loading = app.read_executor.submit(self._read_pilot, self.path)
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.message = str(exc)
 
@@ -195,7 +198,7 @@ class TeacherView:
                     self.message = str(exc)
         state = self.state
         app.text('學習實驗 · 教師先導', 50, 78, large=True)
-        app.button('learning_data', '資料', (50, 122, 130, 34), enabled=not active)
+        app.button('learning_data', '資料', (50, 122, 130, 34))
         app.button('learning_labels', '教師標記', (195, 122, 190, 34), enabled=bool(state.get('choice')) and not active)
         app.button('learning_engine', self.draft + ' |' if self.focus == 'engine' else str(self.command or '輸入／貼上 Stockfish 19 執行檔路徑'),
                    (50, 174, 630, 38), enabled=not active)
