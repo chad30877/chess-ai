@@ -1,5 +1,6 @@
 """候選短對局的明確選擇、保存及結果。"""
 import json
+from ui.report_refresh import ReportRefresh
 from pathlib import Path
 from engine.learning.comparison import comparison_options
 from engine.learning.final_comparison import freeze_final_comparison, load_final_comparison
@@ -15,6 +16,7 @@ class ScreeningView:
         self.path = None
         self.report = None
         self.message = ''
+        self.refresh = ReportRefresh()
         self.selection_path = None
         self.selected = []
         self.final_path = None
@@ -41,6 +43,7 @@ class ScreeningView:
 
     def action(self, action, app):
         try:
+            if self.refresh.error and action != 'learning_screening_back': return
             if action == 'learning_screening_back':
                 app.learning.page = 'inventory'
             elif action == 'learning_screening_final_freeze':
@@ -81,10 +84,17 @@ class ScreeningView:
             self.message = str(exc)
 
     def render(self, app):
-        self.report = screening_report(self.path)
+        refreshed = self.refresh.poll(self.path, screening_report, app.executor)
+        if refreshed is not None:
+            report, error = refreshed
+            if error: self.message = f'無法讀取 {self.path}：{error}'
+            else: self.report, self.message = report, ''
         result = self.report
         app.text('候選短對局篩選', 50, 78, large=True)
         app.button('learning_screening_back', '返回候選', (50, 120, 170, 34))
+        if self.refresh.error:
+            app.text(self.message, 50, 185, width=790)
+            return
         app.text('stable · 八條共同開局 · 換色共 16 局', 50, 185, width=790)
         app.text('Alpha-Beta 3／q4 · 同時 4 局 · 每局 1 worker · TT 4096', 50, 220, width=790)
         app.text(f'狀態 {result["status"]} · 有效 {result["games"]}/16 局', 50, 260, width=790)

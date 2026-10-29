@@ -266,3 +266,48 @@ class RealLabelRecoveryTest(unittest.TestCase):
         click('learning_teacher')
         self.assertEqual(app.learning.page, 'teacher')
         app.close()
+
+    def test_switching_comparison_plan_can_be_left_while_loading(self):
+        from engine.learning.comparison import create_comparison
+        from tests.test_learned_comparison import candidate
+        source = candidate()
+        create_comparison(self.root, source, roles=['learned'])
+        create_comparison(self.root, source, roles=['learned'])
+        pygame.init(); self.addCleanup(pygame.quit)
+        executor = ManualExecutor()
+        app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        from ui.learned_comparison_view import LearnedComparisonView
+        app.learning.comparison = LearnedComparisonView(self.root)
+        app.mode = 'learning'; app.learning.open_comparison(source)
+        app.render()
+        button = next(b for b in app.buttons if b.action == 'learning_compare_next_plan')
+        self.assertTrue(button.enabled)
+        app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+        app.render()
+        self.assertIsNotNone(app.learning.page_loading)
+        button = next(b for b in app.buttons if b.action == 'learning_loading_back')
+        app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+        self.assertEqual(app.learning.page, 'comparison')
+        app.close()
+
+    def test_comparison_report_refresh_does_not_block_and_reports_invalid_source(self):
+        from unittest.mock import patch
+        from engine.learning.comparison import create_comparison
+        from tests.test_learned_comparison import candidate
+        from ui.learned_comparison_view import LearnedComparisonView
+        source = candidate(); path = create_comparison(self.root, source, roles=['learned'])
+        pygame.init(); self.addCleanup(pygame.quit)
+        executor = ManualExecutor()
+        app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        app.learning.comparison = LearnedComparisonView(self.root)
+        app.mode = 'learning'; app.learning.open_comparison(source)
+        with patch('ui.learned_comparison_view.comparison_report', side_effect=ValueError('報告損壞')):
+            app.render()
+            self.assertFalse(executor.jobs[-1][0].done())
+            executor.finish(); app.render()
+        self.assertIn(str(path), app.learning.comparison.message)
+        self.assertFalse(any(b.action == 'learning_compare_start' for b in app.buttons))
+        button = next(b for b in app.buttons if b.action == 'learning_compare_back')
+        app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+        self.assertEqual(app.learning.page, 'groups')
+        app.close()

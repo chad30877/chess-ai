@@ -236,6 +236,17 @@ class LearningView:
                 self._open_page('inventory', 'inventory', InventoryView, self.combination.source_path, 'combination', app.executor)
             except (OSError, ValueError, KeyError) as exc: self.combination.message = str(exc)
             return
+        if self.page == 'comparison' and action in ('learning_compare_prev_plan', 'learning_compare_next_plan'):
+            current = self.comparison
+            if not current.entries: return
+            index = (current.index + (1 if action.endswith('next_plan') else -1)) % len(current.entries)
+            def selected_comparison():
+                view = copy(current)
+                view.index = index
+                return view
+            self._open_page('comparison', 'comparison', selected_comparison, current.entries[index],
+                            'comparison', app.executor, 'open_plan')
+            return
         if self.page == 'comparison':
             self.comparison.action(action,app)
             return

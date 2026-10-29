@@ -1,4 +1,5 @@
 """學習來源、不可變比較預覽及各基準獨立研究報告。"""
+from ui.report_refresh import ReportRefresh
 from pathlib import Path
 from uuid import uuid4
 from engine.learning.comparison import create_comparison, load_comparison_plan, comparison_options, comparison_report
@@ -16,6 +17,7 @@ class LearnedComparisonView:
         self.opening_index=None
         self.rating_details=False; self.rating_page=0
         self.entries=[]; self.index=0; self.return_page='groups'
+        self.refresh=ReportRefresh()
     def open(self,source):
         self.source=source; self.path=None; self.report=None; self.message=''; self.page=0; self.index=0; self.return_page='groups'
         self.roles={'original','learned'}; self.stable=False; self.baseline='material'; self.config=False
@@ -29,6 +31,7 @@ class LearnedComparisonView:
         self.rating_details=False; self.rating_page=0
     def action(self,action,app):
         try:
+            if self.refresh.error and action!='learning_compare_back': return
             if action=='learning_compare_back': app.learning.page=self.return_page; return
             if action=='learning_compare_config': self.config=not self.config; self.config_page=0; return
             if action=='learning_compare_rating': self.rating_details=not self.rating_details; self.rating_page=0; return
@@ -94,8 +97,17 @@ class LearnedComparisonView:
             app.button('learning_compare_freeze','凍結預覽條件',(50,470,340,40),enabled=bool(self.roles),primary=True)
             if self.config: self._config(app,[self.source['original'],self.source['config'],self.source['stable']],['原始','學習／組合','stable'],top=530)
         else:
-            try: self.report=comparison_report(self.path)
-            except (OSError,ValueError,KeyError) as exc: self.message=str(exc); return
+            refreshed=self.refresh.poll(self.path,comparison_report,app.executor)
+            if refreshed is not None:
+                report,error=refreshed
+                if error:
+                    self.message=f'無法讀取 {self.path}：{error}'
+                    app.text(self.message,50,306,width=790)
+                    return
+                self.report,self.message=report,''
+            if self.refresh.error:
+                app.text(self.message,50,306,width=790)
+                return
             data=self.report['baselines'][self.baseline]; plan=self.report['plan']
             for index,key in enumerate(plan['definitions']):
                 app.button('learning_compare_baseline:'+key,'純子力主比較' if key=='material' else 'stable 參考',(50+index*275,260,260,32),primary=self.baseline==key)
