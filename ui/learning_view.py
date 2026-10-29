@@ -402,7 +402,7 @@ class LearningView:
         titles = {'home':'首頁', 'data':'資料準備', 'teacher':'教師先導', 'labeling':'教師標記', 'training':'棋子位置學習',
                   'groups':'單群組學習', 'results':'學習成果', 'combination':'組合', 'inventory':'候選清單',
                   'screening':'快速篩選', 'comparison':'比較', 'heldout':'教師誤差評估'}
-        app.text('› ' + titles.get(self.page, ''), 365, 101, width=260)
+        app.text('› ' + titles.get(self.page, ''), 365 if self.page in parents else 160, 101, width=260)
         if self.path:
             teacher = ('完成' if self.teacher.state.get('choice') else '未完成') if self.teacher.dataset == self.path and self.teacher.loading is None else '尚未載入'
             labels = ('完成' if self.labels.state.get('ready') else '未完成') if self._labels_current() and self.labels.loading is None else '尚未載入'
