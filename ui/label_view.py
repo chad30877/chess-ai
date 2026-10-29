@@ -17,6 +17,7 @@ class LabelView:
         self.advanced = False
         self.loading = None
         self.load_error = False
+        self._loading_runtime = None
         self._entries = []
 
     def active(self):
@@ -42,6 +43,7 @@ class LabelView:
         self.path = self.run = self._loaded_run = None
         self.state, self.message, self.index = {}, '', 0
         self._entries = []
+        self._loading_runtime = None
         self.loading = executor.submit(self._read_saved, self.dataset)
 
     def _poll_loading(self):
@@ -52,6 +54,12 @@ class LabelView:
             self._entries, self.path, self.state, error = future.result()
             self.load_error = bool(error)
             self.message = f'無法讀取標記 {self.path}：{error}' if error else ''
+            runtime, self._loading_runtime = self._loading_runtime, None
+            if runtime and error:
+                self.state = runtime
+            elif runtime and runtime.get('status') == 'failed':
+                self.state['error'] = runtime.get('error', '')
+                if not self.state.get('ready'): self.state['status'] = 'failed'
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.state = {}
             self.load_error = True
@@ -67,6 +75,7 @@ class LabelView:
             if action == 'learning_labels_retry':
                 self.state = {}
                 self.message = ''
+                self._loading_runtime = None
                 self.loading = app.executor.submit(self._read_saved, self.dataset, self.path)
                 return
             if self.loading is not None and action not in ('learning_labels_prev', 'learning_labels_next'): return
@@ -89,6 +98,7 @@ class LabelView:
                 self.run = self._loaded_run = None
                 self.path = entries[self.index].parent
                 self.state, self.message = {}, ''
+                self._loading_runtime = None
                 self.loading = app.executor.submit(self._read_saved, self.dataset, self.path)
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.message = str(exc)
@@ -100,23 +110,17 @@ class LabelView:
         if self.run:
             if active: self.state = self.run.snapshot()
             elif self._loaded_run is not self.run:
-                try:
-                    self.load(self.run.path)
-                    runtime = self.run.snapshot()
-                    if runtime.get('status') == 'failed':
-                        self.state['error'] = runtime.get('error', '')
-                        if not self.state.get('ready'): self.state['status'] = 'failed'
-                except (OSError, ValueError) as exc:
-                    self.state = self.run.snapshot()
-                    self.message = str(exc)
+                self._loading_runtime = self.run.snapshot()
+                self.state = self._loading_runtime
+                self.loading = app.executor.submit(self._read_saved, self.dataset, self.run.path)
                 self._loaded_run = self.run
-                self._entries = self.entries()
+                loading = True
         state = self.state
         app.text('學習實驗 · 教師標記', 50, 78, large=True)
         app.button('learning_data', '資料', (50, 122, 130, 34), enabled=not active)
         app.button('learning_teacher', '教師先導', (195, 122, 190, 34), enabled=not active)
-        app.button('learning_training', '棋子位置學習', (400, 122, 200, 34), enabled=bool(state.get('ready')) and not active)
-        app.button('learning_groups', '五個單群組', (620, 122, 220, 34), enabled=state.get('ready',False) and not active)
+        app.button('learning_training', '棋子位置學習', (400, 122, 200, 34), enabled=bool(state.get('ready')) and not active and not loading)
+        app.button('learning_groups', '五個單群組', (620, 122, 220, 34), enabled=state.get('ready',False) and not active and not loading)
         app.button('learning_labels_new', '建立新標記', (50, 178, 230, 36), enabled=not active and not loading and not self.load_error, primary=True)
         app.button('learning_labels_resume', '續跑／重試', (300, 178, 230, 36), enabled=bool(self.path) and not state.get('ready') and not active and not loading and not self.load_error)
         app.button('learning_labels_stop', '停止', (550, 178, 130, 36), enabled=active)

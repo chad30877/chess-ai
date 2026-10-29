@@ -245,3 +245,24 @@ class RealLabelRecoveryTest(unittest.TestCase):
         executor.finish(0); app.render()
         self.assertEqual(app.learning.training.path, selected)
         app.close()
+
+    def test_completed_label_run_reloads_records_without_blocking_navigation(self):
+        pygame.init(); self.addCleanup(pygame.quit)
+        executor = ManualExecutor()
+        app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        dataset = self.labels.parents[1]
+        app.mode = 'learning'; app.learning.path = dataset
+        app.learning.teacher.path = next((dataset / 'teacher-pilots').iterdir())
+        app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
+        app.learning.page = 'teacher'
+        def click(action):
+            app.render()
+            button = next(b for b in app.buttons if b.action == action)
+            self.assertTrue(button.enabled, action)
+            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+        click('learning_labels'); executor.finish(); app.render()
+        click('learning_labels_new'); executor.finish(); app.render()
+        self.assertIsNotNone(app.learning.labels.loading)
+        click('learning_teacher')
+        self.assertEqual(app.learning.page, 'teacher')
+        app.close()

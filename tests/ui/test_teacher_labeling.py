@@ -62,7 +62,7 @@ class LabelUiTest(unittest.TestCase):
                     time.sleep(.01)
                 click('learning_labels_stop')
                 view.run.future.result(timeout=5)
-                app.render()
+                app.render(); view.loading.result(timeout=15); app.render()
                 self.assertEqual(view.state['status'], 'stopped')
                 path = view.path
                 committed = {p.name: p.read_bytes() for p in (path / 'records').glob('*.json')}
@@ -89,7 +89,7 @@ class LabelUiTest(unittest.TestCase):
                 self.assertEqual(app.learning.labels.state['snapshot']['workers'], 2)
                 click('learning_labels_resume')
                 app.learning.labels.run.future.result(timeout=15)
-                app.render()
+                app.render(); app.learning.labels.loading.result(timeout=15); app.render()
                 self.assertEqual(app.learning.labels.state['status'], 'completed')
                 self.assertEqual(app.learning.labels.state['remaining'], 0)
                 for name, data in committed.items(): self.assertEqual((path / 'records' / name).read_bytes(), data)
@@ -108,7 +108,7 @@ class LabelUiTest(unittest.TestCase):
                         if writes[0] >= 2: raise OSError('摘要保存中斷')
                     return original(src, target)
                 with patch('os.replace', fail_summary): manual.finish()
-                app.render()
+                app.render(); manual.finish(); app.render()
                 recovered = load_labeling(path)
                 self.assertEqual(app.learning.labels.state['completed'], recovered['completed'])
                 self.assertEqual(app.learning.labels.state['status'], 'failed')

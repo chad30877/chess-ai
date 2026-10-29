@@ -57,3 +57,5 @@ Agent 以 pygame 實際繪製並檢視 1280×960 教師標記載入畫面：載�
 `tests.ui.test_learning_loading` 透過應用程式滑鼠事件控制背景工作完成順序，驗證返回、交錯讀取、未完成時點擊開始不會建立任務，以及真實標記損壞修復。尚需核對所有較慢讀取入口及完整文件結案。
 
 群組、舊單組與組合成果切換改為背景讀取；`tests.ui.test_learning_loading.RealLabelRecoveryTest.test_switching_training_results_can_be_left_while_loading` 通過，驗證返回、重新選取與過期讀取不覆蓋。篩選與比較入口背景載入後，相關組合、篩選、保留及比較共 10 例通過。
+
+教師標記任務完成後重新驗證也移至背景；實際短任務完成後，在驗證工作未完成時以 UI 事件返回教師先導的測試通過。篩選結果每次繪製仍會同步讀取報告，及完整比較紀錄入口仍需核查，因此第一項保持未勾選。
