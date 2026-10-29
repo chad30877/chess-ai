@@ -14,6 +14,8 @@
 
 切分、實作、審查或結案工作票時，先讀 `docs/agents/issue-tracker.md` 的定位、驗收與結案規則；本機 `.scratch/` 為目前狀態來源。
 
+完成驗收與結案後，將功能資料夾整份移至 `.scratch/archive/`，更新相關引用，並將仍有效的知識整合至正式文件。日常搜尋排除歸檔，追查歷史時才讀取。
+
 ### Domain docs
 
 採用 single-context 根目錄文件配置，消費規則見 `docs/agents/domain.md`。
