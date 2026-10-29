@@ -33,7 +33,7 @@ class GroupTrainingUiTest(unittest.TestCase):
                     if hasattr(app.executor, 'finish'): app.executor.finish()
                     else: future.result(timeout=15)
                     app.render()
-            click('mode:learning'); app.learning.open(self.labels.parents[1])
+            click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
             click('learning_teacher'); click('learning_labels'); click('learning_groups')
             click('learning_groups_new')
             view = app.learning.group_training
@@ -87,7 +87,7 @@ class GroupTrainingUiTest(unittest.TestCase):
             committed.update({str(p.relative_to(path)):p.read_bytes() for p in path.glob('groups/*/candidates/*.json')})
             app.close()
             app = ChessApplication(app.screen,executor=executor)
-            click('mode:learning'); app.learning.open(self.labels.parents[1])
+            click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
             click('learning_teacher'); click('learning_labels'); click('learning_groups')
             self.assertEqual(app.learning.group_training.state['completed_groups'],saved['completed_groups'])
             click('learning_groups_resume'); app.learning.group_training.run.future.result(timeout=45); app.render()

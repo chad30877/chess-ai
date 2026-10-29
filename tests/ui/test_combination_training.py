@@ -34,7 +34,7 @@ class CombinationUiTest(unittest.TestCase):
                     else: future.result(timeout=15)
                     app.render()
             def open_view():
-                click('mode:learning'); app.learning.open(self.labels.parents[1])
+                click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
                 click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
             open_view(); view = app.learning.combination
             self.assertEqual(view.selected,{'mobility','king-safety'})
@@ -93,7 +93,7 @@ class CombinationUiTest(unittest.TestCase):
                     if hasattr(app.executor, 'finish'): app.executor.finish()
                     else: future.result(timeout=15)
                     app.render()
-            click('mode:learning'); app.learning.open(self.labels.parents[1])
+            click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
             click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
             view = app.learning.combination
             click('learning_combination_batch')

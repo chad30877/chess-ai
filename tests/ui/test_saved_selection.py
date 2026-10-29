@@ -29,7 +29,7 @@ class SavedSelectionTest(unittest.TestCase):
                     app.render(); button = next(b for b in app.buttons if b.action == action)
                     self.assertTrue(button.enabled, action)
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-                click('mode:learning'); click('learning_saved_list')
+                click('mode:learning'); click('learning_nav_data'); click('learning_saved_list')
                 index = next(i for i, entry in enumerate(app.learning.saved_entries) if entry == older)
                 click(f'learning_saved_select:{index}'); executor.finish(); app.render()
                 self.assertEqual(app.learning.path, older)
@@ -38,7 +38,7 @@ class SavedSelectionTest(unittest.TestCase):
                 app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text='我的成果'))
                 app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0))
                 app.close(); app = ChessApplication(app.screen, executor=executor)
-                click('mode:learning'); executor.finish(); app.render()
+                click('mode:learning'); click('learning_nav_data'); executor.finish(); app.render()
                 self.assertEqual(app.learning.path, older)
                 self.assertEqual(app.learning.saved_name(older, '資料'), '我的成果')
                 self.assertEqual((older / 'dataset.json').read_bytes(), before)
@@ -70,7 +70,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
             later = older.parent / 'later'; shutil.copytree(older, later)
             status = later / 'status.json'; os.utime(status, (status.stat().st_mtime + 60, status.stat().st_mtime + 60))
             app.close(); app = ChessApplication(app.screen, executor=executor)
-            app.mode = 'learning'; app.learning.open(dataset)
+            app.mode = 'learning'; app.learning.open(dataset); app.learning.page = 'data'
             self.assertEqual(app.learning.teacher.path, older)
             app.close(); shutil.rmtree(older)
             app = ChessApplication(app.screen, executor=executor)
@@ -210,7 +210,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                     app.render(); button = next(b for b in app.buttons if b.action == action)
                     self.assertTrue(button.enabled, action)
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-                click('mode:learning')
+                click('mode:learning'); click('learning_nav_data')
                 for path in (first, second):
                     click('learning_saved_list'); index = app.learning.saved_entries.index(path)
                     click(f'learning_saved_select:{index}'); executor.finish(); app.render()
@@ -222,7 +222,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                     self.assertEqual((path / 'dataset.json').read_bytes(), originals[path])
                 app.close(); shutil.rmtree(second)
                 app = ChessApplication(app.screen, executor=executor)
-                click('mode:learning'); executor.finish(); app.render()
+                click('mode:learning'); click('learning_nav_data'); executor.finish(); app.render()
                 self.assertEqual(app.learning.path, second)
                 self.assertIsNone(app.learning.data)
                 self.assertIn(str(second), app.learning.message)
@@ -244,7 +244,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                     app.render(); button = next(b for b in app.buttons if b.action == action)
                     self.assertTrue(button.enabled, action)
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-                click('mode:learning'); click('learning_saved_list'); click('learning_saved_next')
+                click('mode:learning'); click('learning_nav_data'); click('learning_saved_list'); click('learning_saved_next')
                 target = app.learning.saved_entries[-1]
                 click('learning_saved_select:9'); executor.finish(); app.render()
                 self.assertEqual(app.learning.path, target)
@@ -258,7 +258,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
             executor = ManualExecutor()
             with patch('apps.chess_application.PROJECT_ROOT', root):
                 app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
-                app.mode = 'learning'; app.learning.source = 'local'; app.learning.local_path = str(source)
+                app.mode = 'learning'; app.learning.page = 'data'; app.learning.source = 'local'; app.learning.local_path = str(source)
                 def click(action):
                     app.render(); button = next(b for b in app.buttons if b.action == action)
                     self.assertTrue(button.enabled, action)
@@ -279,7 +279,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
         executor = ManualExecutor()
         with patch('apps.chess_application.PROJECT_ROOT', self.root):
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
-            app.mode = 'learning'; app.learning.open(dataset); app.learning.teacher.load(original)
+            app.mode = 'learning'; app.learning.open(dataset); app.learning.teacher.load(original); app.learning.page = 'data'
             app.learning.page = 'teacher'
             def click(action):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
@@ -331,7 +331,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
             executor = ManualExecutor()
             with patch('apps.chess_application.PROJECT_ROOT', root):
                 app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
-                app.mode = 'learning'; app.learning.source = 'local'; app.learning.local_path = str(source)
+                app.mode = 'learning'; app.learning.page = 'data'; app.learning.source = 'local'; app.learning.local_path = str(source)
                 app.render(); button = next(b for b in app.buttons if b.action == 'learning_create')
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
                 path = app.learning.run.path
