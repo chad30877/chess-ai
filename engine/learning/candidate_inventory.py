@@ -74,6 +74,16 @@ def load_candidate_inventory(source_path):
         test_data_identity=source['snapshot']['test_data_identity'], exposure=source['snapshot']['data_use'])
 
 
+def _validate_inputs(snapshot, inputs):
+    label = dict(inputs['label_snapshot'])
+    label_identity = label.pop('identity', None)
+    if (digest(inputs) != snapshot['inputs_sha256'] or not label_identity or
+            digest(label) != label_identity or label_identity != snapshot['label_identity'] or
+            label.get('dataset_sha256') != snapshot['dataset_identity'] or
+            ('dataset_sha256' in inputs and inputs['dataset_sha256'] != snapshot['dataset_identity'])):
+        raise ValueError('學習資料與標記來源身份不符')
+
+
 def load_legacy_candidate(path):
     """唯讀轉接舊棋子位置成果；保留原始快照及凍結結果身份。"""
     saved = load_training(path)
@@ -81,9 +91,7 @@ def load_legacy_candidate(path):
     if not saved['report'] or not saved['frozen'] or not saved['calibration']:
         raise ValueError('棋子位置學習尚未完成報告')
     inputs = json.loads((Path(path) / 'inputs.json').read_text(encoding='utf-8'))
-    if (digest(inputs) != snapshot['inputs_sha256'] or inputs['label_snapshot']['identity'] != snapshot['label_identity']
-            or inputs['dataset_sha256'] != snapshot['dataset_identity']):
-        raise ValueError('棋子位置學習來源身份不符')
+    _validate_inputs(snapshot, inputs)
     frozen = saved['frozen']
     chosen = saved['candidates'][frozen['strength']]
     return dict(kind='single', groups=['piece-square'], experiment_id=snapshot['id'],
@@ -122,8 +130,7 @@ def load_all_candidate_inventory(root):
                     if snapshot.get('identity') != digest(identity) or snapshot.get('kind') != 'independent-groups':
                         raise ValueError('群組學習快照身份不符')
                     inputs = json.loads((path / 'inputs.json').read_text(encoding='utf-8'))
-                    if digest(inputs) != snapshot['inputs_sha256'] or inputs['label_snapshot']['identity'] != snapshot['label_identity']:
-                        raise ValueError('群組學習資料身份不符')
+                    _validate_inputs(snapshot, inputs)
                     for group in snapshot['groups']:
                         try:
                             add(load_group_candidate(path, group), path, origin)
@@ -135,8 +142,7 @@ def load_all_candidate_inventory(root):
                     if snapshot.get('identity') != digest(identity) or snapshot.get('kind') != 'combination':
                         raise ValueError('組合快照身份不符')
                     inputs = json.loads((path / 'inputs.json').read_text(encoding='utf-8'))
-                    if digest(inputs) != snapshot['inputs_sha256']:
-                        raise ValueError('組合資料身份不符')
+                    _validate_inputs(snapshot, inputs)
                     for source in snapshot['sources']:
                         source_path = Path(source['label_path']) / 'group-training' / source['experiment_id']
                         if load_group_candidate(source_path, source['groups'][0]) != source:

@@ -163,3 +163,68 @@ class AllCandidatesTest(unittest.TestCase):
         invalid = load_all_candidate_inventory(self.root / 'data')
         self.assertFalse(any(row['origin'] == 'combination' for row in invalid['candidates']))
         self.assertTrue(any(row['groups'] == ('king-safety',) for row in invalid['candidates']))
+
+    def test_resealed_group_with_wrong_dataset_is_not_selectable(self):
+        import json
+        from engine.learning.candidate_inventory import load_all_candidate_inventory
+        from engine.learning.group_training import create_group_training, run_group_training, load_group_candidate
+        from engine.learning.teacher import digest
+        from engine.storage.batch_storage import write_json_atomic
+        path = create_group_training(self.labels, ['mobility']); run_group_training(path)
+        def read(file): return json.loads(file.read_text(encoding='utf-8'))
+        def seal(value):
+            value.pop('identity', None); value['identity'] = digest(value); return value
+        snapshot_path = path / 'snapshot.json'
+        snapshot = read(snapshot_path); snapshot['dataset_identity'] = '不相容資料'
+        seal(snapshot); write_json_atomic(snapshot_path, snapshot)
+        calibration_path = path / 'calibration.json'
+        calibration = read(calibration_path); calibration['snapshot_identity'] = snapshot['identity']
+        seal(calibration); write_json_atomic(calibration_path, calibration)
+        candidate_ids = {}
+        for file in (path / 'groups/mobility/candidates').glob('*.json'):
+            item = read(file); item['snapshot_identity'] = snapshot['identity']; item['calibration_identity'] = calibration['identity']
+            seal(item); write_json_atomic(file, item); candidate_ids[item['strength']] = item['identity']
+        frozen_path = path / 'groups/mobility/frozen.json'
+        frozen = read(frozen_path); frozen['snapshot_identity'] = snapshot['identity']
+        frozen['candidate_identity'] = candidate_ids[frozen['strength']]
+        seal(frozen); write_json_atomic(frozen_path, frozen)
+        report_path = path / 'groups/mobility/report.json'
+        report = read(report_path); report['frozen_identity'] = frozen['identity']; report['calibration_identity'] = calibration['identity']
+        seal(report); write_json_atomic(report_path, report)
+        self.assertEqual(load_group_candidate(path, 'mobility')['dataset_identity'], '不相容資料')
+        inventory = load_all_candidate_inventory(self.root / 'data')
+        self.assertFalse(inventory['candidates'])
+        self.assertTrue(any(row['path'] == str(path) for row in inventory['errors']))
+
+    def test_resealed_legacy_input_with_tampered_label_is_not_selectable(self):
+        import json
+        from engine.learning.candidate_inventory import load_all_candidate_inventory
+        from engine.learning.teacher import digest
+        from engine.storage.batch_storage import write_json_atomic
+        path = create_training(self.labels); run_training(path)
+        def read(file): return json.loads(file.read_text(encoding='utf-8'))
+        def seal(value):
+            value.pop('identity', None); value['identity'] = digest(value); return value
+        inputs_path = path / 'inputs.json'
+        inputs = read(inputs_path); inputs['label_snapshot']['dataset_sha256'] = '偽造來源'
+        write_json_atomic(inputs_path, inputs)
+        snapshot_path = path / 'snapshot.json'
+        snapshot = read(snapshot_path); snapshot['inputs_sha256'] = digest(inputs)
+        seal(snapshot); write_json_atomic(snapshot_path, snapshot)
+        for file in (path / 'candidates').glob('*.json'):
+            item = read(file); item['snapshot_identity'] = snapshot['identity']
+            seal(item); write_json_atomic(file, item)
+        calibration_path = path / 'calibration.json'
+        calibration = read(calibration_path); calibration['snapshot_identity'] = snapshot['identity']
+        write_json_atomic(calibration_path, calibration)
+        frozen_path = path / 'frozen.json'
+        frozen = read(frozen_path); frozen['snapshot_identity'] = snapshot['identity']
+        write_json_atomic(frozen_path, frozen)
+        report_path = path / 'report.json'
+        report = read(report_path); report['frozen_identity'] = digest(frozen)
+        write_json_atomic(report_path, report)
+        from engine.learning.training import load_training
+        self.assertTrue(load_training(path)['report'])
+        inventory = load_all_candidate_inventory(self.root / 'data')
+        self.assertFalse(inventory['candidates'])
+        self.assertTrue(any(row['path'] == str(path) for row in inventory['errors']))
