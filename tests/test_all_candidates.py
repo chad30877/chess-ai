@@ -153,6 +153,11 @@ class AllCandidatesTest(unittest.TestCase):
             click('learning_inventory_candidate:10')
             self.assertIn(10, app.learning.inventory.selected_indices)
             self.assertEqual(app.learning.inventory.report['candidates'][10]['source']['snapshot_identity'], report['candidates'][10]['source']['snapshot_identity'])
+            click('learning_inventory_prev'); click('learning_inventory_candidate:5')
+            app.render()
+            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_inventory_screen').enabled)
+            app.dispatch('learning_inventory_screen')
+            self.assertEqual(app.learning.page, 'inventory')
             self.assertIsNone(app.batch)
             self.assertFalse((self.root / 'data/learning-screening').exists())
 
