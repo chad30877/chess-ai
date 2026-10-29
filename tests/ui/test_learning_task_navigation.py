@@ -114,3 +114,37 @@ class TaskNavigationTest(unittest.TestCase):
             click('learning_task_stop')
             executor.finish()
             self.assertEqual(run.snapshot()['status'], 'stopped')
+
+    def test_short_comparison_keeps_saving_after_leaving_batch_page(self):
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+        from engine.learning.comparison import create_comparison
+        from tests.test_learned_comparison import candidate
+        pygame.init()
+        self.addCleanup(pygame.quit)
+        with tempfile.TemporaryDirectory() as folder, patch('apps.chess_application.PROJECT_ROOT', Path(folder)), ThreadPoolExecutor(1) as executor:
+            lines = [dict(initial_fen='7k/8/8/8/8/8/P7/K7 w - - 0 1', moves_uci=[], name=str(i), source={}) for i in range(12)]
+            path = create_comparison(folder, candidate(), roles=('learned',), opening_lines=lines, max_plies=1)
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            self.addCleanup(app.close)
+            app.learning.comparison.open_plan(path)
+            app.learning.page = 'comparison'
+            app.mode = 'learning'
+            def click(action):
+                app.render()
+                button = next(b for b in app.buttons if b.action == action)
+                self.assertTrue(button.enabled, action)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            click('learning_compare_start')
+            run = app.batch
+            click('learning_comparison_return')
+            before = run.snapshot()['saved_games']
+            deadline = time.monotonic() + 30
+            while run.snapshot()['saved_games'] <= before:
+                self.assertFalse(run.future.done())
+                self.assertLess(time.monotonic(), deadline)
+                app.render()
+                time.sleep(.02)
+            click('learning_task_stop')
+            run.future.result(timeout=20)
+            self.assertGreater(run.snapshot()['saved_games'], before)

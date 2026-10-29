@@ -36,6 +36,12 @@ class GroupTrainingUiTest(unittest.TestCase):
             click('learning_labels')
             self.assertEqual(app.learning.page, 'labeling')
             self.assertIs(view.run, active_run)
+            before = active_run.snapshot()['completed_groups']
+            deadline = time.monotonic() + 30
+            while active_run.snapshot()['completed_groups'] <= before:
+                self.assertFalse(active_run.future.done())
+                self.assertLess(time.monotonic(), deadline)
+                app.render(); time.sleep(.01)
             click('learning_task_return')
             self.assertEqual(app.learning.page, 'groups')
             click('learning_labels')
@@ -43,7 +49,7 @@ class GroupTrainingUiTest(unittest.TestCase):
             click('learning_groups'); app.render()
             path = view.path
             saved = load_group_training(path)
-            self.assertEqual(saved['completed_groups'],2)
+            self.assertGreaterEqual(saved['completed_groups'],3)
             self.assertEqual(saved['status'],'stopped')
             committed = {str(p.relative_to(path)):p.read_bytes() for p in path.glob('groups/*/report.json')}
             committed.update({str(p.relative_to(path)):p.read_bytes() for p in path.glob('groups/*/candidates/*.json')})
@@ -51,7 +57,7 @@ class GroupTrainingUiTest(unittest.TestCase):
             app = ChessApplication(app.screen,executor=executor)
             click('mode:learning'); app.learning.open(self.labels.parents[1])
             click('learning_teacher'); click('learning_labels'); click('learning_groups')
-            self.assertEqual(app.learning.group_training.state['completed_groups'],2)
+            self.assertEqual(app.learning.group_training.state['completed_groups'],saved['completed_groups'])
             click('learning_groups_resume'); app.learning.group_training.run.future.result(timeout=45); app.render()
             self.assertEqual(app.learning.group_training.state['completed_groups'],5)
             self.assertEqual(app.learning.group_training.state['completed'],15)
