@@ -195,6 +195,9 @@ class ChessApplication:
         )
 
     def start_game(self):
+        if self.mode == 'auto' and self.learning.active_task():
+            self.message = f'目前執行中：{self.learning.active_task()[1]}，請先停止或等待完成'
+            return
         if not self._commit_number():
             return
         if self.mode == "auto":
@@ -871,6 +874,8 @@ class ChessApplication:
             self.move_view.handle_wheel(event.pos, 1 if event.button == 4 else -1, items)
 
     def button(self, action, label, rect, *, enabled=True, primary=False):
+        if action == 'start' and self.mode == 'auto' and self.learning.active_task():
+            enabled = False
         if action.startswith('learning_budget:') and self.learning.active_task():
             enabled = False
         if action in START_ACTIONS and (self.learning.active_task() or

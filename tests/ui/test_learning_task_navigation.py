@@ -40,9 +40,17 @@ class TaskNavigationTest(unittest.TestCase):
                 click('learning_data')
                 self.assertEqual(app.learning.page, 'data')
                 self.assertFalse(run.future.done())
+                with patch.object(app, 'text', wraps=app.text) as draw:
+                    app.render()
+                self.assertTrue(any('教師先導' in str(call.args[0]) for call in draw.call_args_list))
                 click('learning_task_return')
                 self.assertEqual(app.learning.page, 'teacher')
                 self.assertIs(app.learning.teacher.run, run)
+                click('home')
+                click('mode:auto')
+                click('batch_mode:evaluation')
+                app.render()
+                self.assertFalse(next(b for b in app.buttons if b.action == 'start').enabled)
 
     def test_another_start_is_blocked_while_pilot_is_running(self):
         pygame.init()

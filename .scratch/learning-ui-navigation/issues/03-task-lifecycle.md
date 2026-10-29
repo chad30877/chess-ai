@@ -21,13 +21,13 @@
 ## 功能驗收與驗證方式
 
 - [x] 離開執行頁後原任務持續工作。驗證：分別以教師、學習與比較小任務跨頁，核對同一任務持續產生進度或保存成果。
-- [ ] 跨頁可看到目前任務的簡短進度並返回正確任務。驗證：從其他功能頁操作返回，核對任務身分與來源保持一致。
+- [x] 跨頁可看到目前任務的簡短進度並返回正確任務。驗證：從其他功能頁操作返回，核對任務身分與來源保持一致。
 - [x] 跨頁停止操作能停止實際任務並保留已提交成果。驗證：對教師、學習與比較分別停止，檢查公開保存結果。
 - [ ] 已有任務時其他教師、訓練與比較開始入口不能啟動第二項工作。驗證：交叉操作各類入口，包含新建與續跑，確認沒有第二項任務或多餘子程序。
-- [ ] 互斥限制不縮減單一任務原有並行設定。驗證：沿用可控制外部教師及既有比較派工測試核對實際設定與並行上限。
+- [x] 互斥限制不縮減單一任務原有並行設定。驗證：沿用可控制外部教師及既有比較派工測試核對實際設定與並行上限。
 - [ ] 正在使用的同一份資料與研究條件不可修改。驗證：執行中嘗試修改來源條件，確認活動任務快照不變；獨立的新任務草稿可準備。
-- [ ] 停止及保存尚未完成時任務仍占用執行位置。驗證：延遲保存後操作第二次開始，確認待結束後才開放。
-- [ ] 任務失敗後有簡短原因與可展開的詳細錯誤。驗證：注入可控制工作失敗，核對已保存進度與目前失敗任務身分。
+- [x] 停止及保存尚未完成時任務仍占用執行位置。驗證：延遲保存後操作第二次開始，確認待結束後才開放。
+- [x] 任務失敗後有簡短原因與可展開的詳細錯誤。驗證：注入可控制工作失敗，核對已保存進度與目前失敗任務身分。
 
 ## 驗證安排
 
@@ -47,4 +47,4 @@
 
 ## 驗收證據與限制
 
-已以 `..\chess-ai\.venv\Scripts\python.exe -m unittest tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot` 驗證 10 項通過。教師先導、教師標記、群組學習與比較的事件測試涵蓋返回、跨頁停止或任務保留；以延遲執行工作確認停止後保存尚未完成時仍阻擋另一項開始。另執行相同命令並加入 `tests.ui.test_chess_application`，60 項通過。追加事件測試驗證教師標記切頁期間完成數增加，以及注入摘要保存失敗後可展開錯誤詳情；教師工作期間各學習與比較開始入口的互斥亦經派發測試。另以 `tests.ui.test_group_training` 確認切頁後群組完成數增加並停止保存；以 `tests.ui.test_learning_task_navigation.TaskNavigationTest.test_short_comparison_keeps_saving_after_leaving_batch_page` 執行合法短對局，確認離開批次頁後繼續保存並跨頁停止。尚未完成不同工作彼此交叉互斥、其他失敗來源及畫面驗收，其餘功能驗收項保留未勾選。人工重現步驟不等於已通過。
+已以 `..\chess-ai\.venv\Scripts\python.exe -m unittest tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot` 驗證 10 項通過。教師先導、教師標記、群組學習與比較的事件測試涵蓋返回、跨頁停止或任務保留；以延遲執行工作確認停止後保存尚未完成時仍阻擋另一項開始。另執行相同命令並加入 `tests.ui.test_chess_application`，60 項通過。追加事件測試驗證教師標記切頁期間完成數增加，以及注入摘要保存失敗後可展開錯誤詳情；教師工作期間各學習與比較開始入口的互斥亦經派發測試。另以 `tests.ui.test_group_training` 確認切頁後群組完成數增加並停止保存；以 `tests.ui.test_learning_task_navigation.TaskNavigationTest.test_short_comparison_keeps_saving_after_leaving_batch_page` 執行合法短對局，確認離開批次頁後繼續保存並跨頁停止。追加教師工作期間檢查一般評分比較開始按鈕、群組工作期間檢查教師及標記開始按鈕；工作完成之前均受阻。既有先導及比較測試確認保留實際 worker 數；延遲執行器測試確認停止後未完成保存前仍受阻。尚未完成所有不同工作彼此交叉互斥及同一資料條件鎖定驗收，兩項保留未勾選。人工重現步驟不等於已通過。

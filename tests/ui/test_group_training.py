@@ -36,6 +36,14 @@ class GroupTrainingUiTest(unittest.TestCase):
             click('learning_labels')
             self.assertEqual(app.learning.page, 'labeling')
             self.assertIs(view.run, active_run)
+            click('learning_teacher')
+            app.render()
+            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_pilot_start').enabled)
+            app.dispatch('learning_pilot_start')
+            self.assertIsNone(app.learning.teacher.run)
+            click('learning_labels')
+            app.render()
+            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_labels_new').enabled)
             before = active_run.snapshot()['completed_groups']
             deadline = time.monotonic() + 30
             while active_run.snapshot()['completed_groups'] <= before:
