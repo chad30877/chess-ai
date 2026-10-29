@@ -40,8 +40,11 @@ class CombinationView:
                 continue
         self.entries = []
         for entry in sorted((self.source_path.parents[1]/'combinations').glob('*/snapshot.json'),key=lambda p:p.stat().st_mtime,reverse=True):
-            snapshot = json.loads(entry.read_text(encoding='utf-8'))
-            if snapshot['sources'][0]['snapshot_identity'] == groups['snapshot']['identity']: self.entries.append(entry)
+            try:
+                snapshot = json.loads(entry.read_text(encoding='utf-8'))
+                if snapshot['sources'][0]['snapshot_identity'] == groups['snapshot']['identity']: self.entries.append(entry)
+            except (OSError, ValueError, KeyError, TypeError, IndexError):
+                continue
         chosen = Path(preferred) if preferred else (self.entries[0].parent if self.entries else None)
         if chosen:
             self.index = next((i for i, e in enumerate(self.entries) if e.parent == chosen), 0)
@@ -75,6 +78,9 @@ class CombinationView:
                 else: self.selected.add(group)
                 self.update_preview(); self.weights = True; self.weight_page = 0
                 if self.preview and self.selection_changed(): self.message = '選組已變更；預覽新組合，按新建套用'
+            elif action == 'learning_combination_batch_resume' and self.batch_path and self.batch_state.get('status') != 'completed':
+                self.batch_active = True; self.message = ''
+                self.run = CombinationBatchRun(self.batch_path, app.executor)
             elif action == 'learning_combination_batch' and len(self.selected) >= 2 and self.preview:
                 selected = [g for g in GROUPS if g in self.selected]
                 selections = [list(c) for n in range(2, len(selected)+1) for c in combinations(selected,n)]
@@ -144,6 +150,8 @@ class CombinationView:
         app.button('learning_combination_resume','續跑／重試',(330,210,210,36),enabled=bool(self.path) and not self.load_error and state.get('status')!='completed' and not active)
         app.button('learning_combination_stop','停止',(550,210,75,36),enabled=active)
         app.button('learning_combination_batch','補齊選取組合',(635,210,205,36),enabled=len(self.selected)>=2 and bool(self.preview) and not active)
+        if self.batch_path and self.batch_state.get('status') != 'completed':
+            app.button('learning_combination_batch_resume','續跑既有批次',(635,252,205,32),enabled=not active)
         statuses = dict(ready='待開始',queued='準備中',running='執行中',completed='完成',stopped='已停止',failed='失敗',interrupted='待續跑')
         app.text(f'{statuses.get(state.get("status"),"權重預覽")} · 聯合候選 {state.get("completed",0)}/3 · {state.get("elapsed_seconds",0):.1f} 秒 · {state.get("current_candidate","")}',50,259,width=790)
         if self.batch_state:
