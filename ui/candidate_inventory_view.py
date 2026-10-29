@@ -100,6 +100,7 @@ class InventoryView:
         kinds = {'legacy': '舊棋子位置', 'group': '單群組', 'combination': '組合'}
         app.text('比較候選', 50, 78, large=True)
         app.button('learning_inventory_back', '返回學習', (50, 120, 170, 34))
+        app.button('learning_inventory_history', '比較紀錄', (50, 550, 350, 34))
         app.button('learning_inventory_origin', '來源：' + kinds.get(self.origin_filter, '全部'), (240, 120, 250, 34))
         app.button('learning_inventory_group', '群組：' + GROUPS.get(self.group_filter, '全部'), (510, 120, 330, 34))
         if not rows: app.text('沒有符合條件的候選', 50, 200)

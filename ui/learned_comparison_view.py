@@ -39,8 +39,13 @@ class LearnedComparisonView:
 
     def open_plan(self,path):
         self.path=Path(path); self.report=comparison_report(path); plan=self.report['plan']; self.source=plan['source']
-        self.roles=set(plan['roles']); self.stable='stable' in plan['definitions']; self.baseline='material'; self.page=0; self.candidate=0
+        self.roles=set(plan['roles']); self.stable='stable' in plan['definitions']; self.baseline=next(iter(plan['definitions'])); self.page=0; self.candidate=0
         self.rating_details=False; self.rating_page=0
+    def open_history(self, path):
+        self.selected_origin = None
+        self.open_plan(path)
+        self.return_page = 'history'
+
     def open_final(self, path, index):
         from engine.learning.final_comparison import load_final_comparison
         final = load_final_comparison(path)

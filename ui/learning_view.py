@@ -19,6 +19,7 @@ from ui.candidate_inventory_view import InventoryView
 from ui.screening_view import ScreeningView
 from ui.heldout_view import HeldoutView
 from ui.comparison_setup_view import ComparisonSetupView
+from ui.comparison_history_view import ComparisonHistoryView
 from ui.controls import ui_font
 from ui.unfinished_tasks import unfinished, RecoveredWork
 
@@ -126,6 +127,7 @@ class LearningView:
         self.comparison = LearnedComparisonView(root)
         self.combination = CombinationView(root)
         self.inventory = InventoryView()
+        self.comparison_history = ComparisonHistoryView()
         self.screening = ScreeningView(root)
         self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
@@ -536,7 +538,7 @@ class LearningView:
         parents = {'teacher': ('teacher', '教師評分'), 'labeling': ('teacher', '教師評分'),
                    'groups': ('groups', '評分權重學習'), 'results': ('groups', '評分權重學習'), 'training': ('groups', '評分權重學習'),
                    'combination': ('groups', '評分權重學習'), 'inventory': ('inventory', '比較候選'),
-                   'screening': ('inventory', '比較候選'), 'setup': ('inventory', '比較候選'), 'comparison': ('inventory', '比較候選'),
+                   'screening': ('inventory', '比較候選'), 'history': ('inventory', '比較候選'), 'setup': ('inventory', '比較候選'), 'comparison': ('inventory', '比較候選'),
                    'heldout': ('inventory', '比較候選')}
         app.button('learning_breadcrumb_data', '學習實驗', (25, 98, 120, 27))
         if self.page in parents:
@@ -544,7 +546,7 @@ class LearningView:
             app.button('learning_breadcrumb_' + parent, label, (160, 98, 190, 27))
         titles = {'home':'首頁', 'data':'資料準備', 'teacher':'教師先導', 'labeling':'教師標記', 'training':'棋子位置學習',
                   'groups':'單群組學習', 'results':'學習成果', 'combination':'組合', 'inventory':'候選清單',
-                  'screening':'快速篩選', 'setup':'比較用途', 'comparison':'比較', 'heldout':'教師誤差評估'}
+                  'screening':'快速篩選', 'history':'比較紀錄', 'setup':'比較用途', 'comparison':'比較', 'heldout':'教師誤差評估'}
         app.text('› ' + titles.get(self.page, ''), 365 if self.page in parents else 160, 101, width=260)
         if self.path:
             teacher = ('完成' if self.teacher.state.get('choice') else '未完成') if self.teacher.dataset == self.path and self.teacher.loading is None else '尚未載入'
@@ -729,6 +731,8 @@ class LearningView:
             return
         if self.page == 'inventory':
             if action == 'learning_inventory_back': self.page = self.inventory_return
+            elif action == 'learning_inventory_history':
+                self._open_page('history', 'comparison_history', ComparisonHistoryView, self.teacher.project_root, 'inventory', app.read_executor)
             elif action == 'learning_inventory_setup' and self.inventory.report.get('all_sources'):
                 rows = [self.inventory.report['candidates'][i] for i in sorted(self.inventory.selected_indices)]
                 if not rows: return
@@ -752,6 +756,14 @@ class LearningView:
             return
         if self.page == 'heldout':
             self.heldout.action(action, app)
+            return
+        if self.page == 'history':
+            if action == 'learning_history_back': self.page = 'inventory'
+            elif action == 'learning_history_prev': self.comparison_history.page = max(0, self.comparison_history.page - 1)
+            elif action == 'learning_history_next': self.comparison_history.page += 1
+            elif action.startswith('learning_history_open:'):
+                entry = self.comparison_history.entries[int(action.split(':')[1])]
+                self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root), entry['path'], 'history', app.read_executor, 'open_history')
             return
         if self.page == 'screening':
             if action == 'learning_screening_heldout':
@@ -994,6 +1006,9 @@ class LearningView:
                 app.button('learning_need_groups', '前往評分權重學習', (50, 140, 250, 36))
                 return
             self.inventory.render(app)
+            return
+        if self.page == 'history':
+            self.comparison_history.render(app)
             return
         if self.page == 'heldout':
             self.heldout.render(app)
