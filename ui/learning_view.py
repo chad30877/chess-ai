@@ -49,6 +49,11 @@ class LearningView:
         self.screening = ScreeningView(root)
         self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
+        self.loading = None
+        self.loading_path = None
+        self.page_loading = None
+        self.page_load_error = ''
+        self.page_load_request = None
 
     def open_comparison(self, candidate):
         self.comparison.open(candidate)
@@ -108,13 +113,77 @@ class LearningView:
         return sorted(self.root.glob('*/status.json'), key=lambda p: p.stat().st_mtime, reverse=True)
 
     def open(self, path):
+        self.loading = None
         self.data = load_dataset(path)
         self.path = Path(path)
         self.sample_index = 0
         self.message = ''
         self.teacher.open(path)
 
+    @staticmethod
+    def _read_dataset(path, root):
+        try:
+            data = load_dataset(path)
+            teacher = TeacherView(root)
+            teacher.open(path)
+            return data, teacher, None
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            return None, None, str(exc)
+
+    def _open_async(self, path, executor):
+        self.loading_path = Path(path)
+        self.path = self.loading_path
+        self.data = None
+        self.message = ''
+        self.loading = executor.submit(self._read_dataset, self.loading_path, self.teacher.project_root)
+
+    def _poll_loading(self):
+        if self.loading is None or not self.loading.done(): return
+        future, self.loading = self.loading, None
+        try:
+            data, teacher, error = future.result()
+            if error: raise ValueError(error)
+            self.data, self.teacher = data, teacher
+            self.path = self.loading_path
+            self.sample_index = 0
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            self.data = None
+            self.message = f'無法開啟資料 {self.loading_path}：{exc}'
+
+    @staticmethod
+    def _read_page(factory, path):
+        try:
+            view = factory()
+            view.open(path)
+            return view, None
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            return None, str(exc)
+
+    def _open_page(self, page, attribute, factory, path, back, executor):
+        self.page = page
+        self.page_load_error = ''
+        self.page_load_request = (page, attribute, factory, Path(path), back)
+        self.page_loading = executor.submit(self._read_page, factory, Path(path))
+
+    def _poll_page(self):
+        if self.page_loading is None or not self.page_loading.done(): return
+        future, self.page_loading = self.page_loading, None
+        view, error = future.result()
+        if error:
+            self.page_load_error = f'無法讀取 {self.page_load_request[3]}：{error}'
+        else:
+            setattr(self, self.page_load_request[1], view)
+            self.page_load_request = None
+
     def action(self, action, app):
+        if self.page_load_request is not None:
+            if action == 'learning_loading_back':
+                self.page = self.page_load_request[4]
+                self.page_loading = self.page_load_request = None
+                self.page_load_error = ''
+            elif action == 'learning_loading_retry' and self.page_loading is None:
+                self._open_page(*self.page_load_request, app.executor)
+            return
         if self.page == 'inventory':
             if action == 'learning_inventory_back': self.page = 'combination'
             elif action == 'learning_inventory_screen':
@@ -139,7 +208,7 @@ class LearningView:
             return
         if action == 'learning_inventory' and self.page == 'combination' and not self.active():
             try:
-                self.inventory.open(self.combination.source_path); self.page = 'inventory'
+                self._open_page('inventory', 'inventory', InventoryView, self.combination.source_path, 'combination', app.executor)
             except (OSError, ValueError, KeyError) as exc: self.combination.message = str(exc)
             return
         if self.page == 'comparison':
@@ -147,20 +216,17 @@ class LearningView:
             return
         if action == 'learning_combinations' and not self.active() and self.group_training.path:
             try:
-                self.combination.open(self.group_training.path)
-                self.page = 'combination'
+                self._open_page('combination', 'combination', lambda: CombinationView(self.teacher.project_root), self.group_training.path, 'groups', app.executor)
             except (OSError,ValueError,KeyError) as exc: self.group_training.message = str(exc)
             return
         if action == 'learning_groups' and not self.active() and self.labels.path and self.labels.loading is None and self.labels.state.get('ready'):
             try:
-                self.group_training.open(self.labels.path)
-                self.page = 'groups'
+                self._open_page('groups', 'group_training', lambda: GroupTrainingView(self.teacher.project_root), self.labels.path, 'labeling', app.executor)
             except (OSError,ValueError,KeyError) as exc: self.labels.message = str(exc)
             return
         if action == 'learning_training' and not self.active() and self.labels.path and self.labels.loading is None and self.labels.state.get('ready'):
             try:
-                self.training.open(self.labels.path)
-                self.page = 'training'
+                self._open_page('training', 'training', lambda: TrainingView(self.teacher.project_root), self.labels.path, 'labeling', app.executor)
             except (OSError, ValueError, KeyError) as exc:
                 self.labels.message = str(exc)
             return
@@ -168,7 +234,7 @@ class LearningView:
             self.teacher.commit()
             self.page = 'data'
             return
-        if action == 'learning_labels' and not self.active() and self.teacher.path:
+        if action == 'learning_labels' and not self.active() and self.teacher.path and self.teacher.loading is None and self.teacher.state.get('choice'):
             try:
                 self.labels.open(self.path, self.teacher.path, app.executor)
                 self.page = 'labeling'
@@ -193,6 +259,8 @@ class LearningView:
         if self.page == 'teacher':
             self.teacher.action(action, app)
             return
+        if self.loading is not None and not action.startswith('learning_open:'):
+            return
         if not self.commit():
             return
         try:
@@ -214,14 +282,16 @@ class LearningView:
                 self.run = DatasetRun(self.root, source, int(self.seed), app.executor)
                 self.data = None
                 self.message = ''
-            elif action == 'learning_teacher' and self.path:
+            elif action == 'learning_teacher' and self.path and self.data is not None:
                 self.page = 'teacher'
             elif action.startswith('learning_open:'):
                 path = self.entries()[int(action.split(':')[1])].parent
                 if (path / 'dataset.json').exists():
-                    self.open(path)
+                    self._open_async(path, app.executor)
                 else:
                     saved = json.loads((path / 'status.json').read_text(encoding='utf-8'))
+                    self.loading = None
+                    self.path = path
                     self.data = None
                     self.run = None
                     self.message = saved.get('error', '資料尚未完成；請建立新實驗重試')
@@ -238,6 +308,14 @@ class LearningView:
             self.message = f'無法開啟資料：{exc}'
 
     def render(self, app):
+        self._poll_loading()
+        self._poll_page()
+        if self.page_load_request is not None:
+            app.text('學習實驗', 50, 78, large=True)
+            app.button('learning_loading_back', '返回', (50, 122, 130, 34))
+            app.text(self.page_load_error or '載入已保存成果…', 50, 190, width=790)
+            if self.page_load_error: app.button('learning_loading_retry', '重新讀取', (50, 240, 180, 34))
+            return
         if self.page == 'inventory':
             self.inventory.render(app)
             return
@@ -277,7 +355,7 @@ class LearningView:
             app.text('database.lichess.org · 下載壓縮來源後串流抽樣', 50, 178, muted=True, width=790)
         app.button('learning_field:seed', '種子：' + (self.draft + ' |' if self.focus == 'seed' else self.seed),
                    (50, 220, 270, 36), enabled=not active)
-        app.button('learning_create', '建立新實驗', (340, 220, 220, 36), enabled=not active, primary=True)
+        app.button('learning_create', '建立新實驗', (340, 220, 220, 36), enabled=not active and self.loading is None, primary=True)
         app.button('learning_stop', '停止', (580, 220, 110, 36), enabled=active)
         state = self.run.snapshot() if self.run else {}
         if state.get('status') == 'completed' and self._loaded_run is not self.run:
@@ -291,7 +369,9 @@ class LearningView:
         if state:
             app.text(f'{statuses.get(state["status"], state["status"])} · {stages.get(state["stage"], state["stage"])}'
                      f' · {state.get("bytes", 0) / 1048576:.1f} MB · {state.get("source_games", 0)} 盤 · {state.get("elapsed_seconds", 0):.1f} 秒', 50, 276, width=790)
-        if self.message or state.get('error'):
+        if self.loading is not None:
+            app.text('載入已保存資料…', 50, 310, width=790)
+        elif self.message or state.get('error'):
             app.text(self.message or state['error'], 50, 310, width=790)
         if self.data:
             data = self.data

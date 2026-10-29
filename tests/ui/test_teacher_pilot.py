@@ -34,6 +34,10 @@ class PilotUiTest(unittest.TestCase):
                     app.render()
                     button = next(b for b in app.buttons if b.action == action)
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                    if action.startswith('learning_open:') and app.learning.loading is not None:
+                        if hasattr(app.executor, 'finish'): app.executor.finish()
+                        else: app.learning.loading.result(timeout=15)
+                        app.render()
                 click('mode:learning')
                 click('learning_open:0')
                 click('learning_teacher')
@@ -74,6 +78,10 @@ class PilotUiTest(unittest.TestCase):
                     app.render()
                     button = next(b for b in app.buttons if b.action == action)
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                    if action.startswith('learning_open:') and app.learning.loading is not None:
+                        if hasattr(app.executor, 'finish'): app.executor.finish()
+                        else: app.learning.loading.result(timeout=15)
+                        app.render()
                 def enter(text):
                     click('learning_teacher_workers')
                     app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
@@ -115,6 +123,10 @@ class PilotUiTest(unittest.TestCase):
                     app.render()
                     button = next(b for b in app.buttons if b.action == action)
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                    if action.startswith('learning_open:') and app.learning.loading is not None:
+                        if hasattr(app.executor, 'finish'): app.executor.finish()
+                        else: app.learning.loading.result(timeout=15)
+                        app.render()
                 click('mode:learning')
                 click('learning_open:0')
                 click('learning_teacher')

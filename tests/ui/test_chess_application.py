@@ -47,6 +47,8 @@ class ChessApplicationTest(unittest.TestCase):
         self.addCleanup(self.app.close)
         self.click('mode:learning')
         self.click('learning_open:0')
+        self.executor.finish()
+        self.app.render()
         self.assertEqual(self.app.learning.data['summary']['selected_games'], 12)
         self.assertEqual(self.app.learning.data, load_dataset(path))
         self.app.learning.local_path = str(self.project / 'missing.pgn')

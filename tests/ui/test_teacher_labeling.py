@@ -40,6 +40,10 @@ class LabelUiTest(unittest.TestCase):
                     button = next(b for b in app.buttons if b.action == action)
                     self.assertTrue(button.enabled)
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                    if action.startswith('learning_open:') and app.learning.loading is not None:
+                        if hasattr(app.executor, 'finish'): app.executor.finish()
+                        else: app.learning.loading.result(timeout=15)
+                        app.render()
                     if action == 'learning_labels':
                         future = app.learning.labels.loading
                         if hasattr(app.executor, 'finish'): app.executor.finish()

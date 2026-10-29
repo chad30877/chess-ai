@@ -16,6 +16,7 @@ class LabelView:
         self.index = 0
         self.advanced = False
         self.loading = None
+        self.load_error = False
         self._entries = []
 
     def active(self):
@@ -49,9 +50,11 @@ class LabelView:
         self.loading = None
         try:
             self._entries, self.path, self.state, error = future.result()
+            self.load_error = bool(error)
             self.message = f'無法讀取標記 {self.path}：{error}' if error else ''
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.state = {}
+            self.load_error = True
             self.message = f'無法讀取標記 {self.path or self.dataset}：{exc}'
 
     def load(self, path):
@@ -71,7 +74,7 @@ class LabelView:
                 self.run.stop()
                 return
             if self.active(): return
-            if self.message and action in ('learning_labels_new', 'learning_labels_resume'): return
+            if self.load_error and action in ('learning_labels_new', 'learning_labels_resume'): return
             if action == 'learning_labels_new':
                 self.path = create_labeling(self.dataset, self.pilot)
                 self.run = LabelRun(self.path, app.executor)
@@ -114,8 +117,8 @@ class LabelView:
         app.button('learning_teacher', '教師先導', (195, 122, 190, 34), enabled=not active)
         app.button('learning_training', '棋子位置學習', (400, 122, 200, 34), enabled=bool(state.get('ready')) and not active)
         app.button('learning_groups', '五個單群組', (620, 122, 220, 34), enabled=state.get('ready',False) and not active)
-        app.button('learning_labels_new', '建立新標記', (50, 178, 230, 36), enabled=not active and not loading and not self.message, primary=True)
-        app.button('learning_labels_resume', '續跑／重試', (300, 178, 230, 36), enabled=bool(self.path) and not state.get('ready') and not active and not loading and not self.message)
+        app.button('learning_labels_new', '建立新標記', (50, 178, 230, 36), enabled=not active and not loading and not self.load_error, primary=True)
+        app.button('learning_labels_resume', '續跑／重試', (300, 178, 230, 36), enabled=bool(self.path) and not state.get('ready') and not active and not loading and not self.load_error)
         app.button('learning_labels_stop', '停止', (550, 178, 130, 36), enabled=active)
         statuses = {'queued': '排隊', 'running': '標記中', 'completed': '標記完成', 'stopped': '已停止', 'failed': '失敗', 'interrupted': '未完成', 'ready': '待開始'}
         if state:
@@ -126,7 +129,7 @@ class LabelView:
         if loading: app.text('載入已保存標記…', 50, 306, width=790)
         elif self.message or state.get('error'):
             app.text(self.message or state['error'], 50, 306, width=570)
-            if self.message: app.button('learning_labels_retry', '重新讀取', (650, 300, 150, 34))
+            if self.load_error: app.button('learning_labels_retry', '重新讀取', (650, 300, 150, 34))
         summary = state.get('summary')
         if summary:
             app.text(f'有效 {summary["valid"]} · 排除 {summary["excluded"]} · 重用先導 {summary["reused_pilot"]} · 來源不足 {summary["shortfall_games"]} 盤', 50, 350, width=790)

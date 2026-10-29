@@ -73,3 +73,98 @@ class LoadingUiTest(unittest.TestCase):
                 self.assertEqual(app.learning.labels.path, first)
                 self.assertEqual(app.learning.labels.state['name'], first.name)
             app.close()
+
+    def test_unavailable_label_can_be_retried_without_switching_source(self):
+        from unittest.mock import patch
+        pygame.init(); self.addCleanup(pygame.quit)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            saved = root / 'teacher-labels' / 'broken'
+            saved.mkdir(parents=True)
+            (saved / 'snapshot.json').write_text('{}', encoding='utf-8')
+            executor = ManualExecutor()
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.mode = 'learning'; app.learning.path = root
+            app.learning.teacher.path = root / 'pilot'
+            app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
+            app.learning.page = 'teacher'
+            def click(action):
+                app.render()
+                button = next(b for b in app.buttons if b.action == action)
+                self.assertTrue(button.enabled, action)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            with patch('ui.label_view.load_labeling', side_effect=ValueError('損壞')):
+                click('learning_labels'); executor.finish(); app.render()
+            self.assertEqual(app.learning.labels.path, saved)
+            self.assertIn('損壞', app.learning.labels.message)
+            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_labels_new').enabled)
+            good = {'status': 'stopped', 'completed': 1, 'total': 2, 'remaining': 1, 'failed': 0}
+            with patch('ui.label_view.load_labeling', return_value=good):
+                click('learning_labels_retry'); executor.finish(); app.render()
+            self.assertEqual(app.learning.labels.path, saved)
+            self.assertFalse(app.learning.labels.message)
+            self.assertTrue(next(b for b in app.buttons if b.action == 'learning_labels_resume').enabled)
+            app.close()
+
+    def test_dataset_selection_keeps_event_loop_available_during_read(self):
+        import json
+        pygame.init(); self.addCleanup(pygame.quit)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            saved = root / 'one'; saved.mkdir()
+            (saved / 'status.json').write_text(json.dumps({'status': 'completed', 'seed': 1}), encoding='utf-8')
+            (saved / 'dataset.json').write_text('{broken', encoding='utf-8')
+            executor = ManualExecutor()
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.mode = 'learning'; app.learning.root = root
+            app.render()
+            button = next(b for b in app.buttons if b.action == 'learning_open:0')
+            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            app.render()
+            self.assertTrue(app.learning.loading)
+            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_teacher').enabled)
+            executor.finish(); app.render()
+            self.assertIn(str(saved), app.learning.message)
+            app.close()
+
+    def test_teacher_selection_stays_responsive_while_saved_pilot_loads(self):
+        pygame.init(); self.addCleanup(pygame.quit)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name in ('one', 'two'):
+                saved = root / 'teacher-pilots' / name; saved.mkdir(parents=True)
+                (saved / 'status.json').write_text('{}', encoding='utf-8')
+            executor = ManualExecutor()
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.mode = 'learning'; app.learning.page = 'teacher'
+            app.learning.teacher.dataset = root
+            app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
+            app.render()
+            button = next(b for b in app.buttons if b.action == 'learning_pilot_next')
+            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            app.render()
+            self.assertTrue(app.learning.teacher.loading)
+            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_labels').enabled)
+            button = next(b for b in app.buttons if b.action == 'learning_data')
+            self.assertTrue(button.enabled)
+            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            self.assertEqual(app.learning.page, 'data')
+            app.close()
+
+    def test_learning_results_page_can_be_left_while_loading(self):
+        pygame.init(); self.addCleanup(pygame.quit)
+        executor = ManualExecutor()
+        app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+        app.mode = 'learning'; app.learning.page = 'labeling'
+        app.learning.labels.path = Path('saved-labels')
+        app.learning.labels.state = {'status': 'completed', 'completed': 1, 'total': 1, 'remaining': 0, 'failed': 0, 'ready': True}
+        app.render()
+        button = next(b for b in app.buttons if b.action == 'learning_groups')
+        app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+        self.assertEqual(app.learning.page, 'groups')
+        app.render()
+        self.assertTrue(app.learning.page_loading)
+        button = next(b for b in app.buttons if b.action == 'learning_loading_back')
+        app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+        self.assertEqual(app.learning.page, 'labeling')
+        app.close()

@@ -45,6 +45,10 @@ class InventoryUiTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                if action in ('learning_groups', 'learning_training', 'learning_combinations', 'learning_inventory') and app.learning.page_loading is not None:
+                    if hasattr(app.executor, 'finish'): app.executor.finish()
+                    else: app.learning.page_loading.result(timeout=30)
+                    app.render()
                 if action == 'learning_labels':
                     future = app.learning.labels.loading
                     if hasattr(app.executor, 'finish'): app.executor.finish()
@@ -130,11 +134,7 @@ class FullInventoryTest(unittest.TestCase):
             app.render()
             button = next(b for b in app.buttons if b.action == 'learning_inventory')
             app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            if action == 'learning_labels':
-                future = app.learning.labels.loading
-                if hasattr(app.executor, 'finish'): app.executor.finish()
-                else: future.result(timeout=15)
-                app.render()
+            app.learning.page_loading.result(timeout=30)
             app.render()
             self.assertEqual(app.learning.page, 'inventory')
             self.assertEqual(len(app.learning.inventory.report['candidates']), 10)
