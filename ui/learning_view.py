@@ -18,6 +18,11 @@ from ui.heldout_view import HeldoutView
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
+START_ACTIONS = {'learning_create', 'learning_pilot_start', 'learning_labels_new', 'learning_labels_resume',
+                 'learning_training_new', 'learning_training_resume', 'learning_groups_new', 'learning_groups_resume',
+                 'learning_combination_new', 'learning_combination_resume', 'learning_combination_batch',
+                 'learning_compare_start', 'learning_screening_start'}
+
 EXCLUSION_LABELS = {'first_8_plies': '前八手', 'terminal': '終局', 'in_check': '受將',
                     'not_sampled': '抽樣上限', 'cross_split_duplicate': '跨組重複',
                     'within_split_duplicate': '同組重複'}
@@ -125,11 +130,7 @@ class LearningView:
 
     def action(self, action, app):
         task = self.active_task()
-        starts = {'learning_create', 'learning_pilot_start', 'learning_labels_new', 'learning_labels_resume',
-                  'learning_training_new', 'learning_training_resume', 'learning_groups_new', 'learning_groups_resume',
-                  'learning_combination_new', 'learning_combination_resume', 'learning_combination_batch',
-                  'learning_compare_start', 'learning_screening_start'}
-        if action in starts:
+        if action in START_ACTIONS:
             batch = getattr(app, 'batch', None)
             running = task[1] if task else ('比較' if batch and not batch.future.done() else None)
             if running:
@@ -166,7 +167,7 @@ class LearningView:
                 return
             self.screening.action(action, app)
             return
-        if action == 'learning_inventory' and self.page == 'combination' and not self.active():
+        if action == 'learning_inventory' and self.page == 'combination':
             try:
                 self.inventory.open(self.combination.source_path); self.page = 'inventory'
             except (OSError, ValueError, KeyError) as exc: self.combination.message = str(exc)
@@ -174,21 +175,21 @@ class LearningView:
         if self.page == 'comparison':
             self.comparison.action(action,app)
             return
-        if action == 'learning_combinations' and not self.active() and self.group_training.path:
+        if action == 'learning_combinations' and self.group_training.path:
             try:
-                self.combination.open(self.group_training.path)
+                if not self.combination.active(): self.combination.open(self.group_training.path)
                 self.page = 'combination'
             except (OSError,ValueError,KeyError) as exc: self.group_training.message = str(exc)
             return
-        if action == 'learning_groups' and not self.active() and self.labels.path:
+        if action == 'learning_groups' and self.labels.path:
             try:
-                self.group_training.open(self.labels.path)
+                if not self.group_training.active(): self.group_training.open(self.labels.path)
                 self.page = 'groups'
             except (OSError,ValueError,KeyError) as exc: self.labels.message = str(exc)
             return
-        if action == 'learning_training' and not self.active() and self.labels.path:
+        if action == 'learning_training' and self.labels.path:
             try:
-                self.training.open(self.labels.path)
+                if not self.training.active(): self.training.open(self.labels.path)
                 self.page = 'training'
             except (OSError, ValueError, KeyError) as exc:
                 self.labels.message = str(exc)
@@ -197,14 +198,14 @@ class LearningView:
             self.teacher.commit()
             self.page = 'data'
             return
-        if action == 'learning_labels' and not self.active() and self.teacher.path:
+        if action == 'learning_labels' and self.teacher.path:
             try:
-                self.labels.open(self.path, self.teacher.path)
+                if not self.labels.active(): self.labels.open(self.path, self.teacher.path)
                 self.page = 'labeling'
             except (OSError, ValueError, KeyError) as exc:
                 self.teacher.message = str(exc)
             return
-        if action == 'learning_teacher' and self.page == 'labeling' and not self.active():
+        if action == 'learning_teacher' and self.page == 'labeling':
             self.page = 'teacher'
             return
         if self.page == 'combination':

@@ -51,8 +51,16 @@ class LabelUiTest(unittest.TestCase):
                     state = view.run.snapshot()
                     if state['completed'] > state['summary']['reused_pilot']: break
                     time.sleep(.01)
-                click('learning_labels_stop')
+                active_run = view.run
+                click('learning_teacher')
+                self.assertEqual(app.learning.page, 'teacher')
+                self.assertIs(view.run, active_run)
+                click('learning_task_return')
+                self.assertEqual(app.learning.page, 'labeling')
+                click('learning_teacher')
+                click('learning_task_stop')
                 view.run.future.result(timeout=5)
+                click('learning_labels')
                 app.render()
                 self.assertEqual(view.state['status'], 'stopped')
                 path = view.path

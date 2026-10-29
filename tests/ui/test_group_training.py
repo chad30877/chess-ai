@@ -32,7 +32,15 @@ class GroupTrainingUiTest(unittest.TestCase):
             while view.run.snapshot()['completed_groups'] < 2:
                 self.assertLess(time.monotonic(),deadline)
                 app.render(); time.sleep(.01)
-            click('learning_groups_stop'); view.run.future.result(timeout=5); app.render()
+            active_run = view.run
+            click('learning_labels')
+            self.assertEqual(app.learning.page, 'labeling')
+            self.assertIs(view.run, active_run)
+            click('learning_task_return')
+            self.assertEqual(app.learning.page, 'groups')
+            click('learning_labels')
+            click('learning_task_stop'); view.run.future.result(timeout=5)
+            click('learning_groups'); app.render()
             path = view.path
             saved = load_group_training(path)
             self.assertEqual(saved['completed_groups'],2)

@@ -23,7 +23,7 @@ from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
 from ui.evaluation_profiles import profile_name, profile_summary, config_summary
 from ui.profile_selector import ProfileSelector, rating_search
-from ui.learning_view import LearningView
+from ui.learning_view import LearningView, START_ACTIONS
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.replay.replay_loader import load_replay_json
@@ -81,6 +81,7 @@ class ChessApplication:
         self.batch_evaluation_files = {side: self.live_evaluation_file for side in ("white", "black")}
         self.game_count = 20
         self.batch = None
+        self.learning_batch = None
         self.batch_games_page = 0
         self.pending_leave = None
         self.numeric_focus = None
@@ -161,7 +162,9 @@ class ChessApplication:
             self.live.stop()
         self.mode = mode
         self.live = self.replay = self.replay_data = None
-        self.batch = None
+        if not (self.learning_batch and not self.learning_batch.future.done()):
+            self.batch = None
+            self.learning_batch = None
         self.batch_mode = "general"
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
         self.saved_path = None
@@ -369,6 +372,9 @@ class ChessApplication:
         return self.live is not None and (self.live.active or (bool(self.live.move_items) and not self.saved))
 
     def request_leave(self, action: str):
+        if action == 'home' and self.learning_batch is not None and self.batch is self.learning_batch and not self.batch.future.done():
+            self.mode = 'home'
+            return
         if self.confirm_action:
             return
         if self.needs_confirmation():
@@ -442,6 +448,16 @@ class ChessApplication:
     def dispatch(self, action: str):
         if self.profile_selector is not None:
             self.profile_selector.action(action, self)
+            return
+        if action == 'learning_task_stop' and self.learning_batch and not self.learning_batch.future.done():
+            self.learning_batch.stop()
+            return
+        if action == 'learning_task_return' and self.learning_batch and not self.learning_batch.future.done():
+            self.mode = 'auto'
+            return
+        if action in ('learning_task_return', 'learning_task_stop') and self.learning.active_task():
+            self.learning.action(action, self)
+            if action == 'learning_task_return': self.mode = 'learning'
             return
         if self.mode == 'learning' and action.startswith('learning_'):
             self.learning.action(action, self)
@@ -824,6 +840,9 @@ class ChessApplication:
             self.move_view.handle_wheel(event.pos, 1 if event.button == 4 else -1, items)
 
     def button(self, action, label, rect, *, enabled=True, primary=False):
+        if action in START_ACTIONS and (self.learning.active_task() or
+                (self.batch and not self.batch.future.done())):
+            enabled = False
         button = Button(action, label, self.rect(rect), enabled, primary)
         self.buttons.append(button)
         button.draw(self.screen, self.font)
@@ -864,9 +883,11 @@ class ChessApplication:
                 self.button("flip", "翻轉 F", (664, 10, 104, 36))
             self.button("home", "回首頁", (780, 10, 104, 36))
         task = self.learning.active_task()
-        if task and self.mode == 'learning':
+        if not task and self.learning_batch and not self.learning_batch.future.done():
+            task = ('batch', '比較', self.learning_batch)
+        if task and (self.mode != 'auto' or task[0] != 'batch'):
             state = task[2].snapshot()
-            progress = f'{state.get("completed", 0)}/{state.get("total", 0)}'
+            progress = f'{state.get("completed", state.get("saved_games", 0))}/{state.get("total", state.get("requested_games", 0))}'
             self.text(f'{task[1]} {progress}', 190, 15, width=220)
             self.button('learning_task_return', '返回任務', (420, 10, 110, 36))
             self.button('learning_task_stop', '停止', (540, 10, 90, 36))
@@ -1239,6 +1260,8 @@ class ChessApplication:
             self.text(self.message, 64, 642, width=772, muted=True)
             return
         state = self.batch.snapshot()
+        if self.batch is self.learning_batch:
+            self.button('learning_comparison_return', '返回學習實驗', (460, 672, 376, 40))
         status = state["status"]
         labels = {"running": "生成中（暫時結果）", "paused": "已暫停", "stopping": "正在停止並保存",
                   "completed": "批次完成", "stopped": "已停止", "failed": "生成失敗"}

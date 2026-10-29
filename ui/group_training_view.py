@@ -82,7 +82,7 @@ class GroupTrainingView:
                 self._loaded_run = self.run
         s = self.state; groups = s.get('groups',{}); snapshot = s.get('snapshot',{})
         app.text('學習實驗 · 五個單群組',50,78,large=True)
-        app.button('learning_labels','教師標記',(50,120,190,34),enabled=not active)
+        app.button('learning_labels','教師標記',(50,120,190,34))
         app.text(f'已保存 {min(self.index+1,len(self.entries))}/{len(self.entries)}',260,128,muted=True)
         app.button('learning_groups_prev','上一份',(540,120,140,32),enabled=len(self.entries)>1 and not active)
         app.button('learning_groups_next','下一份',(700,120,140,32),enabled=len(self.entries)>1 and not active)

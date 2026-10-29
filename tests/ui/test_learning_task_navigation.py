@@ -66,3 +66,39 @@ class TaskNavigationTest(unittest.TestCase):
                 app.dispatch('learning_labels_new')
                 self.assertEqual(len(executor.jobs), 1)
                 self.assertIn('教師先導', app.learning.labels.message)
+                app.dispatch('learning_task_stop')
+                app.dispatch('learning_labels_new')
+                self.assertEqual(len(executor.jobs), 1)
+                self.assertFalse(app.learning.teacher.run.future.done())
+
+    def test_comparison_can_return_to_learning_and_stop_from_there(self):
+        from tests.test_learned_comparison import candidate
+        pygame.init()
+        self.addCleanup(pygame.quit)
+        with tempfile.TemporaryDirectory() as folder, patch('apps.chess_application.PROJECT_ROOT', Path(folder)):
+            executor = ManualExecutor()
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            self.addCleanup(app.close)
+            app.learning.open_comparison(candidate())
+            app.mode = 'learning'
+            def click(action):
+                app.render()
+                button = next(b for b in app.buttons if b.action == action)
+                self.assertTrue(button.enabled, action)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            click('learning_compare_freeze')
+            click('learning_compare_start')
+            run = app.batch
+            click('learning_comparison_return')
+            self.assertEqual(app.mode, 'learning')
+            self.assertIs(app.batch, run)
+            self.assertFalse(run.future.done())
+            click('home')
+            self.assertEqual(app.mode, 'home')
+            self.assertIs(app.batch, run)
+            click('learning_task_return')
+            self.assertEqual(app.mode, 'auto')
+            click('learning_comparison_return')
+            click('learning_task_stop')
+            executor.finish()
+            self.assertEqual(run.snapshot()['status'], 'stopped')
