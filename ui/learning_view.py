@@ -32,6 +32,19 @@ EXCLUSION_LABELS = {'first_8_plies': '前八手', 'terminal': '終局', 'in_chec
                     'within_split_duplicate': '同組重複'}
 
 
+class _DatasetGroups(GroupTrainingView):
+    def open(self, dataset, pilot, preferred_label, selections):
+        labels = LabelView()
+        labels.dataset, labels.pilot = Path(dataset), Path(pilot)
+        labels._entries, labels.path, labels.state, error = labels._read_saved(labels.dataset, preferred_label, labels.pilot)
+        labels.load_error = bool(error)
+        if error: labels.message = f'無法讀取標記 {labels.path}：{error}'
+        self.navigation_labels = labels
+        if labels.path and labels.state.get('ready'):
+            preferred = selections.get(f'groups:{labels.path}')
+            super().open(labels.path, preferred)
+
+
 class _SavedGroupResults:
     def __init__(self): self.entries, self.page = [], 0
     def open(self, root):
@@ -353,6 +366,8 @@ class LearningView:
             self.page_load_error = f'無法讀取 {self.page_load_request[3]}：{error}'
         else:
             setattr(self, self.page_load_request[1], view)
+            if hasattr(view, 'navigation_labels'):
+                self.labels = view.navigation_labels
             self.page_load_request = None
 
     def _labels_current(self):
@@ -376,7 +391,14 @@ class LearningView:
             self.page = 'labeling'
         elif page == 'groups':
             self.browse_result = False
-            if self._labels_current() and self.labels.path and self.labels.loading is None and not self.group_training.active():
+            if (self.path and self.data and self.teacher.path and self.teacher.loading is None and
+                    self.teacher.state.get('choice') and not self._labels_current() and not self.group_training.active()):
+                self._preserve_browsing_context()
+                key = f'labeling:{self.path}:{self.teacher.path}'
+                selections = dict(self.saved_state.get('selected', {}))
+                self._open_page('groups', 'group_training', lambda: _DatasetGroups(self.teacher.project_root),
+                                (self.path, self.teacher.path, selections.get(key), selections), 'home', app.read_executor)
+            elif self._labels_current() and self.labels.path and self.labels.loading is None and not self.group_training.active():
                 self._open_page('groups', 'group_training', lambda: GroupTrainingView(self.teacher.project_root),
                                 (self.labels.path, self.saved_state.get('selected', {}).get(f'groups:{self.labels.path}')), 'data', app.read_executor)
             else: self.page = 'groups'

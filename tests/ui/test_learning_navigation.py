@@ -88,6 +88,27 @@ class SourceStageTest(unittest.TestCase):
     from tests.test_weight_training import TrainingFlowTest
     setUp = TrainingFlowTest.setUp
 
+    def test_continue_learning_finds_saved_labels_without_opening_label_page(self):
+        pygame.init(); self.addCleanup(pygame.quit)
+        with patch('apps.chess_application.PROJECT_ROOT', self.root):
+            executor = ManualExecutor()
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            self.addCleanup(app.close)
+            app.new_setup('learning')
+            app.learning.open(self.labels.parents[1])
+            from engine.learning.labeling import create_labeling
+            create_labeling(self.labels.parents[1], app.learning.teacher.path)
+            key = f'labeling:{app.learning.path}:{app.learning.teacher.path}'
+            app.learning.saved_state.setdefault('selected', {})[key] = str(self.labels)
+            app.render()
+            button = next(b for b in app.buttons if b.action == 'learning_goal_resume')
+            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            self.assertEqual(app.learning.page, 'groups')
+            executor.finish(); app.render()
+            self.assertEqual(app.learning.labels.path, self.labels)
+            self.assertTrue(app.learning.labels.state['ready'])
+            self.assertTrue(any(b.action == 'learning_groups_new' and b.enabled for b in app.buttons))
+
     def test_stage_follows_selected_dataset_without_reusing_old_labels(self):
         from engine.learning.dataset import create_dataset
         from tests.test_learning_dataset import pgn_games
