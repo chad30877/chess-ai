@@ -127,7 +127,9 @@ class TaskNavigationTest(unittest.TestCase):
             self.assertEqual(app.mode, 'auto')
             click('learning_comparison_return')
             click('learning_task_stop')
-            executor.finish()
+            self.assertFalse(run.future.done())
+            executor.finish(next(i for i, job in enumerate(executor.jobs) if job[0] is run.future))
+            self.assertTrue(run.future.done())
             self.assertEqual(run.snapshot()['status'], 'stopped')
 
     def test_short_comparison_keeps_saving_after_leaving_batch_page(self):
