@@ -147,6 +147,14 @@ class TaskNavigationTest(unittest.TestCase):
             run = app.batch
             click('learning_comparison_return')
             before = run.snapshot()['saved_games']
+            for page, action in (('teacher', 'learning_pilot_start'), ('labeling', 'learning_labels_new'),
+                                 ('training', 'learning_training_new'), ('groups', 'learning_groups_new'),
+                                 ('combination', 'learning_combination_new')):
+                app.learning.page = page
+                app.dispatch(action)
+                self.assertIs(app.batch, run)
+                self.assertFalse(app.learning.active())
+            app.learning.page = 'comparison'
             deadline = time.monotonic() + 30
             while run.snapshot()['saved_games'] <= before:
                 self.assertFalse(run.future.done())
