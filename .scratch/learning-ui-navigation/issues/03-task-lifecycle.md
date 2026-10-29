@@ -54,3 +54,5 @@
 複審修正：以三份資料的真實 UI 事件驗證 A 執行、切換 B、A 完成、B 執行再切換 C，仍能返回與停止 B；`tests.ui.test_learning_task_navigation` 5 項通過。
 
 整合分支複跑 ` .\.venv\Scripts\python.exe -m unittest tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot tests.ui.test_chess_application`：62 項通過。獨立複審確認先前的互斥、跨頁瀏覽、背景失敗提示與連續跨資料任務問題已修正。未進行正式長實驗；人工重現方式仍僅供操作參考。
+
+- 整合回歸追查：比較恢復頁可排入背景報告讀取，手動執行器若完成最後工作會完成讀取而非比較，狀態仍為停止中。事件測試改為等待原比較 future，確認保存完成後為已停止；跨頁、比較恢復與既有比較回歸 11 項通過。
