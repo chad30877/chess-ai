@@ -5,7 +5,27 @@
 </style></head><body><main>
 <p class="tag">CHESS AI · 離線操作指南 · 2026-10-24</p><h1>從教師標記到共同開局對戰</h1>
 <p class="lead">用同一份資料比較五個評分項群組，分開查看加入群組、學習權重、群組搭配及實際對戰的效果。</p>
-<p>本頁及 <code>ml-guide/</code> 一起保存即可離線閱讀，無外部字型、腳本或圖片依賴。畫面由交付版應用程式的真實 pygame UI 事件與背景執行產生；編號是 HTML 註記，原始截圖未重繪。驗收使用 SDL dummy 顯示表面，來源、Stockfish、求解、深度三搜尋與保存均實際執行。版本基礎 <code>595c010</code>，含 Windows 保存修正 <code>4f2feff</code> 及相同版本的選取標記顯示修正。</p>
+<p>本頁及 <code>ml-guide/</code> 一起保存即可離線閱讀，無外部字型、腳本或圖片依賴。目前畫面與下方收合的歷史研究畫面分別標示；編號是歷史畫面的 HTML 註記。歷史 60 盤短流程的來源、Stockfish、求解與搜尋曾實際執行；目前介面截圖使用小型測試資料。</p>
+<h2>目前介面：依目的進入</h2>
+<p>從首頁選「學習實驗」，可直接建立新實驗、接續學習、比較候選或查看學習成果。上方四個入口可切換資料、教師、權重學習及比較；位置路徑與所選資料的階段狀態分開顯示。</p>
+<figure><div class="shot"><img src="ml-guide/ui10-home.png" alt="學習實驗目的首頁"></div><figcaption>目的首頁及固定主入口</figcaption></figure>
+<h2>建立資料與教師標記</h2>
+<ol><li>選「建立新實驗」，選來源與種子並建立資料。完成後進入教師評分，建立先導並選定教師預算。</li><li>進入「教師標記」，依凍結條件完成標記。停止後可選同一標記的「續跑／重試」。先導停止後須重新量測。</li></ol>
+<h2>選群組、新建或續跑</h2>
+<p>完整標記後進入「評分權重學習」；新訓練預設五組全選，可取消個別群組，按「開始學習」及顯示的群組數。各群組獨立完成三強度學習，共用一次預算。既有成果使用「續跑原條件」；要變更群組時選「以此建立新訓練」，不覆蓋原成果。舊棋子位置成果仍可由同頁開啟。</p>
+<figure><div class="shot"><img src="ml-guide/ui10-group-draft.png" alt="選擇新訓練群組"></div><figcaption>勾選新訓練群組</figcaption></figure>
+<p>結果先列群組狀態及原始／學習教師誤差；選群組後可展開權重及進階條件，或另存、載入真人對戰及比較。教師誤差改善不代表棋力提升。組合是獨立頁面，仍須使用相容來源。</p>
+<figure><div class="shot"><img src="ml-guide/ui10-group-result.png" alt="單群組成果摘要"></div><figcaption>成果摘要及下一步</figcaption></figure>
+<h2>比較候選與查看紀錄</h2>
+<p>從學習實驗首頁或上方「比較候選」直接查找跨來源候選，按來源、群組篩選並勾選。舊棋子位置、單群組及組合成果均可列出；同值但來源不同的設定各有獨立身份。選取後按「選擇比較用途」。</p>
+<figure><div class="shot"><img src="ml-guide/ui10-candidates.png" alt="跨來源候選清單"></div><figcaption>候選清單與來源篩選</figcaption></figure>
+<p>選快速篩選或完整比較，先核對候選、基準及總局數再按「開始比較」。完整比較需要先通過快速篩選。候選清單中的「比較紀錄」可開啟已保存的計畫、查看結果或手動續跑；結果頁可檢視設定並回放，返回時保留原計畫。</p>
+<figure><div class="shot"><img src="ml-guide/ui10-setup.png" alt="選擇比較用途與工作量"></div><figcaption>比較用途及實際工作量</figcaption></figure>
+<h2>跨頁、停止與重開</h2>
+<p>工作執行時可切換頁面，頂端顯示進度並提供「返回任務」及「停止」。一次只執行一項耗時工作。關閉時可選「繼續執行」或「停止並離開」；確認後等待保存。重開後從上方未完成工作清單選原工作，再手動續跑；先導需重新量測。長清單可用滾輪或上下頁。</p>
+<figure><div class="shot"><img src="ml-guide/ui10-progress.png" alt="工作進度與跨頁控制"></div><figcaption>工作進度及停止控制</figcaption></figure>
+<p>上圖由現行程式以小型測試資料及 SDL dummy 畫面產生；不代表已執行正式長研究。</p>
+<details><summary>展開舊版 60 盤研究過程與歷史畫面</summary><p>以下是舊版介面的歷史研究紀錄，按鈕位置與操作步驟已更新，請以上方目前介面為準。</p>
 <nav aria-label="目錄"><a href="#find">想調什麼</a><a href="#data">資料與教師</a><a href="#groups">校準與單群組</a><a href="#combination">直接／聯合組合</a><a href="#comparison">共同開局對戰</a><a href="#formal">正式分次執行</a><a href="#evidence">本次證據</a></nav>
 <div class="note">這次是<strong>真實 60 盤短流程驗收</strong>。正式 500 盤完整標記、全套候選與每候選每基準 64 局研究尚未執行。教師誤差下降不等於棋力提升，中斷對局不算和棋；沒有改善也是有效結果。</div>
 <h2 id="find">想調什麼 → 使用哪個控制項</h2>
@@ -82,4 +102,4 @@
 </tbody></table></div>
 <p>可攜式摘要見 <a href="ml-guide/evidence.json">本次驗收摘要</a>。完整來源及操作原始證據保留於本地M11工作票指向的外部目錄；JSON包含原始快照身份與檔案雜湊。先前完整月份已抽樣500盤，不等於500盤標記、學習或64局研究已完成。</p>
 <p>來源參考（需連線）：<a href="https://database.lichess.org/">Lichess 棋譜資料庫（CC0）</a>、<a href="https://stockfishchess.org/download/">Stockfish 官方下載（GPL-3.0）</a>。軟體、棋譜與原始標記沒有打包進教學圖片目錄；請自行保存可追溯來源。</p><p><a href="#find">回到控制項查找</a> · <a href="../README.md">README</a> · <a href="../.scratch/ml-small-trial/spec.md">完整規格</a></p>
-</main></body></html>
+</details></main></body></html>

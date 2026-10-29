@@ -167,7 +167,9 @@ class GroupTrainingView:
             for index,(group,label) in enumerate(GROUPS.items()):
                 result = groups.get(group,{})
                 status = result.get('status','incomplete') if group in groups else 'not-selected'
-                if active: status = s.get('group_states',{}).get(group,status)
+                if active:
+                    selected = self.run.groups if self.run.groups is not None else snapshot.get('groups', [])
+                    status = s.get('group_states',{}).get(group, 'queued' if group in selected else status)
                 text = label+' · '+statuses.get(status,status)
                 r = result.get('report')
                 if r:

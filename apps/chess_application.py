@@ -797,6 +797,16 @@ class ChessApplication:
             return
         if self.mode == 'learning' and self.learning.input(event):
             return
+        if self.mode == 'learning' and event.type == pygame.MOUSEWHEEL and event.y:
+            suffix = 'prev' if event.y > 0 else 'next'
+            for prefix in ('learning_saved_', 'learning_recovery_', 'learning_results_',
+                           'learning_inventory_', 'learning_history_', 'learning_bundle_',
+                           'learning_setup_', 'learning_compare_'):
+                action = prefix + suffix
+                if any(button.action == action and button.enabled for button in self.buttons):
+                    self.dispatch(action)
+                    return
+            return
         if self.replay_editor is not None:
             editor = self.replay_editor
             if editor.focus is not None and event.type == pygame.TEXTINPUT:

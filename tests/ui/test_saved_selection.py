@@ -246,7 +246,10 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                     app.render(); button = next(b for b in app.buttons if b.action == action)
                     self.assertTrue(button.enabled, action)
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-                click('mode:learning'); click('learning_nav_data'); click('learning_saved_list'); click('learning_saved_next')
+                click('mode:learning'); click('learning_nav_data'); click('learning_saved_list')
+                app.render()
+                app.handle_event(pygame.event.Event(pygame.MOUSEWHEEL, x=0, y=-1))
+                app.render(); self.assertEqual(app.learning.saved_page, 1)
                 target = app.learning.saved_entries[-1]
                 click('learning_saved_select:9'); executor.finish(); app.render()
                 self.assertEqual(app.learning.path, target)
