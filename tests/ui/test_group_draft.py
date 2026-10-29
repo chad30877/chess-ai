@@ -205,6 +205,14 @@ class GroupDraftTest(unittest.TestCase):
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
             click('learning_groups_compare'); app.learning.page_loading.result(timeout=30); app.render()
+            report_file = path / 'groups' / 'mobility' / 'report.json'
+            report_bytes = report_file.read_bytes(); report_file.unlink()
+            click('learning_compare_freeze')
+            self.assertIsNone(app.learning.comparison.path)
+            self.assertTrue(app.learning.comparison.message)
+            report_file.write_bytes(report_bytes)
+            click('learning_compare_back'); click('learning_groups_compare')
+            app.learning.page_loading.result(timeout=30); app.render()
             lines = [dict(initial_fen='7k/5Q2/6K1/8/8/8/8/8 w - - 0 1', moves_uci=[], name='短局', source={})]
             comparison = create_comparison(self.root, source, roles=('learned',), opening_lines=lines)
             run_evaluation_comparison(**comparison_options(comparison, 'material'))

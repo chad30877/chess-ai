@@ -216,14 +216,17 @@ class LearningView:
         if path and self.path is None and self.loading is None and not self.active_task():
             self._open_async(Path(path), executor)
 
-    def open_comparison(self, candidate, executor=None):
+    def open_comparison(self, candidate, executor=None, origin=None, path=None):
+        row = dict(source=candidate, origin=origin, path=str(path)) if origin and path else None
         if executor is None:
-            self.comparison.open(candidate)
+            if row: self.comparison.open_selected(self.root, row)
+            else: self.comparison.open(candidate)
             if self.page in ('groups', 'combination', 'training'): self.comparison.return_page = self.page
             self.page = 'comparison'
         else:
             self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root),
-                            candidate, self.page, executor)
+                            (self.root, row) if row else candidate, self.page, executor,
+                            'open_selected' if row else 'open')
 
     def active(self):
         return self.pending_setup is not None or bool(self._detached_task and not self._detached_task[2].future.done()) or (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active() or self.combination.active()
@@ -480,7 +483,7 @@ class LearningView:
                         selected[context[0]] = str(context[1].path)
                     self._save_ui_state()
             else:
-                if self.page_load_request[1] == 'comparison' and self.page_load_request[5] == 'open' and self.page_load_request[4] in ('groups', 'combination', 'training'):
+                if self.page_load_request[1] == 'comparison' and self.page_load_request[4] in ('groups', 'combination', 'training'):
                     view.return_page = self.page_load_request[4]
                 setattr(self, self.page_load_request[1], view)
                 if hasattr(view, 'navigation_labels'):
