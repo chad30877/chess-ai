@@ -170,6 +170,15 @@ class ComparisonHistoryTest(unittest.TestCase):
             with patch.object(app, 'button', wraps=app.button) as buttons: app.render()
             self.assertTrue(any('很長的比較紀錄名稱' in str(call.args[1]) for call in buttons.call_args_list))
             app.close()
+            import shutil
+            shutil.rmtree(path)
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor); app.new_setup('learning')
+            click('learning_goal_compare'); executor.finish(); app.render()
+            click('learning_inventory_history'); executor.finish(); app.render()
+            missing = next(row for row in app.learning.comparison_history.entries if row['path'] == path)
+            self.assertEqual(missing['status'], 'invalid')
+            self.assertEqual(app.learning.saved_state['selected']['comparison_history'], str(path))
+            app.close()
 
     def test_bundle_rejects_duplicate_source_and_missing_candidate(self):
         from engine.learning.teacher import digest
