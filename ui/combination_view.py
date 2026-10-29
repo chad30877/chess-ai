@@ -100,7 +100,7 @@ class CombinationView:
             elif action in ('learning_combination_save','learning_combination_battle','learning_combination_compare'):
                 if self.selection_changed(): raise ValueError('選組已變更；請先新建組合')
                 candidate = load_combination_candidate(self.path,self.kind)
-                if action == 'learning_combination_compare': app.learning.open_comparison(candidate, app.read_executor); return
+                if action == 'learning_combination_compare': app.learning.open_comparison(candidate, app.read_executor, 'combination', self.path); return
                 target = self.root/'configs/evaluation'/f'learned-{self.path.name}-{self.kind}.json'
                 if target.exists():
                     if EvaluationConfig.from_dict(json.loads(target.read_text(encoding='utf-8'))).to_dict() != candidate['config']:

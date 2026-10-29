@@ -116,4 +116,6 @@ class InventoryView:
         app.text(f'{self.page + 1}/{pages} · 已選 {len(self.selected_indices)}', 205, 658)
         app.button('learning_inventory_next', '下頁', (300, 650, 130, 34), enabled=self.page + 1 < pages)
         if self.selected_indices:
+            app.button('learning_inventory_setup', '選擇比較用途', (490, 595, 350, 34), primary=True)
+            app.button('learning_inventory_compare', '原始／學習設定對照', (50, 595, 350, 34), enabled=len(self.selected_indices) == 1)
             app.button('learning_inventory_screen', '選此候選進行短對局', (490, 650, 350, 34), enabled=len(self.selected_indices) == 1, primary=True)

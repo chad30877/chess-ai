@@ -9,7 +9,7 @@ from engine.learning.teacher import digest
 from engine.storage.batch_storage import write_json_atomic
 
 
-def freeze_final_comparison(root, candidates):
+def freeze_final_comparison(root, candidates, *, learned_only=False):
     root = Path(root)
     candidates = deepcopy(list(candidates))
     if not 1 <= len(candidates) <= 5:
@@ -29,6 +29,11 @@ def freeze_final_comparison(root, candidates):
             try:
                 old = load_comparison_plan(file.parent)
                 if digest(old['source']) != digest(source):
+                    continue
+                if learned_only and (old.get('roles') != ['learned'] or
+                        any(len(definition.get('candidates', [])) != 1 or
+                            definition['candidates'][0].get('role') != 'learned'
+                            for definition in old['definitions'].values())):
                     continue
                 for baseline, definition in old['definitions'].items():
                     if baseline not in template['definitions']:

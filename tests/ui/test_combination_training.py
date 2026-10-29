@@ -73,6 +73,12 @@ class CombinationUiTest(unittest.TestCase):
                 self.assertEqual(current, breadcrumb)
                 self.assertEqual(current, group_breadcrumb)
                 selected_source = app.learning.path
+                source_file = path / 'inputs.json'
+                saved_inputs = source_file.read_bytes(); source_file.unlink()
+                click('learning_compare_freeze')
+                self.assertIsNone(app.learning.comparison.path)
+                self.assertTrue(app.learning.comparison.message)
+                source_file.write_bytes(saved_inputs)
                 click('learning_compare_freeze')
                 plan=app.learning.comparison.report['plan']
                 expected=load_combination_candidate(path,kind)
