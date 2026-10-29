@@ -126,8 +126,26 @@ class ChessApplicationTest(unittest.TestCase):
         self.executor = ManualExecutor()
         self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
         self.addCleanup(self.app.close)
+        from engine.learning.dataset import create_dataset
+        from tests.helpers.uci_teacher import make_engine
+        from tests.test_learning_dataset import pgn_games
+        source = self.project / 'teacher-games.pgn'
+        source.write_text(pgn_games(8), encoding='utf-8')
+        dataset = create_dataset(self.project / 'data/learning', source)
+        self.click('mode:learning')
+        self.app.learning.open(dataset)
+        self.click('learning_teacher')
+        self.app.learning.teacher.command = make_engine(self.project)
+        self.click('learning_pilot_start')
+        self.click('home')
         self.click("mode:records")
         self.click("records_entry:0")
+        self.app.render()
+        self.assertFalse(next(b for b in self.app.buttons if b.action == 'records_resume').enabled)
+        self.app.dispatch('records_resume')
+        self.assertIsNone(self.app.batch)
+        self.click('learning_task_stop')
+        self.executor.finish()
         self.click("records_resume")
         self.executor.finish()
         self.assertEqual(self.app.batch.snapshot()['status'], 'completed')

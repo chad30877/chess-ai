@@ -112,7 +112,12 @@ class LabelUiTest(unittest.TestCase):
                         writes[0] += 1
                         if writes[0] >= 2: raise OSError('摘要保存中斷')
                     return original(src, target)
+                click('learning_teacher')
                 with patch('os.replace', fail_summary): manual.finish()
+                with patch.object(app, 'text', wraps=app.text) as draw:
+                    app.render()
+                self.assertTrue(any('教師標記 失敗' in str(call.args[0]) for call in draw.call_args_list))
+                click('learning_task_return')
                 app.render()
                 recovered = load_labeling(path)
                 self.assertEqual(app.learning.labels.state['completed'], recovered['completed'])

@@ -54,15 +54,19 @@ class LearningView:
         self.screening = ScreeningView(root)
         self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
+        self._detached_task = None
+        self._task_context = None
 
     def open_comparison(self, candidate):
         self.comparison.open(candidate)
         self.page = 'comparison'
 
     def active(self):
-        return (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active() or self.combination.active()
+        return bool(self._detached_task and not self._detached_task[2].future.done()) or (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active() or self.combination.active()
 
     def active_task(self):
+        if self._detached_task and not self._detached_task[2].future.done():
+            return self._detached_task
         for page, label, view in (('data', '資料準備', self), ('teacher', '教師先導', self.teacher),
                                   ('labeling', '教師標記', self.labels), ('training', '棋子位置學習', self.training),
                                   ('groups', '單群組學習', self.group_training), ('combination', '組合學習', self.combination)):
@@ -71,8 +75,20 @@ class LearningView:
                 return page, label, run
         return None
 
+    def failed_task(self):
+        if self._detached_task and self._detached_task[2].future.done() and self._detached_task[2].snapshot().get('status') == 'failed':
+            return self._detached_task
+        for page, label, view in (('data', '資料準備', self), ('teacher', '教師先導', self.teacher),
+                                  ('labeling', '教師標記', self.labels), ('training', '棋子位置學習', self.training),
+                                  ('groups', '單群組學習', self.group_training), ('combination', '組合學習', self.combination)):
+            run = view.run
+            if run is not None and run.future.done() and run.snapshot().get('status') == 'failed':
+                return page, label, run
+        return None
+
     def close(self, wait=False):
-        for run in (self.run, self.teacher.run, self.labels.run, self.training.run, self.group_training.run, self.combination.run):
+        detached = self._detached_task[2] if self._detached_task else None
+        for run in (detached, self.run, self.teacher.run, self.labels.run, self.training.run, self.group_training.run, self.combination.run):
             if run and not run.future.done():
                 run.stop()
                 if wait:
@@ -122,6 +138,17 @@ class LearningView:
         return sorted(self.root.glob('*/status.json'), key=lambda p: p.stat().st_mtime, reverse=True)
 
     def open(self, path):
+        task = self.active_task()
+        if task and task[0] != 'data' and self._task_context is None:
+            keys = ('data', 'path', 'sample_index', 'teacher', 'labels', 'training', 'group_training',
+                    'comparison', 'combination', 'inventory', 'screening', 'heldout')
+            self._task_context = {key: getattr(self, key) for key in keys}
+            self._detached_task = task
+            root = self.root.parents[1]
+            self.teacher, self.labels, self.training = TeacherView(root), LabelView(), TrainingView(root)
+            self.group_training, self.combination = GroupTrainingView(root), CombinationView(root)
+            self.comparison, self.inventory = LearnedComparisonView(root), InventoryView()
+            self.screening, self.heldout = ScreeningView(root), HeldoutView(root)
         self.data = load_dataset(path)
         self.path = Path(path)
         self.sample_index = 0
@@ -142,8 +169,12 @@ class LearningView:
                         'comparison': self.comparison, 'screening': self.screening}.get(self.page, self)
                 view.message = f'目前執行中：{running}，請先停止或等待完成'
                 return
-        if action == 'learning_task_return' and task:
-            self.page = task[0]
+        if action == 'learning_task_return' and (task or self.failed_task()):
+            target = task or self.failed_task()
+            if self._task_context and target is self._detached_task:
+                for key, value in self._task_context.items(): setattr(self, key, value)
+                self._task_context = self._detached_task = None
+            self.page = target[0]
             return
         if action == 'learning_task_stop' and task:
             task[2].stop()
@@ -232,7 +263,7 @@ class LearningView:
             if action == 'learning_stop' and self.active():
                 self.run.stop()
                 return
-            if self.active():
+            if self.active() and not (action in ('learning_teacher', 'learning_prev', 'learning_next', 'learning_sample', 'learning_recent_prev', 'learning_recent_next') or (action.startswith('learning_open:') and not (self.run and not self.run.future.done()))):
                 return
             if action == 'learning_source':
                 self.source = 'local' if self.source == 'lichess' else 'lichess'
@@ -300,7 +331,7 @@ class LearningView:
             return
         active = self.active()
         app.text('學習實驗 · 資料準備', 50, 78, large=True)
-        app.button('learning_teacher', '教師先導', (650, 74, 190, 36), enabled=self.data is not None and not active)
+        app.button('learning_teacher', '教師先導', (650, 74, 190, 36), enabled=self.data is not None)
         app.button('learning_source', 'Lichess 2013-01 · CC0' if self.source == 'lichess' else '本機棋譜（授權自查）',
                    (50, 125, 470, 36), enabled=not active)
         if self.source == 'local':
@@ -349,8 +380,8 @@ class LearningView:
         pages = max(1, (len(entries) + 2) // 3)
         self.recent_page = min(self.recent_page, pages - 1)
         app.text(f'已保存實驗 {self.recent_page + 1}/{pages}', 50, 620)
-        app.button('learning_recent_prev', '上頁', (570, 617, 120, 32), enabled=self.recent_page > 0 and not active)
-        app.button('learning_recent_next', '下頁', (705, 617, 120, 32), enabled=self.recent_page < pages - 1 and not active)
+        app.button('learning_recent_prev', '上頁', (570, 617, 120, 32), enabled=self.recent_page > 0 and not (self.run and not self.run.future.done()))
+        app.button('learning_recent_next', '下頁', (705, 617, 120, 32), enabled=self.recent_page < pages - 1 and not (self.run and not self.run.future.done()))
         for row, entry in enumerate(entries[self.recent_page * 3:self.recent_page * 3 + 3]):
             try:
                 saved = json.loads(entry.read_text(encoding='utf-8'))
@@ -362,4 +393,4 @@ class LearningView:
             except (OSError, ValueError, KeyError):
                 label, status = '紀錄損壞', 'failed'
             app.button(f'learning_open:{self.recent_page * 3 + row}', label,
-                       (50, 658 + row * 30, 775, 28), enabled=not active)
+                       (50, 658 + row * 30, 775, 28), enabled=not (self.run and not self.run.future.done()))

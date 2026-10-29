@@ -22,6 +22,7 @@ class TaskNavigationTest(unittest.TestCase):
             source = root / 'games.pgn'
             source.write_text(pgn_games(8), encoding='utf-8')
             create_dataset(root / 'data/learning', source)
+            create_dataset(root / 'data/learning', source)
             executor = ManualExecutor()
             with patch('apps.chess_application.PROJECT_ROOT', root):
                 app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
@@ -37,15 +38,19 @@ class TaskNavigationTest(unittest.TestCase):
                 app.learning.teacher.command = make_engine(root)
                 click('learning_pilot_start')
                 run = app.learning.teacher.run
+                original_path = app.learning.path
                 click('learning_data')
                 self.assertEqual(app.learning.page, 'data')
                 self.assertFalse(run.future.done())
+                click('learning_open:1')
+                self.assertNotEqual(app.learning.path, original_path)
                 with patch.object(app, 'text', wraps=app.text) as draw:
                     app.render()
                 self.assertTrue(any('教師先導' in str(call.args[0]) for call in draw.call_args_list))
                 click('learning_task_return')
                 self.assertEqual(app.learning.page, 'teacher')
                 self.assertIs(app.learning.teacher.run, run)
+                self.assertEqual(app.learning.path, original_path)
                 click('home')
                 click('mode:auto')
                 click('batch_mode:evaluation')

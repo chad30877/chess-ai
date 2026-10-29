@@ -33,6 +33,10 @@ class GroupTrainingUiTest(unittest.TestCase):
                 self.assertLess(time.monotonic(),deadline)
                 app.render(); time.sleep(.01)
             active_run = view.run
+            click('learning_combinations')
+            self.assertEqual(app.learning.page, 'combination')
+            click('learning_task_return')
+            self.assertIs(app.learning.group_training.run, active_run)
             frozen_snapshot = (view.path / 'snapshot.json').read_bytes()
             pilot_path = app.learning.teacher.path
             pilot_status = (pilot_path / 'status.json').read_bytes()

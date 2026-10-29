@@ -486,10 +486,10 @@ class ChessApplication:
         if action == 'learning_task_stop' and self.learning_batch and not self.learning_batch.future.done():
             self.learning_batch.stop()
             return
-        if action == 'learning_task_return' and self.learning_batch and not self.learning_batch.future.done():
+        if action == 'learning_task_return' and self.learning_batch and (not self.learning_batch.future.done() or self.learning_batch.snapshot().get('status') == 'failed') and not self.learning.active_task():
             self.mode = 'auto'
             return
-        if action in ('learning_task_return', 'learning_task_stop') and self.learning.active_task():
+        if action in ('learning_task_return', 'learning_task_stop') and (self.learning.active_task() or (action == 'learning_task_return' and self.learning.failed_task())):
             self.learning.action(action, self)
             if action == 'learning_task_return': self.mode = 'learning'
             return
@@ -923,12 +923,19 @@ class ChessApplication:
         task = self.learning.active_task()
         if not task and self.learning_batch and not self.learning_batch.future.done():
             task = ('batch', '比較', self.learning_batch)
+        failed_task = None
+        if not task:
+            failed_task = self.learning.failed_task()
+            if not failed_task and self.learning_batch and self.learning_batch.future.done() and self.learning_batch.snapshot().get('status') == 'failed':
+                failed_task = ('batch', '比較', self.learning_batch)
+            task = failed_task
         if task and (self.mode != 'auto' or task[0] != 'batch'):
             state = task[2].snapshot()
             progress = f'{state.get("completed", state.get("saved_games", 0))}/{state.get("total", state.get("requested_games", 0))}'
-            self.text(f'{task[1]} {progress}', 190, 15, width=220)
+            self.text(f'{task[1]} {"失敗" if failed_task else progress}', 190, 15, width=220)
             self.button('learning_task_return', '返回任務', (420, 10, 110, 36))
-            self.button('learning_task_stop', '停止', (540, 10, 90, 36))
+            if not failed_task:
+                self.button('learning_task_stop', '停止', (540, 10, 90, 36))
         failure = self.learning_failure()
         if failure and not self.confirm_action:
             self.button('learning_error_details', '錯誤詳情', (640, 10, 130, 36))
