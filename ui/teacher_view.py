@@ -209,7 +209,7 @@ class TeacherView:
         app.button('learning_pilot_stop', '停止', (310, 230, 130, 36), enabled=active)
         workers = self.draft + ' |' if self.focus == 'workers' else str(self.workers)
         app.button('learning_teacher_workers', f'同時分析局面數：{workers}', (455, 230, 385, 36), enabled=not active)
-        status = {'queued': '排隊', 'running': '量測中', 'completed': '量測完成', 'stopped': '已停止', 'failed': '失敗',
+        status = {'queued': '排隊', 'running': '量測中', 'completed': '量測完成', 'stopped': '已停止，請重新量測', 'failed': '失敗，請重新量測',
                   'interrupted': '未完成，請建立新先導'}
         if state:
             display_status = 'interrupted' if state['status'] in ('running', 'queued') and not active else state['status']

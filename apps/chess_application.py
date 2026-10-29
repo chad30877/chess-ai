@@ -54,6 +54,7 @@ class ChessApplication:
         self._owns_executor = executor is None
         self.executor = executor if executor is not None else ThreadPoolExecutor(max_workers=1)
         self._read_executor = ThreadPoolExecutor(max_workers=2) if isinstance(self.executor, ThreadPoolExecutor) else None
+        self._scan_executor = self._read_executor or ThreadPoolExecutor(max_workers=1)
         self.resize(screen)
         self.mode = "home"
         self.live: LiveSession | None = None
@@ -110,6 +111,7 @@ class ChessApplication:
         self.learning_error_page = 0
         self.confirm_action: str | None = None
         self.confirm_was_running = False
+        self.confirm_paused = None
         self.message = ""
         self.profile_selector = None
         self.saved = False
@@ -166,12 +168,16 @@ class ChessApplication:
             self.executor.shutdown(wait=False, cancel_futures=True)
         if self._read_executor:
             self._read_executor.shutdown(wait=False, cancel_futures=True)
+        else:
+            self._scan_executor.shutdown(wait=False, cancel_futures=True)
 
     def new_setup(self, mode: str):
         if self.live:
             self.live.stop()
         self.mode = mode
-        if mode == 'learning': self.learning.restore(self.read_executor)
+        if mode == 'learning':
+            self.learning.scan_unfinished(self._scan_executor)
+            self.learning.restore(self.read_executor)
         self.live = self.replay = self.replay_data = None
         if not (self.learning_batch and not self.learning_batch.future.done()):
             self.batch = None
@@ -386,28 +392,37 @@ class ChessApplication:
         return self.live is not None and (self.live.active or (bool(self.live.move_items) and not self.saved))
 
     def request_leave(self, action: str):
+        if self.pending_leave: return
         if action == 'home' and self.learning_batch is not None and self.batch is self.learning_batch and not self.batch.future.done():
             self.mode = 'home'
             return
         if self.confirm_action:
             return
-        if self.needs_confirmation():
+        if self.needs_confirmation() or (action == 'quit' and self.learning.active()):
             self.confirm_action = action
             self.confirm_was_running = False
-            if self.batch:
+            self.confirm_paused = None
+            if self.batch and not self.batch.future.done():
                 self.confirm_was_running = self.batch.can_pause and self.batch.snapshot()["status"] == "running"
                 if self.confirm_was_running:
                     self.batch.pause()
+                    self.confirm_paused = self.batch
             elif self.live:
                 self.confirm_was_running = self.live.status == "running"
                 self.live.pause()
+                if self.confirm_was_running: self.confirm_paused = self.live
             self.move_view.handle_mouse_up()
         else:
             self._leave(action)
 
     def _leave(self, action: str):
+        if action == 'quit' and self.learning.active():
+            self.learning.close(wait=False)
         if self.batch and not self.batch.future.done():
             self.batch.stop()
+            self.pending_leave = action
+            return
+        if action == 'quit' and self.learning.active():
             self.pending_leave = action
             return
         if self.live:
@@ -442,7 +457,7 @@ class ChessApplication:
 
     def tick(self):
         worker = self.batch
-        if self.pending_leave and worker and worker.future.done():
+        if self.pending_leave and (worker is None or worker.future.done()) and (self.pending_leave != 'quit' or not self.learning.active()):
             action, self.pending_leave = self.pending_leave, None
             self._leave(action)
         if self.live and self.mode in ("auto", "human") and not self.confirm_action and not self.promotions:
@@ -476,6 +491,17 @@ class ChessApplication:
         return None
 
     def dispatch(self, action: str):
+        if self.pending_leave == 'quit': return
+        if self.confirm_action:
+            if action == "confirm":
+                pending = self.confirm_action
+                self.confirm_action = None
+                self._leave(pending)
+            elif action == "cancel":
+                self.confirm_action = None
+                if self.confirm_was_running:
+                    self.confirm_paused.resume()
+            return
         if action == 'learning_error_close':
             self.learning_error_open = False
             return
@@ -536,16 +562,6 @@ class ChessApplication:
             if self.replay_evaluator is not None:
                 self.replay_editor = ReplayEvaluationEditor(self.replay_evaluator.config)
                 self._replay_breakdown_ply = -1
-            return
-        if self.confirm_action:
-            if action == "confirm":
-                pending = self.confirm_action
-                self.confirm_action = None
-                self._leave(pending)
-            elif action == "cancel":
-                self.confirm_action = None
-                if self.confirm_was_running:
-                    (self.batch or self.live).resume()
             return
         if self.promotions:
             if action.startswith("promote:"):
@@ -755,6 +771,16 @@ class ChessApplication:
         if event.type == pygame.VIDEORESIZE:
             self.resize(pygame.display.set_mode((max(900, event.w), max(768, event.h)), pygame.RESIZABLE))
             return
+        if self.pending_leave == 'quit': return
+        if self.confirm_action:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                self.dispatch('cancel')
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                for button in self.buttons:
+                    if button.action in ('confirm', 'cancel') and button.enabled and button.rect.collidepoint(event.pos):
+                        self.dispatch(button.action)
+                        break
+            return
         if self.profile_selector is not None:
             self.profile_selector.input(event, self)
             return
@@ -944,6 +970,13 @@ class ChessApplication:
             self.button('learning_task_return', '返回任務', (420, 10, 110, 36))
             if not failed_task:
                 self.button('learning_task_stop', '停止', (540, 10, 90, 36))
+        if self.mode == 'learning' and not task and (self.learning.recovery_entries or self.learning.recovery_error or self.learning.recovery_future) and not self.learning.recovery_list:
+            kinds = {'teacher':'先導', 'labeling':'標記', 'training':'學習', 'groups':'學習', 'combination':'組合', 'combination_batch':'組合', 'comparison':'比較'}
+            labels = '、'.join(dict.fromkeys(kinds[item['kind']] for item in self.learning.recovery_entries))
+            title = ('查找未完成工作…' if self.learning.recovery_future else
+                     '未完成工作：讀取失敗' if self.learning.recovery_error else
+                     f'未完成：{labels}（{len(self.learning.recovery_entries)}）')
+            self.button('learning_recovery_list', title, (180, 10, 440, 36))
         failure = self.learning_failure()
         if failure and not self.confirm_action:
             self.button('learning_error_details', '錯誤詳情', (640, 10, 130, 36))
@@ -960,7 +993,10 @@ class ChessApplication:
                 self.text(f'{self.learning_error_page + 1}/{pages}', 210, 513)
                 self.button('learning_error_next', '下頁', (270, 505, 120, 36), enabled=self.learning_error_page + 1 < pages)
             self.button('learning_error_close', '關閉', (650, 505, 170, 36))
-        if self.confirm_action:
+        if self.pending_leave == 'quit':
+            self._modal((210, 260, 480, 170))
+            self.text('正在停止並保存…', 238, 300, large=True)
+        elif self.confirm_action:
             self._render_confirmation()
         elif self.promotions:
             self._render_promotion()
@@ -1278,11 +1314,13 @@ class ChessApplication:
 
     def _render_confirmation(self):
         self._modal((210, 260, 480, 230))
-        self.text("離開目前對局？", 238, 287, large=True)
-        self.text("停止後將保留已保存對局與本局走法。" if self.batch else "未保存的棋譜將不會保留。", 238, 340)
-        self.text("確認後等待停止與保存完成。" if self.batch else "取消後可繼續，或先停止並保存棋譜。", 238, 373, muted=True)
-        self.button("cancel", "取消", (238, 428, 196, 40), primary=True)
-        self.button("confirm", "確認離開", (454, 428, 208, 40))
+        self.text('停止並保存後離開？' if self.confirm_action == 'quit' and self.learning.active() else '離開目前對局？', 238, 287, large=True)
+        self.text('已完成的進度會保留。' if self.confirm_action == 'quit' and self.learning.active() else ('停止後將保留已保存對局與本局走法。' if self.batch else '未保存的棋譜將不會保留。'), 238, 340)
+        self.text('確認後等待停止與保存完成。' if self.batch or (self.confirm_action == 'quit' and self.learning.active()) else '取消後可繼續，或先停止並保存棋譜。', 238, 373, muted=True)
+        learning_quit = self.confirm_action == 'quit' and (self.learning.active() or
+                         (self.learning_batch is not None and not self.learning_batch.future.done()))
+        self.button('cancel', '繼續執行' if learning_quit else '取消', (238, 428, 196, 40), primary=True)
+        self.button('confirm', '停止並離開' if learning_quit else '確認離開', (454, 428, 208, 40))
 
     def _render_promotion(self):
         self._modal((210, 260, 480, 220))

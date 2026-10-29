@@ -18,12 +18,13 @@ from ui.combination_view import CombinationView
 from ui.candidate_inventory_view import InventoryView
 from ui.screening_view import ScreeningView
 from ui.heldout_view import HeldoutView
+from ui.unfinished_tasks import unfinished, RecoveredWork
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
 STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'}
 START_ACTIONS = {'learning_create', 'learning_pilot_start', 'learning_labels_new', 'learning_labels_resume',
                  'learning_training_new', 'learning_training_resume', 'learning_groups_new', 'learning_groups_resume',
-                 'learning_combination_new', 'learning_combination_resume', 'learning_combination_batch',
+                 'learning_combination_new', 'learning_combination_resume', 'learning_combination_batch', 'learning_combination_batch_resume',
                  'learning_compare_start', 'learning_screening_start'}
 
 EXCLUSION_LABELS = {'first_8_plies': '前八手', 'terminal': '終局', 'in_check': '受將',
@@ -64,6 +65,11 @@ class LearningView:
         self.page_load_request = None
         self._detached_task = None
         self._task_context = None
+        self.recovery_future = None
+        self.recovery_error = ''
+        self.recovery_entries = []
+        self.recovery_list = False
+        self.recovery_page = 0
         self.saved_list = False
         self.saved_entries = []
         self.saved_page = 0
@@ -114,6 +120,18 @@ class LearningView:
     def _remember_new(self, key, path):
         self.saved_state.setdefault('created', {})[str(Path(path))] = datetime.now().strftime('%Y/%m/%d')
         self._remember(key, path)
+
+    def scan_unfinished(self, executor):
+        self.recovery_error = ''
+        self.recovery_future = executor.submit(unfinished, self.root, self.teacher.project_root)
+
+    def poll_unfinished(self):
+        if self.recovery_future is not None and self.recovery_future.done():
+            future, self.recovery_future = self.recovery_future, None
+            try: self.recovery_entries = future.result()
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                self.recovery_entries = []
+                self.recovery_error = f'無法查找未完成工作：{exc}'
 
     def restore(self, executor):
         path = self.saved_state.get('selected', {}).get('data')
@@ -312,12 +330,50 @@ class LearningView:
         future, self.page_loading = self.page_loading, None
         view, error = future.result()
         if error:
-            self.page_load_error = f'無法讀取 {self.page_load_request[3]}：{error}'
+            source = self.page_load_request[3]
+            if isinstance(source, dict): source = source.get('path', source.get('experiment_id', '成果'))
+            self.page_load_error = f'無法讀取 {source}：{error}'
         else:
-            setattr(self, self.page_load_request[1], view)
+            if self.page_load_request[1] == 'recovery':
+                for key, value in view.context.items(): setattr(self, key, value)
+                if view.context.get('data') is not None:
+                    selected = self.saved_state.setdefault('selected', {})
+                    selected['data'] = str(self.path)
+                    if self.teacher.path:
+                        selected[f'teacher:{self.path}'] = str(self.teacher.path)
+                    if self.labels.path:
+                        selected[f'labeling:{self.path}:{self.teacher.path}'] = str(self.labels.path)
+                    context = self._saved_context()
+                    item = self.page_load_request[3]
+                    if item['kind'] == 'combination_batch':
+                        selected[f'groups:{self.labels.path}'] = str(self.group_training.path)
+                    elif context and context[1].path:
+                        selected[context[0]] = str(context[1].path)
+                    self._save_ui_state()
+            else:
+                setattr(self, self.page_load_request[1], view)
             self.page_load_request = None
 
     def action(self, action, app):
+        if self.recovery_list and action not in ('learning_task_return', 'learning_task_stop'):
+            if action == 'learning_recovery_back': self.recovery_list = False
+            elif action == 'learning_recovery_retry': self.scan_unfinished(app._scan_executor)
+            elif action == 'learning_recovery_next': self.recovery_page += 1
+            elif action == 'learning_recovery_prev': self.recovery_page = max(0, self.recovery_page - 1)
+            elif action.startswith('learning_recovery_open:'):
+                if self.active_task() or (app.batch and not app.batch.future.done()): return
+                item = self.recovery_entries[int(action.split(':')[1])]
+                self.loading = None
+                self.recovery_list = False
+                self._open_page('combination' if item['kind'] == 'combination_batch' else item['kind'], 'recovery', lambda: RecoveredWork(self.teacher.project_root), item, 'data', app.read_executor)
+            return
+        if action == 'learning_recovery_list':
+            if self.active_task() or (app.batch and not app.batch.future.done()): return
+            self.saved_list = False
+            if self.rename_focus:
+                self.rename_focus = False; pygame.key.stop_text_input()
+            self.recovery_list = True; self.recovery_page = 0
+            return
         if self.saved_list and action not in ('learning_task_return', 'learning_task_stop'):
             if action == 'learning_saved_back': self.saved_list = False
             elif action == 'learning_saved_next': self.saved_page += 1
@@ -384,6 +440,7 @@ class LearningView:
                 for key, value in self._task_context.items(): setattr(self, key, value)
                 self._task_context = self._detached_task = None
             self.saved_list = False
+            self.recovery_list = False
             self.page_loading = self.page_load_request = None
             self.loading = None
             self.page_load_error = ''
@@ -585,6 +642,31 @@ class LearningView:
     def render(self, app):
         self._poll_loading()
         self._poll_page()
+        self.poll_unfinished()
+        if self.recovery_list:
+            app.text('未完成工作', 50, 78, large=True)
+            app.button('learning_recovery_back', '返回', (50, 122, 130, 34))
+            if self.recovery_error:
+                app.text(self.recovery_error, 50, 180, width=790)
+                app.button('learning_recovery_retry', '重新讀取', (50, 230, 180, 34))
+                return
+            if self.recovery_future is not None:
+                app.text('載入未完成工作…', 50, 180, width=790)
+                return
+            pages = max(1, (len(self.recovery_entries) + 7) // 8)
+            self.recovery_page = min(self.recovery_page, pages - 1)
+            titles = {'teacher':'教師先導', 'labeling':'教師標記', 'training':'棋子位置學習', 'groups':'單群組學習', 'combination':'組合', 'combination_batch':'組合批次', 'comparison':'比較'}
+            for row, item in enumerate(self.recovery_entries[self.recovery_page * 8:self.recovery_page * 8 + 8]):
+                name = self.saved_name(item['path'], titles[item['kind']])
+                app.button(f'learning_recovery_open:{self.recovery_page * 8 + row}', name, (50, 180 + row * 50, 485, 40))
+                statuses = {'ready':'待開始', 'queued':'未完成', 'running':'未完成', 'stopped':'已停止', 'failed':'失敗', 'interrupted':'未完成', 'unavailable':'不可用', 'generating':'未完成', 'partial':'部分失敗'}
+                status = statuses.get(item['status'], item['status'])
+                if item['kind'] == 'teacher': status += ' · 需重新量測'
+                baseline = {'material': '純子力', 'stable': 'stable'}.get(item.get('baseline'), '')
+                app.text(item['path'].name[-8:] + (' · ' + baseline if baseline else '') + ' · ' + status, 550, 190 + row * 50, muted=True, width=290)
+            app.button('learning_recovery_prev', '上頁', (50, 615, 150, 34), enabled=self.recovery_page > 0)
+            app.button('learning_recovery_next', '下頁', (220, 615, 150, 34), enabled=self.recovery_page < pages - 1)
+            return
         if self.saved_list:
             app.text('選擇' + self.saved_kind, 50, 78, large=True)
             app.button('learning_saved_back', '返回', (50, 122, 130, 34))
