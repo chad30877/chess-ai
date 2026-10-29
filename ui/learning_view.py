@@ -37,6 +37,7 @@ class _DatasetGroups(GroupTrainingView):
         labels = LabelView()
         labels.dataset, labels.pilot = Path(dataset), Path(pilot)
         labels._entries, labels.path, labels.state, error = labels._read_saved(labels.dataset, preferred_label, labels.pilot)
+        labels.index = next((i for i, entry in enumerate(labels._entries) if entry.parent == labels.path), 0)
         labels.load_error = bool(error)
         if error: labels.message = f'無法讀取標記 {labels.path}：{error}'
         self.navigation_labels = labels
@@ -497,12 +498,6 @@ class LearningView:
         if task and action.startswith('learning_budget:'):
             self.teacher.message = f'目前執行中：{task[1]}，請先停止或等待完成'
             return
-        if action in ('learning_labels_new', 'learning_labels_resume') and not self._labels_current():
-            self.labels.message = '請先選定對應教師先導'
-            return
-        if self.browse_result and action in ('learning_groups_new', 'learning_groups_resume'):
-            self.group_training.message = '請先選擇對應教師標記'
-            return
         if action in START_ACTIONS:
             batch = getattr(app, 'batch', None)
             running = task[1] if task else ('比較' if batch and not batch.future.done() else None)
@@ -512,6 +507,26 @@ class LearningView:
                         'comparison': self.comparison, 'screening': self.screening}.get(self.page, self)
                 view.message = f'目前執行中：{running}，請先停止或等待完成'
                 return
+        if action in START_ACTIONS and (self.page_load_request is not None or self.loading is not None):
+            return
+        if action in ('learning_groups_new', 'learning_groups_resume') and self.group_training.labels != self.labels.path:
+            self.group_training.message = '請先載入對應教師標記'
+            return
+        if action in ('learning_training_new', 'learning_training_resume') and self.training.labels != self.labels.path:
+            self.training.message = '請先載入對應教師標記'
+            return
+        if action in ('learning_groups_new', 'learning_groups_resume', 'learning_training_new', 'learning_training_resume') and (not self._labels_current() or self.labels.loading is not None or not self.labels.state.get('ready')):
+            self.message = '請先完成對應教師標記'
+            return
+        if action == 'learning_pilot_start' and (not self.data or self.teacher.dataset != self.path or self.teacher.loading is not None or self.teacher.load_error):
+            self.teacher.message = '請先選擇有效資料'
+            return
+        if action in ('learning_labels_new', 'learning_labels_resume') and (not self._labels_current() or not self.teacher.state.get('choice') or self.labels.loading is not None or self.labels.load_error):
+            self.labels.message = '請先選定對應教師先導'
+            return
+        if self.browse_result and action in ('learning_groups_new', 'learning_groups_resume'):
+            self.group_training.message = '請先選擇對應教師標記'
+            return
         if action == 'learning_task_return' and (task or self.failed_task()):
             target = task or self.failed_task()
             if self._task_context and target is self._detached_task:

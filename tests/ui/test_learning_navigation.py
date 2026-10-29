@@ -72,6 +72,8 @@ class LearningNavigationTest(unittest.TestCase):
             self.assertEqual(app.learning.page, 'groups')
             app.render()
             self.assertFalse(any(b.enabled for b in app.buttons if b.action in ('learning_groups_new', 'learning_groups_resume')))
+            app.dispatch('learning_groups_new')
+            self.assertIsNone(app.learning.group_training.run)
             click('learning_need_labels')
             self.assertEqual(app.learning.page, 'labeling')
             app.render()
@@ -97,7 +99,7 @@ class SourceStageTest(unittest.TestCase):
             app.new_setup('learning')
             app.learning.open(self.labels.parents[1])
             from engine.learning.labeling import create_labeling
-            create_labeling(self.labels.parents[1], app.learning.teacher.path)
+            newer = create_labeling(self.labels.parents[1], app.learning.teacher.path)
             key = f'labeling:{app.learning.path}:{app.learning.teacher.path}'
             app.learning.saved_state.setdefault('selected', {})[key] = str(self.labels)
             app.render()
@@ -108,6 +110,13 @@ class SourceStageTest(unittest.TestCase):
             self.assertEqual(app.learning.labels.path, self.labels)
             self.assertTrue(app.learning.labels.state['ready'])
             self.assertTrue(any(b.action == 'learning_groups_new' and b.enabled for b in app.buttons))
+            button = next(b for b in app.buttons if b.action == 'learning_labels')
+            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            app.render()
+            button = next(b for b in app.buttons if b.action == 'learning_labels_next')
+            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            executor.finish(); app.render()
+            self.assertEqual(app.learning.labels.path, newer)
 
     def test_stage_follows_selected_dataset_without_reusing_old_labels(self):
         from engine.learning.dataset import create_dataset
