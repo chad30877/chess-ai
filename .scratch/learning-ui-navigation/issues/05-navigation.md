@@ -1,12 +1,12 @@
 # UI05：建立目的首頁、固定主入口與可返回的位置路徑
 
-狀態：已完成。
+狀態：待驗收。
 阻擋來源：[UI01](01-responsive-loading.md)、[UI02](02-result-selection.md)、[UI03](03-task-lifecycle.md)。
 對應決策：Q1、Q2、Q4、Q8、Q9、Q15。
 規格：[學習實驗導覽與操作改善](../spec.md)。
 索引：[本批工作票](../README.md)。
 
-UI01、UI02、UI03 均已完成；本票功能、審查與整合回歸已依下列證據驗收。
+UI01、UI02、UI03 均已完成；本票合併後整合回歸發現錯誤，待修復並重新驗收。
 
 ## 要交付的行為
 
@@ -29,7 +29,7 @@ UI01、UI02、UI03 均已完成；本票功能、審查與整合回歸已依下�
 - [x] 缺少前置成果的頁面仍可開啟並提供直接補足入口。驗證：未完成教師標記時進學習頁，點前往接續標記。
 - [x] 前置不足時無法啟動依賴該成果的運算。驗證：在缺少預算或標記資料情境操作開始，核對未建立工作。
 - [x] 未滿足新任務前置條件時仍能查看既有成果。驗證：選擇未完成資料後開啟既有可讀結果。
-- [x] 新導覽中的載入返回與活動任務進度遵循 UI01、UI03。驗證：在新主入口交錯切頁、返回及進入活動任務。
+- [ ] 新導覽中的載入返回與活動任務進度遵循 UI01、UI03。驗證：在新主入口交錯切頁、返回及進入活動任務。
 
 ## 驗證安排
 
@@ -55,3 +55,5 @@ UI01、UI02、UI03 均已完成；本票功能、審查與整合回歸已依下�
 - 以 SDL dummy 實際渲染檢查 900×768 與 1280×960 首頁；非使用者操作。`tests.ui.test_learning_navigation` 與 `tests.ui.test_teacher_picker` 分開執行通過，同程序執行曾出現 Tcl_AsyncDelete 並以碼 1 結束，未宣稱該組合通過。
 - 獨立審查指出成果瀏覽時任務及標記來源、瀏覽模式、直接接續標記索引及比較返回來源等問題，均已修正並複審。上次選定的較早完成標記不被較新未完成標記取代。
 - 本票直接使用既有單次群組候選盤點；全來源候選與比較紀錄分別由 UI07、UI09 交付。人工重現步驟不等於已執行。
+
+- 整合分支重跑 `tests.ui.test_learning_close tests.ui.test_learning_navigation tests.ui.test_learning_task_navigation tests.ui.test_learning_loading tests.ui.test_saved_selection`，55 項中 1 錯誤：`SavedTeacherSelectionTest.test_changing_label_while_training_preserves_running_task_context` 找不到 `learning_task_return`。單獨重跑相同錯誤；需修復並重新驗收。
