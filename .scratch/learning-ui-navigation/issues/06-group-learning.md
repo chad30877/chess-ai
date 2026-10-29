@@ -58,3 +58,5 @@ UI04、UI05 已完成；本票已依下列證據驗收。
 - 沒有執行正式長實驗；操作教學截圖為舊版示意，已標明以現行介面為準。人工重現方式未由使用者執行。
 
 - 合入 UI07 後執行 `tests.ui.test_group_draft tests.ui.test_learning_navigation tests.test_candidate_inventory tests.ui.test_group_training` 共 15 項通過；原有候選 UI 測試更新為先開新建草稿。
+
+- 整合分支以專案虛擬環境複跑群組草稿、導覽、候選盤點、群組學習及比較，共 17 項通過。獨立複審未再確認阻擋。
