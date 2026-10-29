@@ -20,6 +20,7 @@ class ComparisonSetupView:
         self.data_root = Path(data_root)
         self.rows = deepcopy(rows)
         self.quick = preview_setup(self.root, self.data_root, self.rows, 'screening')
+        for row, source in zip(self.rows, self.quick['sources']): row['source'] = deepcopy(source)
         try:
             self.final = preview_setup(self.root, self.data_root, self.rows, 'final')
         except ValueError as exc:
@@ -48,7 +49,8 @@ class ComparisonSetupView:
         for row, item in enumerate(self.rows[self.page * 4:self.page * 4 + 4]):
             source = item['source']; index = self.page * 4 + row
             status = '' if self.purpose == 'screening' or not self.final else (' · 通過篩選' if self.final['passed'][index] else ' · 尚未通過篩選')
-            app.text(f'{source["experiment_id"][-12:]} · {"、".join(GROUPS.get(group, group) for group in source["groups"])}{status}', 50, 310 + row * 38, width=790)
+            name = item.get('name', source['experiment_id'][-12:])
+            app.text(f'{name} · {"、".join(GROUPS.get(group, group) for group in source["groups"])}{status}', 50, 310 + row * 38, width=790)
         app.button('learning_setup_prev', '上頁', (50, 480, 130, 32), enabled=self.page > 0)
         app.button('learning_setup_next', '下頁', (220, 480, 130, 32), enabled=self.page + 1 < pages)
         ready = self.purpose == 'screening' or bool(self.final and all(self.final['passed']))

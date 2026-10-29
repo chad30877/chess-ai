@@ -27,7 +27,6 @@ def unfinished(root, project):
     for kind, pattern in (
         ('teacher', '*/teacher-pilots/*'),
         ('labeling', '*/teacher-labels/*'),
-        ('training', '*/teacher-labels/*/training/*'),
         ('groups', '*/teacher-labels/*/group-training/*'),
         ('combination', '*/teacher-labels/*/combinations/*'),
         ('combination_batch', '*/teacher-labels/*/combination-batches/*'),

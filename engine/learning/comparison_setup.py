@@ -21,7 +21,10 @@ def verify_selection(root, rows):
     selected = []
     for row in rows:
         try:
-            if not Path(row['path']).resolve().is_relative_to(Path(root).resolve()):
+            from engine.learning.config_catalog import project_root
+            allowed = [Path(root).resolve()]
+            if row['origin'] == 'catalog': allowed.append((project_root(root) / 'configs/evaluation').resolve())
+            if not any(Path(row['path']).resolve().is_relative_to(folder) for folder in allowed):
                 raise ValueError('候選不屬於目前資料範圍')
             selected.append(validate_candidate_row(row))
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:

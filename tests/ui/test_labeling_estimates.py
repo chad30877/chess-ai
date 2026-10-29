@@ -12,6 +12,7 @@ from apps.chess_application import ChessApplication, APP_SIZE
 from engine.learning.dataset import create_dataset
 from engine.learning.labeling import load_labeling
 from tests.helpers.executors import ManualExecutor
+from tests.helpers.learning_ui import settle
 from tests.helpers.uci_teacher import make_engine
 from tests.test_learning_dataset import pgn_games
 
@@ -66,7 +67,7 @@ class LabelingEstimatesUiTest(unittest.TestCase):
                 self.addCleanup(app.close)
                 open_teacher()
                 self.assertEqual(app.learning.teacher.state['labeling_estimates'], estimates)
-                click('learning_labels')
+                click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
                 click('learning_labels_new')
                 labels = load_labeling(app.learning.labels.path)
                 self.assertEqual(labels['remaining'], estimates['200000']['remaining'])

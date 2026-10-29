@@ -26,7 +26,7 @@ def _envelope(snapshot, sample, record, origin):
                 snapshot_identity=snapshot['identity'], origin=origin, label=record)
 
 
-def create_labeling(dataset_path, pilot_path, *, run_path=None):
+def create_labeling(dataset_path, pilot_path, *, run_path=None, reuse=False):
     """由已選定先導建立新標記快照；來源及教師改動不覆寫既有實驗。"""
     dataset_path, pilot_path = Path(dataset_path), Path(pilot_path)
     data, pilot = load_dataset(dataset_path), load_pilot(pilot_path)
@@ -44,6 +44,14 @@ def create_labeling(dataset_path, pilot_path, *, run_path=None):
         raise ValueError('篩選條件版本不相容；請建立新先導')
     if not data['positions']:
         raise ValueError('沒有可標記局面')
+    if reuse and run_path is None:
+        for entry in sorted((dataset_path / 'teacher-labels').glob('*/snapshot.json'), key=lambda p: p.stat().st_mtime, reverse=True):
+            saved = _read(entry)
+            fields = ('teacher', 'nodes', 'filter_version', 'cp_special_threshold')
+            if saved.get('dataset_sha256') == digest(data) and all(saved.get(key) == choice[key] for key in fields):
+                # 資料身分包含抽樣種子；先導 UUID 不影響相同條件的重用。
+                load_labeling(entry.parent)
+                return entry.parent
     path = Path(run_path) if run_path else dataset_path / 'teacher-labels' / uuid4().hex
     if (path / 'snapshot.json').exists():
         raise ValueError('標記條件不可變；請建立新實驗')

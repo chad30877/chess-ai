@@ -118,9 +118,8 @@ class GroupTrainingView:
             try: self.compared = self.comparison_future.result()
             except (OSError, ValueError, KeyError, TypeError, IndexError): self.compared = set()
             self.comparison_future = None
-        app.text('學習實驗 · 單群組學習',50,78,large=True)
+        app.text('評分權重學習',50,78,large=True)
         app.button('learning_labels','教師標記',(50,120,190,34))
-        app.button('learning_training','舊棋子位置成果',(260,120,250,32),enabled=bool(self.labels) and (self.labels/'training').is_dir() and not active)
         app.button('learning_groups_prev','上一份',(540,120,140,32),enabled=len(self.entries)>1 and not active)
         app.button('learning_groups_next','下一份',(700,120,140,32),enabled=len(self.entries)>1 and not active)
         if self.draft:

@@ -28,11 +28,12 @@ class ComparisonSetupUiTest(unittest.TestCase):
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
             click('learning_goal_compare'); executor.finish(); app.render()
             click('learning_inventory_candidate:0')
-            selected = app.learning.inventory.report['candidates'][0]['source']
+            from engine.learning.candidate_inventory import validate_candidate_row
+            selected = validate_candidate_row(app.learning.inventory.report['candidates'][0])
             broken = self.root / 'data/learning-comparisons/broken'
             broken.mkdir(parents=True)
             (broken / 'snapshot.json').write_text('{broken', encoding='utf-8')
-            click('learning_inventory_compare'); executor.finish(); app.render()
+            click('learning_inventory_details'); click('learning_inventory_compare'); executor.finish(); app.render()
             self.assertEqual(app.learning.page, 'comparison')
             self.assertEqual(app.learning.comparison.source, selected)
             self.assertEqual(app.learning.comparison.roles, {'original', 'learned'})
@@ -187,7 +188,7 @@ class ComparisonSetupUiTest(unittest.TestCase):
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
             click('learning_goal_compare'); executor.finish(); app.render()
-            click('learning_inventory_candidate:0'); click('learning_inventory_compare'); executor.finish(); app.render()
+            click('learning_inventory_candidate:0'); click('learning_inventory_details'); click('learning_inventory_compare'); executor.finish(); app.render()
             click('learning_compare_role:original')
             with patch.object(app, 'text', wraps=app.text) as draw: app.render()
             self.assertTrue(any('共64局' in str(call.args[0]) for call in draw.call_args_list))

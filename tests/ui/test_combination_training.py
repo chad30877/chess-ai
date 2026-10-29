@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pygame
 from apps.chess_application import ChessApplication, APP_SIZE
 from tests import test_weight_training as fixtures
+from tests.helpers.learning_ui import choose_labels
 from engine.learning.group_training import create_group_training, run_group_training
 from engine.learning.combination_training import load_combination_candidate
 
@@ -35,9 +36,9 @@ class CombinationUiTest(unittest.TestCase):
                     app.render()
             def open_view():
                 click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
-                click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
+                choose_labels(app, self.labels, training=True); click('learning_combinations')
             open_view(); view = app.learning.combination
-            click('learning_groups'); click('learning_groups_select:mobility'); click('learning_groups_compare')
+            click('learning_nav_groups'); click('learning_groups_select:mobility'); click('learning_groups_compare')
             app.render()
             group_breadcrumb = next(b.label for b in app.buttons if b.action == 'learning_breadcrumb_inventory')
             click('learning_compare_back'); click('learning_combinations')
@@ -114,7 +115,7 @@ class CombinationUiTest(unittest.TestCase):
                     else: future.result(timeout=15)
                     app.render()
             click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
-            click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
+            choose_labels(app, self.labels, training=True); click('learning_combinations')
             view = app.learning.combination
             click('learning_combination_batch')
             view.run.future.result(timeout=45); app.render()

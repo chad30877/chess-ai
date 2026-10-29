@@ -264,9 +264,12 @@ class ComparisonHistoryTest(unittest.TestCase):
                 app.new_setup('learning')
                 app.render(); button = next(b for b in app.buttons if b.action == 'learning_goal_compare')
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-                executor.finish()
-                with patch.object(app, 'text', wraps=app.text) as draw: app.render()
-                self.assertTrue(any('尚未比較' in str(call.args[0]) for call in draw.call_args_list))
+                executor.finish(); app.render()
+                app.dispatch('learning_inventory_sort'); executor.finish(); app.render()
+                self.assertEqual(app.learning.inventory.sort, 'rating')
+                with patch.object(app, 'button', wraps=app.button) as draw: app.render()
+                self.assertTrue(any(call.args[0].startswith('learning_inventory_candidate:') and
+                                    '未評估' in call.args[1] for call in draw.call_args_list))
                 app.close()
         finally: case.doCleanups()
     def test_half_pair_shows_saved_and_remaining_work_before_resume(self):

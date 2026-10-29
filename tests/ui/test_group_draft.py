@@ -99,33 +99,23 @@ class GroupDraftTest(unittest.TestCase):
             click('learning_groups_battle')
             app.opponent = 'Greedy'; app.start_game()
             self.assertEqual(app.live.settings.black_evaluation.to_dict(), expected)
-    def test_legacy_unfinished_resume_and_create_draft_from_result(self):
-        from engine.learning.training import create_training, load_training
+    def test_legacy_unfinished_has_no_page_and_keeps_saved_data(self):
+        from engine.learning.training import create_training
         legacy = create_training(self.labels)
+        before = (legacy / 'snapshot.json').read_bytes()
         pygame.init(); self.addCleanup(pygame.quit)
         with patch('apps.chess_application.PROJECT_ROOT', self.root), ThreadPoolExecutor(1) as executor:
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
             self.addCleanup(app.close)
-            app.learning.open(self.labels.parents[1])
-            app.learning.labels.open(self.labels.parents[1], app.learning.teacher.path, executor, self.labels)
-            app.learning.labels.loading.result(timeout=30); app.learning.labels.render(app)
-            app.learning.group_training.open(self.labels)
-            app.mode = 'learning'; app.learning.page = 'groups'
-            def click(action):
-                app.render(); button = next(b for b in app.buttons if b.action == action)
-                self.assertTrue(button.enabled, action)
-                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_training')
+            app.mode = 'learning'; app.learning.open(self.labels.parents[1])
+            app.learning.group_training.open(self.labels); app.learning.page = 'groups'
+            app.render()
+            self.assertFalse(any(b.action == 'learning_training' for b in app.buttons))
+            app.dispatch('learning_training')
             app.learning.page_loading.result(timeout=30); app.render()
-            self.assertEqual(app.learning.training.path, legacy)
-            click('learning_training_resume')
-            app.learning.training.run.future.result(timeout=60); app.render()
-            self.assertEqual(load_training(legacy)['status'], 'completed')
-            before = (legacy / 'snapshot.json').read_bytes()
-            click('learning_training_draft'); app.render()
-            self.assertEqual(app.learning.page, 'groups')
-            self.assertEqual(app.learning.group_training.selected, set(GROUPS))
+            self.assertEqual(app.learning.page, 'inventory')
             self.assertEqual((legacy / 'snapshot.json').read_bytes(), before)
+
     def test_browsed_result_new_draft_restores_its_original_source(self):
         from engine.learning.group_training import create_group_training
         original = create_group_training(self.labels, groups=['mobility'])

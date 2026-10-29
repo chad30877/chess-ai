@@ -1,3 +1,4 @@
+from tests.helpers.learning_ui import choose_labels
 """關閉學習工作、保存完成及手動恢復的事件測試。"""
 import os
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
@@ -173,8 +174,7 @@ class UnfinishedWorkTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_groups'); executor.finish(); app.render()
+            choose_labels(app, self.labels, training=True)
             click('learning_groups_new'); run = app.learning.group_training.run
             app.render()
             self.assertTrue(all('未選取' not in next(b.label for b in app.buttons if b.action == 'learning_groups_select:' + group)
@@ -254,8 +254,8 @@ class UnfinishedWorkTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_labels_new'); run = app.learning.labels.run
+            choose_labels(app, self.labels)
+            click('learning_labels_recreate'); run = app.learning.labels.run
             before = {p.name: p.read_bytes() for p in (run.path / 'records').glob('*.json')}
             click('learning_nav_data')
             self.assertIs(app.learning.active_task()[2], run)
@@ -396,8 +396,7 @@ class UnfinishedWorkTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_groups'); executor.finish(); app.render()
+            choose_labels(app, self.labels, training=True)
             for group in ('piece-square', 'pawn', 'king-safety', 'coordination'):
                 click('learning_groups_toggle:' + group)
             click('learning_groups_new'); run = app.learning.group_training.run
@@ -436,8 +435,7 @@ class UnfinishedWorkTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); app.learning.labels.loading.result(timeout=15); app.render()
-            click('learning_groups'); app.learning.page_loading.result(timeout=15); app.render()
+            choose_labels(app, self.labels, training=True)
             for group in ('piece-square', 'pawn', 'king-safety', 'coordination'):
                 click('learning_groups_toggle:' + group)
             click('learning_groups_new'); run = app.learning.group_training.run

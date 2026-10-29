@@ -1,119 +1,59 @@
+from tests.helpers.learning_ui import choose_labels
+"""非同步選擇與過期結果不覆蓋目前頁面。"""
 import os
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 import pygame
 from apps.chess_application import ChessApplication, APP_SIZE
 from tests.helpers.executors import ManualExecutor
+from ui.label_view import LabelView
 
 class LoadingUiTest(unittest.TestCase):
-    def test_label_page_is_available_before_saved_records_finish_loading(self):
-        pygame.init()
-        self.addCleanup(pygame.quit)
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            saved = root / 'teacher-labels' / 'one'
-            saved.mkdir(parents=True)
-            (saved / 'snapshot.json').write_text('{}', encoding='utf-8')
-            executor = ManualExecutor()
-            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
-            app.learning.saved_state_path = root / 'ui-state.json'; app.learning.saved_state = {}
-            app.mode = 'learning'
-            app.learning.path = root
-            app.learning.teacher.path = root / 'pilot'
-            app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
-            app.learning.page = 'teacher'
-            def click(action):
-                app.render()
-                button = next(b for b in app.buttons if b.action == action)
-                self.assertTrue(button.enabled)
-                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels')
-            self.assertEqual(app.learning.page, 'labeling')
-            app.render()
-            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_labels_resume').enabled)
-            button = next(b for b in app.buttons if b.action == 'learning_labels_new')
-            self.assertFalse(button.enabled)
-            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            self.assertIsNone(app.learning.labels.run)
-            self.assertEqual(len(executor.jobs), 1)
-            click('learning_teacher')
-            self.assertEqual(app.learning.page, 'teacher')
-            app.close()
-
-
-    def test_switching_saved_labels_ignores_an_older_read(self):
-        from unittest.mock import patch
-        pygame.init()
-        self.addCleanup(pygame.quit)
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            for name in ('one', 'two'):
-                saved = root / 'teacher-labels' / name
-                saved.mkdir(parents=True)
-                (saved / 'snapshot.json').write_text('{}', encoding='utf-8')
-            executor = ManualExecutor()
-            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
-            app.learning.saved_state_path = root / 'ui-state.json'; app.learning.saved_state = {}
-            app.mode = 'learning'
-            app.learning.path = root
-            app.learning.teacher.path = root / 'pilot'
-            app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
-            app.learning.page = 'teacher'
-            def click(action):
-                app.render()
-                button = next(b for b in app.buttons if b.action == action)
-                self.assertTrue(button.enabled, action)
-                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            def read(path):
-                return {'status': 'stopped', 'completed': 1, 'total': 2, 'remaining': 1, 'failed': 0, 'name': path.name}
-            with patch('ui.label_view.load_labeling', side_effect=read):
-                click('learning_labels'); executor.finish(); app.render()
-                first = app.learning.labels.path
-                click('learning_labels_next')
-                click('learning_labels_next')
-                executor.finish(2); app.render()
-                self.assertEqual(app.learning.labels.path, first)
-                executor.finish(1); app.render()
-                self.assertEqual(app.learning.labels.path, first)
-                self.assertEqual(app.learning.labels.state['name'], first.name)
-            app.close()
-
-    def test_unavailable_label_can_be_retried_without_switching_source(self):
-        from unittest.mock import patch
+    def test_leaving_selector_ignores_older_read(self):
         pygame.init(); self.addCleanup(pygame.quit)
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            saved = root / 'teacher-labels' / 'broken'
-            saved.mkdir(parents=True)
-            (saved / 'snapshot.json').write_text('{}', encoding='utf-8')
+        with tempfile.TemporaryDirectory() as folder, patch('apps.chess_application.PROJECT_ROOT', Path(folder)):
             executor = ManualExecutor()
-            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
-            app.learning.saved_state_path = root / 'ui-state.json'; app.learning.saved_state = {}
-            app.mode = 'learning'; app.learning.path = root
-            app.learning.teacher.path = root / 'pilot'
-            app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
-            app.learning.page = 'teacher'
-            def click(action):
-                app.render()
-                button = next(b for b in app.buttons if b.action == action)
-                self.assertTrue(button.enabled, action)
-                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            with patch('ui.label_view.load_labeling', side_effect=ValueError('損壞')):
-                click('learning_labels'); executor.finish(); app.render()
-            self.assertEqual(app.learning.labels.path, saved)
-            self.assertIn('損壞', app.learning.labels.message)
-            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_labels_new').enabled)
-            good = {'status': 'stopped', 'completed': 1, 'total': 2, 'remaining': 1, 'failed': 0}
-            with patch('ui.label_view.load_labeling', return_value=good):
-                click('learning_labels_retry'); executor.finish(); app.render()
-            self.assertEqual(app.learning.labels.path, saved)
-            self.assertFalse(app.learning.labels.message)
-            self.assertTrue(next(b for b in app.buttons if b.action == 'learning_labels_resume').enabled)
-            app.close()
+            app = ChessApplication(pygame.display.set_mode((900,768)), executor=executor)
+            self.addCleanup(app.close); app.mode = 'learning'
+            app.dispatch('learning_choose_training_labels')
+            pending = app.learning.page_loading
+            app.dispatch('learning_nav_data')
+            executor.finish(); app.render()
+            self.assertTrue(pending.done())
+            self.assertEqual(app.learning.page, 'data')
+            self.assertIsNone(app.learning.page_loading)
 
+    def test_explicit_label_from_other_pilot_is_valid(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); path = root / 'teacher-labels' / 'chosen'
+            path.mkdir(parents=True); (path / 'snapshot.json').write_text('{}')
+            state = dict(ready=True, snapshot={'pilot_path': str(root / 'original')})
+            with patch('ui.label_view.load_labeling', return_value=state):
+                entries, selected, loaded, error = LabelView._read_saved(root, path, root / 'other')
+            self.assertIsNone(error)
+            self.assertEqual(selected, path)
+            self.assertTrue(loaded['ready'])
+
+    def test_read_failure_can_be_retried(self):
+        executor = ManualExecutor(); view = LabelView()
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); path = root / 'teacher-labels' / 'chosen'
+            path.mkdir(parents=True); (path / 'snapshot.json').write_text('{}')
+            with patch('ui.label_view.load_labeling', side_effect=ValueError('損壞')):
+                view.open(root, root / 'pilot', executor, path); executor.finish(); view._poll_loading()
+            self.assertTrue(view.load_error)
+            from types import SimpleNamespace
+            with patch('ui.label_view.load_labeling', return_value={'ready':True}):
+                view.action('learning_labels_retry', SimpleNamespace(read_executor=executor))
+                executor.finish(); view._poll_loading()
+            self.assertFalse(view.load_error)
+            self.assertTrue(view.state['ready'])
+
+class ExistingLoadingUiTest(unittest.TestCase):
     def test_dataset_selection_keeps_event_loop_available_during_read(self):
         import json
         pygame.init(); self.addCleanup(pygame.quit)
@@ -150,12 +90,11 @@ class LoadingUiTest(unittest.TestCase):
             app.learning.teacher.dataset = root
             app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
             app.render()
-            button = next(b for b in app.buttons if b.action == 'learning_pilot_next')
-            app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            app.dispatch('learning_pilot_next')
             app.render()
             self.assertTrue(app.learning.teacher.loading)
-            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_labels').enabled)
-            button = next(b for b in app.buttons if b.action == 'learning_data')
+            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_labels_new').enabled)
+            button = next(b for b in app.buttons if b.action == 'learning_nav_data')
             self.assertTrue(button.enabled)
             app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
             self.assertEqual(app.learning.page, 'data')
@@ -169,9 +108,9 @@ class LoadingUiTest(unittest.TestCase):
         app.learning.labels.path = Path('saved-labels')
         app.learning.labels.state = {'status': 'completed', 'completed': 1, 'total': 1, 'remaining': 0, 'failed': 0, 'ready': True}
         app.render()
-        button = next(b for b in app.buttons if b.action == 'learning_groups')
+        button = next(b for b in app.buttons if b.action == 'learning_choose_training_labels')
         app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-        self.assertEqual(app.learning.page, 'groups')
+        self.assertEqual(app.learning.page, 'label_choices')
         app.render()
         self.assertTrue(app.learning.page_loading)
         button = next(b for b in app.buttons if b.action == 'learning_loading_back')
@@ -205,52 +144,52 @@ class RealLabelRecoveryTest(unittest.TestCase):
             button = next(b for b in app.buttons if b.action == action)
             self.assertTrue(button.enabled, action)
             app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-        click('learning_labels'); executor.finish(); app.render()
+        click('learning_nav_teacher'); executor.finish(); app.render()
         self.assertEqual(app.learning.labels.path, broken)
         self.assertIn(str(broken), app.learning.labels.message)
-        self.assertFalse(next(b for b in app.buttons if b.action == 'learning_groups').enabled)
+        self.assertFalse(app.learning.labels.state.get('ready', False))
         snapshot.write_bytes(original)
         click('learning_labels_retry'); executor.finish(); app.render()
         self.assertEqual(app.learning.labels.path, broken)
         self.assertTrue(app.learning.labels.state['ready'])
         snapshot.write_text('{broken', encoding='utf-8')
-        click('learning_labels_next'); executor.finish(); app.render()
+        choose_labels(app, self.labels)
         self.assertEqual(app.learning.labels.path, self.labels)
         self.assertTrue(app.learning.labels.state['ready'])
         snapshot.write_bytes(original)
-        click('learning_labels_prev'); executor.finish(); app.render()
+        choose_labels(app, broken)
         self.assertEqual(app.learning.labels.path, broken)
         self.assertTrue(app.learning.labels.state['ready'])
-        self.assertTrue(next(b for b in app.buttons if b.action == 'learning_groups').enabled)
+        self.assertTrue(next(b for b in app.buttons if b.action == 'learning_choose_training_labels').enabled)
         app.close()
 
     def test_switching_training_results_can_be_left_while_loading(self):
-        from engine.learning.training import create_training
-        create_training(self.labels)
-        create_training(self.labels)
+        from engine.learning.group_training import create_group_training
+        create_group_training(self.labels)
+        create_group_training(self.labels)
         pygame.init(); self.addCleanup(pygame.quit)
         executor = ManualExecutor()
         app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
         app.learning.saved_state_path = self.root / 'ui-state.json'; app.learning.saved_state = {}
-        app.mode = 'learning'; app.learning.page = 'training'
-        app.learning.training.open(self.labels)
-        selected = app.learning.training.entries[1].parent
+        app.mode = 'learning'; app.learning.page = 'groups'
+        app.learning.group_training.open(self.labels)
+        selected = app.learning.group_training.entries[1].parent
         app.render()
-        button = next(b for b in app.buttons if b.action == 'learning_training_next')
+        button = next(b for b in app.buttons if b.action == 'learning_groups_next')
         self.assertTrue(button.enabled)
         app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
         app.render()
         self.assertTrue(app.learning.page_loading)
         button = next(b for b in app.buttons if b.action == 'learning_loading_back')
         app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-        self.assertEqual(app.learning.page, 'training')
+        self.assertEqual(app.learning.page, 'groups')
         app.render()
-        button = next(b for b in app.buttons if b.action == 'learning_training_next')
+        button = next(b for b in app.buttons if b.action == 'learning_groups_next')
         app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
         executor.finish(); app.render()
-        self.assertEqual(app.learning.training.path, selected)
+        self.assertEqual(app.learning.group_training.path, selected)
         executor.finish(0); app.render()
-        self.assertEqual(app.learning.training.path, selected)
+        self.assertEqual(app.learning.group_training.path, selected)
         app.close()
 
     def test_completed_label_run_reloads_records_without_blocking_navigation(self):
@@ -268,10 +207,13 @@ class RealLabelRecoveryTest(unittest.TestCase):
             button = next(b for b in app.buttons if b.action == action)
             self.assertTrue(button.enabled, action)
             app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-        click('learning_labels'); executor.finish(); app.render()
-        click('learning_labels_new'); executor.finish(); app.render()
+        click('learning_nav_teacher'); executor.finish(); app.render()
+        app.learning.labels.dataset = dataset
+        app.learning.labels.pilot = app.learning.teacher.path
+        app.learning.teacher.dataset = dataset
+        click('learning_labels_recreate'); executor.finish(); app.render()
         self.assertIsNotNone(app.learning.labels.loading)
-        click('learning_teacher')
+        click('learning_nav_teacher')
         self.assertEqual(app.learning.page, 'teacher')
         app.close()
 
@@ -336,7 +278,7 @@ class RealLabelRecoveryTest(unittest.TestCase):
         app.learning.teacher.path = next((dataset / 'teacher-pilots').iterdir())
         app.learning.teacher.state = {'status': 'completed', 'choice': {'nodes': 50000}}
         app.learning.page = 'teacher'; app.render()
-        button = next(b for b in app.buttons if b.action == 'learning_labels')
+        button = next(b for b in app.buttons if b.action == 'learning_nav_teacher')
         app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
         app.learning.labels.loading.result(timeout=5); app.render()
         self.assertTrue(app.learning.labels.state['ready'])
@@ -364,10 +306,10 @@ class RealLabelRecoveryTest(unittest.TestCase):
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
             click('learning_open:0'); executor.finish(); app.render()
             self.assertIsNotNone(app.learning.data)
-            click('learning_teacher')
+            click('learning_nav_teacher')
             self.assertEqual(app.learning.teacher.path, broken)
             self.assertIn(str(broken), app.learning.teacher.message)
-            click('learning_pilot_next'); executor.finish(); app.render()
+            app.dispatch('learning_pilot_next'); executor.finish(); app.render()
             self.assertEqual(app.learning.teacher.path, valid)
             self.assertTrue(app.learning.teacher.state['choice'])
             app.close()

@@ -5,6 +5,7 @@ os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 import unittest
+from pathlib import Path
 import pygame
 from apps.chess_application import ChessApplication, APP_SIZE
 from tests import test_weight_training as fixtures
@@ -37,8 +38,7 @@ class LearningIntegrationTest(unittest.TestCase):
                 if app.learning.page_loading is not None:
                     app.learning.page_loading.result(timeout=30); app.render()
             click('learning_goal_compare')
-            origins = {row['origin'] for row in app.learning.inventory.report['candidates']}
-            self.assertTrue({'legacy', 'group'} <= origins)
+            self.assertEqual(len(app.learning.inventory.report['candidates']), 2)
             click('learning_inventory_history')
             for source, plan in zip(sources, plans):
                 index = next(i for i, row in enumerate(app.learning.comparison_history.entries) if row['path'] == plan)
@@ -72,8 +72,9 @@ class LearningIntegrationTest(unittest.TestCase):
                     app.learning.page_loading.result(timeout=30); app.render()
             click('learning_goal_compare')
             rows = app.learning.inventory.report['candidates']
-            selected = [next(i for i, row in enumerate(rows) if row['path'] == str(path)) for path in (legacy, group)]
-            expected = [rows[i]['source'] for i in sorted(selected)]
+            selected = [next(i for i, row in enumerate(rows) if Path(row['path']).is_relative_to(path)) for path in (legacy, group)]
+            from engine.learning.candidate_inventory import validate_candidate_row
+            expected = [validate_candidate_row(rows[i]) for i in sorted(selected)]
             for index in selected: click('learning_inventory_candidate:' + str(index))
             click('learning_inventory_setup')
             self.assertEqual(app.learning.setup.quick['planned_games'], 32)

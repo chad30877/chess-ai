@@ -161,6 +161,9 @@ def load_all_candidate_inventory(root):
 
 def validate_candidate_row(row):
     """重讀指定來源並核對完整候選身分，不依賴先前盤點快取。"""
+    if row['origin'] == 'catalog':
+        from engine.learning.config_catalog import validate_catalog_row
+        return validate_catalog_row(row)
     path = Path(row['path']); origin = row['origin']; source = row['source']
     if origin == 'legacy':
         current = load_legacy_candidate(path)

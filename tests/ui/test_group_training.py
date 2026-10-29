@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pygame
 from apps.chess_application import ChessApplication, APP_SIZE
 from tests import test_weight_training as fixtures
+from tests.helpers.learning_ui import choose_labels
 from engine.learning.group_training import load_group_training
 
 
@@ -35,7 +36,7 @@ class GroupTrainingUiTest(unittest.TestCase):
                         else: future.result(timeout=15)
                         app.render()
             click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
-            click('learning_teacher'); click('learning_labels'); click('learning_groups')
+            choose_labels(app, self.labels, training=True)
             click('learning_groups_new')
             view = app.learning.group_training
             deadline = time.monotonic()+45
@@ -62,15 +63,13 @@ class GroupTrainingUiTest(unittest.TestCase):
             frozen_snapshot = (view.path / 'snapshot.json').read_bytes()
             pilot_path = app.learning.teacher.path
             pilot_status = (pilot_path / 'status.json').read_bytes()
-            click('learning_labels')
-            self.assertEqual(app.learning.page, 'labeling')
+            click('learning_nav_teacher')
+            self.assertIn(app.learning.page, ('teacher', 'labeling'))
             self.assertEqual(app.learning.labels.path, self.labels)
             self.assertIs(view.run, active_run)
-            click('learning_teacher')
+            click('learning_nav_teacher')
             app.render()
-            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_pilot_start').enabled)
-            app.dispatch('learning_pilot_start')
-            app.dispatch('learning_budget:200000')
+            self.assertTrue(next(b for b in app.buttons if b.action == 'learning_pilot_start').enabled)
             click('learning_engine')
             app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
             app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text='另一份設定'))
@@ -79,9 +78,9 @@ class GroupTrainingUiTest(unittest.TestCase):
             self.assertIsNone(app.learning.teacher.run)
             self.assertEqual((pilot_path / 'status.json').read_bytes(), pilot_status)
             self.assertEqual((view.path / 'snapshot.json').read_bytes(), frozen_snapshot)
-            click('learning_labels')
+            click('learning_nav_teacher')
             app.render()
-            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_labels_new').enabled)
+            self.assertIs(view.run, active_run)
             before = active_run.snapshot()['completed_groups']
             deadline = time.monotonic() + 30
             while active_run.snapshot()['completed_groups'] <= before:
@@ -90,9 +89,9 @@ class GroupTrainingUiTest(unittest.TestCase):
                 app.render(); time.sleep(.01)
             click('learning_task_return')
             self.assertEqual(app.learning.page, 'groups')
-            click('learning_labels')
+            click('learning_nav_teacher')
             click('learning_task_stop'); view.run.future.result(timeout=5)
-            click('learning_groups'); app.render()
+            click('learning_nav_groups'); app.render()
             self.assertTrue(next(b for b in app.buttons if b.action == 'learning_groups_resume').enabled)
             path = view.path
             saved = load_group_training(path)
@@ -105,7 +104,7 @@ class GroupTrainingUiTest(unittest.TestCase):
             app.close()
             app = ChessApplication(app.screen,executor=executor)
             click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
-            click('learning_teacher'); click('learning_labels'); click('learning_groups')
+            choose_labels(app, self.labels, training=True)
             self.assertEqual(app.learning.group_training.state['completed_groups'],saved['completed_groups'])
             click('learning_groups_resume'); app.learning.group_training.run.future.result(timeout=45); app.render()
             self.assertEqual(app.learning.group_training.state['completed_groups'],5)

@@ -24,7 +24,7 @@ from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
 from ui.evaluation_profiles import profile_name, profile_summary, config_summary
 from ui.profile_selector import ProfileSelector, rating_search
-from ui.learning_view import LearningView, START_ACTIONS
+from ui.learning_view import LearningView
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.replay.replay_loader import load_replay_json
@@ -52,7 +52,7 @@ class ChessApplication:
         self.screen = screen
         self.now = now
         self._owns_executor = executor is None
-        self.executor = executor if executor is not None else ThreadPoolExecutor(max_workers=1)
+        self.executor = executor if executor is not None else ThreadPoolExecutor(max_workers=4)
         self._read_executor = ThreadPoolExecutor(max_workers=2) if isinstance(self.executor, ThreadPoolExecutor) else None
         self._scan_executor = self._read_executor or ThreadPoolExecutor(max_workers=1)
         self.resize(screen)
@@ -209,9 +209,6 @@ class ChessApplication:
         )
 
     def start_game(self):
-        if self.mode == 'auto' and self.learning.active_task():
-            self.message = f'目前執行中：{self.learning.active_task()[1]}，請先停止或等待完成'
-            return
         if not self._commit_number():
             return
         if self.mode == "auto":
@@ -939,12 +936,9 @@ class ChessApplication:
             self.move_view.handle_wheel(event.pos, 1 if event.button == 4 else -1, items)
 
     def button(self, action, label, rect, *, enabled=True, primary=False):
-        if action == 'start' and self.mode == 'auto' and self.learning.active_task():
+        if action.startswith('learning_budget:') and self.learning.teacher.active():
             enabled = False
-        if action.startswith('learning_budget:') and self.learning.active_task():
-            enabled = False
-        if action in START_ACTIONS and (self.learning.active_task() or
-                (self.batch and not self.batch.future.done())):
+        if action in ('learning_setup_start', 'learning_compare_start', 'learning_screening_start', 'learning_bundle_resume') and self.batch and not self.batch.future.done():
             enabled = False
         button = Button(action, label, self.rect(rect), enabled, primary)
         self.buttons.append(button)

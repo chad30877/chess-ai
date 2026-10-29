@@ -10,6 +10,7 @@ import pygame
 from apps.chess_application import ChessApplication, APP_SIZE
 from engine.learning.dataset import create_dataset, load_dataset
 from tests.helpers.executors import ManualExecutor
+from tests.helpers.learning_ui import choose_labels, settle
 from tests.test_learning_dataset import pgn_games
 
 
@@ -95,14 +96,12 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_saved_list')
-            index = app.learning.saved_entries.index(self.labels)
-            click(f'learning_saved_select:{index}'); executor.finish(); app.render()
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
+            choose_labels(app, self.labels)
             create_labeling(dataset, pilot)
             app.close(); app = ChessApplication(app.screen, executor=executor)
             app.mode = 'learning'; app.learning.open(dataset); app.learning.page = 'teacher'
-            click('learning_labels'); executor.finish(); app.render()
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
             self.assertEqual(app.learning.labels.path, self.labels)
             self.assertTrue(app.learning.labels.state['ready'])
             app.close()
@@ -118,7 +117,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
             app.mode = 'learning'; app.learning.open(dataset); app.learning.page = 'teacher'
             app.learning.teacher.load(other)
-            app.render(); button = next(b for b in app.buttons if b.action == 'learning_labels')
+            app.render(); button = next(b for b in app.buttons if b.action == 'learning_nav_teacher')
             app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
             executor.finish(); app.render()
             self.assertFalse(app.learning.labels.state.get('ready'))
@@ -126,7 +125,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
             self.assertTrue(next(b for b in app.buttons if b.action == 'learning_labels_new').enabled)
             app.close()
     def test_older_training_selection_survives_newer_unfinished_work(self):
-        from engine.learning.training import create_training
+        from engine.learning.group_training import create_group_training as create_training
         dataset = self.labels.parents[1]
         older = create_training(self.labels)
         create_training(self.labels)
@@ -139,18 +138,16 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_groups'); executor.finish(); app.render()
-            click('learning_training'); executor.finish(); app.render()
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
+            choose_labels(app, self.labels, training=True)
             click('learning_saved_list'); index = app.learning.saved_entries.index(older)
             click(f'learning_saved_select:{index}'); executor.finish(); app.render()
             create_training(self.labels)
             app.close(); app = ChessApplication(app.screen, executor=executor)
             app.mode = 'learning'; app.learning.open(dataset); app.learning.page = 'teacher'
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_groups'); executor.finish(); app.render()
-            click('learning_training'); executor.finish(); app.render()
-            self.assertEqual(app.learning.training.path, older)
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
+            choose_labels(app, self.labels, training=True)
+            self.assertEqual(app.learning.group_training.path, older)
             app.close()
     def test_group_and_combination_lists_restore_selected_results(self):
         from engine.learning.group_training import create_group_training, run_group_training
@@ -169,8 +166,8 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_groups'); executor.finish(); app.render()
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
+            choose_labels(app, self.labels, training=True)
             click('learning_saved_list'); index = app.learning.saved_entries.index(group)
             click(f'learning_saved_select:{index}'); executor.finish(); app.render()
             self.assertEqual(app.learning.group_training.path, group)
@@ -190,8 +187,8 @@ class SavedTeacherSelectionTest(unittest.TestCase):
             self.assertEqual(app.learning.combination.path, first)
             app.close(); app = ChessApplication(app.screen, executor=executor)
             app.mode = 'learning'; app.learning.open(dataset); app.learning.page = 'teacher'
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_groups'); executor.finish(); app.render()
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
+            choose_labels(app, self.labels, training=True)
             self.assertEqual(app.learning.group_training.path, group)
             self.assertEqual(app.learning.saved_name(group, '單群組學習'), '已完成群組')
             click('learning_combinations'); executor.finish(); app.render()
@@ -290,9 +287,9 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_labels_new'); run = app.learning.labels.run
-            click('learning_teacher'); click('learning_saved_list')
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
+            click('learning_labels_recreate'); run = app.learning.labels.run
+            click('learning_nav_teacher'); click('learning_saved_list')
             index = app.learning.saved_entries.index(other)
             click(f'learning_saved_select:{index}'); executor.finish(); app.render()
             self.assertEqual(app.learning.teacher.path, other)
@@ -315,18 +312,16 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_saved_list'); index = app.learning.saved_entries.index(self.labels)
-            click(f'learning_saved_select:{index}'); executor.finish(); app.render()
-            click('learning_groups'); executor.finish(); app.render()
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
+            choose_labels(app, self.labels)
+            choose_labels(app, self.labels, training=True)
             click('learning_groups_new'); run = app.learning.group_training.run
             self.assertFalse(run.future.done())
-            click('learning_labels')
+            click('learning_nav_teacher')
             if app.learning.labels.loading is not None: executor.finish()
             app.render()
             self.assertFalse(run.future.done())
-            click('learning_saved_list'); index = app.learning.saved_entries.index(other)
-            click(f'learning_saved_select:{index}'); executor.finish(); app.render()
+            choose_labels(app, other)
             self.assertEqual(app.learning.labels.path, other)
             click('learning_task_return')
             self.assertEqual(app.learning.labels.path, self.labels)
@@ -363,14 +358,14 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_labels_new'); first = app.learning.labels.run
-            click('learning_teacher'); click('learning_saved_list')
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
+            click('learning_labels_recreate'); first = app.learning.labels.run
+            click('learning_nav_teacher'); click('learning_saved_list')
             click(f'learning_saved_select:{app.learning.saved_entries.index(other)}'); executor.finish(); app.render()
             executor.finish(next(i for i, job in enumerate(executor.jobs) if job[0] is first.future))
-            click('learning_labels'); executor.finish(); app.render()
-            click('learning_labels_new'); second = app.learning.labels.run
-            click('learning_teacher'); click('learning_saved_list')
+            click('learning_nav_teacher'); settle(app, app.learning.labels.loading)
+            click('learning_labels_recreate'); second = app.learning.labels.run
+            click('learning_nav_teacher'); click('learning_saved_list')
             click(f'learning_saved_select:{app.learning.saved_entries.index(original)}'); executor.finish(); app.render()
             click('learning_task_return')
             self.assertIs(app.learning.labels.run, second)

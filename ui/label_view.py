@@ -46,8 +46,6 @@ class LabelView:
         try:
             state = load_labeling(selected) if selected else {}
             snapshot = state.get('snapshot')
-            if snapshot and pilot and Path(snapshot['pilot_path']).resolve() != Path(pilot).resolve():
-                raise ValueError('標記來源與目前教師先導不符')
             return entries, selected, state, None
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             return entries, selected, {}, str(exc)
@@ -68,6 +66,8 @@ class LabelView:
             self._entries, self.path, self.state, error = future.result()
             self.index = next((i for i, entry in enumerate(self._entries) if entry.parent == self.path), 0)
             self.load_error = bool(error)
+            if self.state.get('snapshot'):
+                self.pilot = Path(self.state['snapshot']['pilot_path'])
             self.message = f'無法讀取標記 {self.path}：{error}' if error else ''
             runtime, self._loading_runtime = self._loading_runtime, None
             if runtime and error:
@@ -99,9 +99,11 @@ class LabelView:
                 return
             if self.active(): return
             if self.load_error and action in ('learning_labels_new', 'learning_labels_resume'): return
-            if action == 'learning_labels_new':
-                self.path = create_labeling(self.dataset, self.pilot)
-                self.run = LabelRun(self.path, app.executor)
+            if action in ('learning_labels_new', 'learning_labels_recreate'):
+                self.path = create_labeling(self.dataset, self.pilot, reuse=action == 'learning_labels_new')
+                self.load(self.path)
+                existing = app.learning.running_labels(self.path) if hasattr(app, 'learning') else None
+                self.run = existing or (None if self.state.get('ready') else LabelRun(self.path, app.executor))
                 self.index, self.message = 0, ''
             elif action == 'learning_labels_resume' and self.path and not self.state.get('ready'):
                 self.run = LabelRun(self.path, app.executor)
@@ -118,7 +120,7 @@ class LabelView:
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.message = str(exc)
 
-    def render(self, app):
+    def refresh(self, app):
         self._poll_loading()
         loading = self.loading is not None
         active = self.active()
@@ -130,6 +132,10 @@ class LabelView:
                 self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.run.path, self.pilot)
                 self._loaded_run = self.run
                 loading = True
+
+    def render(self, app):
+        self.refresh(app)
+        loading, active = self.loading is not None, self.active()
         state = self.state
         app.text('學習實驗 · 教師標記', 50, 78, large=True)
         app.button('learning_data', '資料', (50, 122, 130, 34))

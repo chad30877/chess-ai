@@ -181,7 +181,7 @@ class TeacherView:
             if window is not None:
                 window.destroy()
 
-    def render(self, app):
+    def refresh(self):
         self._poll_loading()
         loading = self.loading is not None
         active = self.active()
@@ -198,6 +198,10 @@ class TeacherView:
                 except (OSError, ValueError) as exc:
                     self.state = self.run.snapshot()
                     self.message = str(exc)
+
+    def render(self, app):
+        self.refresh()
+        loading, active = self.loading is not None, self.active()
         state = self.state
         app.text('學習實驗 · 教師先導', 50, 78, large=True)
         app.button('learning_data', '資料', (50, 122, 130, 34))

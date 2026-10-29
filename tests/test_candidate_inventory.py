@@ -72,7 +72,9 @@ class InventoryUiTest(unittest.TestCase):
                              load_candidate_inventory(source)['source_identity'])
             self.assertIsNone(app.batch)
             click('learning_nav_data'); app.learning.open(self.labels.parents[1])
-            click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
+            from tests.helpers.learning_ui import choose_labels
+            choose_labels(app, self.labels, training=True)
+            click('learning_combinations')
             click('learning_inventory')
             self.assertEqual(app.learning.page, 'inventory')
             self.assertFalse(app.learning.inventory.report['complete'])

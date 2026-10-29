@@ -1,3 +1,4 @@
+from tests.helpers.learning_ui import settle
 """使用實際 UI 事件完成教師先導、停止、選擇及保存重開。"""
 import os
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
@@ -53,8 +54,8 @@ class LabelUiTest(unittest.TestCase):
                             app.render()
                 click('mode:learning'); click('learning_nav_data')
                 click('learning_open:0')
-                click('learning_teacher')
-                click('learning_labels')
+                click('learning_nav_teacher')
+                settle(app, app.learning.labels.loading)
                 click('learning_labels_new')
                 view = app.learning.labels
                 deadline = time.monotonic() + 15
@@ -63,7 +64,7 @@ class LabelUiTest(unittest.TestCase):
                     if state['completed'] > state['summary']['reused_pilot']: break
                     time.sleep(.01)
                 active_run = view.run
-                click('learning_teacher')
+                click('learning_nav_teacher')
                 self.assertEqual(app.learning.page, 'teacher')
                 self.assertIs(view.run, active_run)
                 completed = active_run.snapshot()['completed']
@@ -74,10 +75,10 @@ class LabelUiTest(unittest.TestCase):
                     time.sleep(.01)
                 click('learning_task_return')
                 self.assertEqual(app.learning.page, 'labeling')
-                click('learning_teacher')
+                click('learning_nav_teacher')
                 click('learning_task_stop')
                 view.run.future.result(timeout=5)
-                click('learning_labels')
+                settle(app, app.learning.labels.loading)
                 app.render()
                 if view.loading is not None: view.loading.result(timeout=15); app.render()
                 self.assertEqual(view.state['status'], 'stopped')
@@ -89,8 +90,8 @@ class LabelUiTest(unittest.TestCase):
                 app = ChessApplication(app.screen, executor=executor)
                 click('mode:learning'); click('learning_nav_data')
                 click('learning_open:0')
-                click('learning_teacher')
-                click('learning_labels')
+                click('learning_nav_teacher')
+                settle(app, app.learning.labels.loading)
                 self.assertEqual(app.learning.labels.path, path)
                 self.assertEqual(app.learning.labels.state['completed'], len(committed))
                 click('learning_labels_resume')
@@ -101,8 +102,8 @@ class LabelUiTest(unittest.TestCase):
                 app = ChessApplication(app.screen, executor=executor)
                 click('mode:learning'); click('learning_nav_data')
                 click('learning_open:0')
-                click('learning_teacher')
-                click('learning_labels')
+                click('learning_nav_teacher')
+                settle(app, app.learning.labels.loading)
                 self.assertEqual(app.learning.labels.state['snapshot']['workers'], 2)
                 click('learning_labels_resume')
                 app.learning.labels.run.future.result(timeout=15)
@@ -111,11 +112,10 @@ class LabelUiTest(unittest.TestCase):
                 self.assertEqual(app.learning.labels.state['remaining'], 0)
                 for name, data in committed.items(): self.assertEqual((path / 'records' / name).read_bytes(), data)
                 self.assertTrue(load_labeling(path)['ready'])
-                click('learning_labels_advanced')
                 app.render()
                 manual = ManualExecutor()
                 app.executor = manual
-                click('learning_labels_new')
+                click('learning_labels_recreate')
                 path = app.learning.labels.path
                 original = os.replace
                 writes = [0]
@@ -124,7 +124,7 @@ class LabelUiTest(unittest.TestCase):
                         writes[0] += 1
                         if writes[0] >= 2: raise OSError('摘要保存中斷')
                     return original(src, target)
-                click('learning_teacher')
+                click('learning_nav_teacher')
                 with patch('os.replace', fail_summary): manual.finish()
                 with patch.object(app, 'text', wraps=app.text) as draw:
                     app.render()
