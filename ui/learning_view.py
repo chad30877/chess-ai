@@ -151,13 +151,13 @@ class LearningView:
                 self.page = 'combination'
             except (OSError,ValueError,KeyError) as exc: self.group_training.message = str(exc)
             return
-        if action == 'learning_groups' and not self.active() and self.labels.path:
+        if action == 'learning_groups' and not self.active() and self.labels.path and self.labels.loading is None and self.labels.state.get('ready'):
             try:
                 self.group_training.open(self.labels.path)
                 self.page = 'groups'
             except (OSError,ValueError,KeyError) as exc: self.labels.message = str(exc)
             return
-        if action == 'learning_training' and not self.active() and self.labels.path:
+        if action == 'learning_training' and not self.active() and self.labels.path and self.labels.loading is None and self.labels.state.get('ready'):
             try:
                 self.training.open(self.labels.path)
                 self.page = 'training'
@@ -170,7 +170,7 @@ class LearningView:
             return
         if action == 'learning_labels' and not self.active() and self.teacher.path:
             try:
-                self.labels.open(self.path, self.teacher.path)
+                self.labels.open(self.path, self.teacher.path, app.executor)
                 self.page = 'labeling'
             except (OSError, ValueError, KeyError) as exc:
                 self.teacher.message = str(exc)
