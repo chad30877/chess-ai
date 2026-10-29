@@ -157,3 +157,63 @@ class SourceStageTest(unittest.TestCase):
             app.learning.action('learning_nav_groups', app)
             app.render()
             self.assertTrue(any(b.action == 'learning_need_labels' for b in app.buttons))
+
+class MainEntryCoverageTest(unittest.TestCase):
+    from tests.test_weight_training import TrainingFlowTest
+    setUp = TrainingFlowTest.setUp
+
+    def test_all_main_entries_work_from_each_available_learning_page(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from engine.learning.group_training import create_group_training, run_group_training, load_group_candidate
+        from engine.learning.final_comparison import freeze_final_comparison
+        source = create_group_training(self.labels, ['mobility', 'king-safety'])
+        run_group_training(source)
+        final_path = freeze_final_comparison(self.root, [load_group_candidate(source, 'mobility')])
+        pygame.init(); self.addCleanup(pygame.quit)
+        with patch('apps.chess_application.PROJECT_ROOT', self.root), ThreadPoolExecutor(1) as executor:
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            self.addCleanup(app.close)
+            app.new_setup('learning')
+            app.learning.root = self.root / 'data'
+            app.learning.open(self.labels.parents[1])
+            def click(action):
+                app.render()
+                button = next(b for b in app.buttons if b.action == action)
+                self.assertTrue(button.enabled, action)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                if app.learning.page_loading is not None:
+                    app.learning.page_loading.result(timeout=30); app.render()
+                if action == 'learning_labels' and app.learning.labels.loading is not None:
+                    app.learning.labels.loading.result(timeout=30); app.render()
+            def goto(page):
+                if page == 'home': click('learning_breadcrumb_data'); return
+                if page == 'data': click('learning_nav_data'); return
+                if page == 'teacher': click('learning_nav_teacher'); return
+                if page in ('labeling', 'groups', 'training', 'combination', 'comparison'):
+                    click('learning_nav_teacher'); click('learning_labels')
+                    if page == 'labeling': return
+                    if page == 'training': click('learning_training'); return
+                    click('learning_groups')
+                    if page == 'groups': return
+                    if page == 'comparison':
+                        click('learning_groups_select:mobility'); click('learning_groups_compare'); return
+                    click('learning_combinations'); return
+                click('learning_nav_inventory')
+                if page == 'inventory': return
+                if page in ('screening', 'heldout'):
+                    click('learning_inventory_screen')
+                    if page == 'heldout':
+                        app.learning.screening.final_path = final_path
+                        click('learning_screening_heldout')
+                    return
+                if page == 'results':
+                    click('learning_breadcrumb_data'); click('learning_goal_results'); return
+                raise AssertionError(page)
+            for page in ('home', 'data', 'teacher', 'labeling', 'training', 'groups',
+                         'combination', 'inventory', 'screening', 'comparison', 'results', 'heldout'):
+                for target in ('data', 'teacher', 'groups', 'inventory'):
+                    with self.subTest(page=page, target=target):
+                        goto(page)
+                        self.assertEqual(app.learning.page, page)
+                        click('learning_nav_' + target)
+                        self.assertEqual(app.learning.page, target)
