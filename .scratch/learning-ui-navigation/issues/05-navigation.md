@@ -1,12 +1,12 @@
 # UI05：建立目的首頁、固定主入口與可返回的位置路徑
 
-狀態：待驗收（已實作，待審查）。
+狀態：已完成。
 阻擋來源：[UI01](01-responsive-loading.md)、[UI02](02-result-selection.md)、[UI03](03-task-lifecycle.md)。
 對應決策：Q1、Q2、Q4、Q8、Q9、Q15。
 規格：[學習實驗導覽與操作改善](../spec.md)。
 索引：[本批工作票](../README.md)。
 
-已完成主要實作；依下列證據逐項驗收，尚待審查與整合回歸。依賴票未完成必要驗收前，不宣稱本票已解除阻擋。
+UI01、UI02、UI03 均已完成；本票功能、審查與整合回歸已依下列證據驗收。
 
 ## 要交付的行為
 
@@ -38,10 +38,10 @@
 
 ## 文件與提交
 
-- [ ] 更新受影響操作說明，反映本票實際交付行為。
-- [ ] 記錄實際驗收證據及限制。
-- [ ] 同步本票、批次索引與開發計畫的狀態。
-- [ ] 建立繁體中文 Git commit，讀回核對提交與狀態。
+- [x] 更新受影響操作說明，反映本票實際交付行為。
+- [x] 記錄實際驗收證據及限制。
+- [x] 同步本票、批次索引與開發計畫的狀態。
+- [x] 建立繁體中文 Git commit，讀回核對提交與狀態。
 
 ## 人工重現方式（尚未執行）
 
@@ -49,20 +49,9 @@
 
 ## 驗收證據與限制
 
-已執行 `tests.ui.test_learning_navigation`：目的入口、固定導覽、前置引導及跨資料狀態通過；`tests.test_candidate_inventory.InventoryUiTest`：從首頁直接讀取既有候選及未選標記時查看既有成果通過。以 900×768 dummy SDL 實際渲染檢查首頁。91 項相關測試首輪有四項舊入口測試失敗，調整後四項各自重跑通過；整批需再次執行。所有子頁位置路徑、載入返回、任務跨頁及完整回歸尚待補證據與審查。人工重現步驟不等於已通過。
-
-補充驗證：更新既有事件測試後，UI01～UI03、一般應用、目的導覽及既有候選相關共 91 項測試通過。不同入口到教師標記的路徑與來源返回、延遲讀取切頁亦有事件測試。審查指出活動群組任務的成果瀏覽與標記來源切換風險，已加入隔離與真實訓練回歸，等待複審。
-
-複審修正：活動任務的瀏覽模式一併保存及還原；真實群組訓練跨頁查看成果、返回、停止後，續跑按鈕仍可用。
-
-畫面補充：以 SDL dummy 渲染檢查 1280×960 首頁。`tests.ui.test_learning_navigation` 與 `tests.ui.test_teacher_picker` 分開執行通過；兩者同程序執行曾觸發 Tcl_AsyncDelete 並以碼 1 結束，未宣稱該組合通過。
-
-直接接續補充：以完成標記及較新未完成標記的實際保存資料驗證，目的首頁「接續學習」在背景讀取上次選擇的完成標記後直接開啟可操作學習頁，無須先造訪標記頁。
-
-複審補充：直接接續載入記住的非最新標記後，透過 UI 切換下一份並核對身分；另以應用程式派發確認缺少標記時不建立學習工作。相關導覽與任務測試 10 項通過。
-
-執行前置防護後，`tests.ui.test_group_training tests.ui.test_teacher_labeling tests.ui.test_teacher_pilot tests.ui.test_learned_comparison` 共 7 項通過。複審已確認直接接續標記索引修正；仍待合併後回歸與未勾選項的驗收。
-
-UI04 合入後執行 `tests.ui.test_learning_close tests.ui.test_learning_navigation tests.ui.test_learning_task_navigation` 共 28 項通過；缺少預算或標記時派發開始不建立任務。以實際單群組及直接／聯合組合候選進比較，核對相同位置路徑、凍結來源及返回原結果頁；教師標記由不同入口進入及返回後保留資料與先導來源。尚待逐個子頁操作四個固定入口及其整合驗收。
-
-逐頁補充：以真實保存的兩組學習成果建立候選及凍結評估資料，從首頁、資料、教師先導、標記、舊棋子位置、單群組、組合、候選、篩選、比較、成果清單及最終教師評估逐頁使用四個主入口，48 次 UI 事件均到達指定頁面；不啟動正式對局。測試：`tests.ui.test_learning_navigation.MainEntryCoverageTest`。
+- 應用程式事件：`tests.ui.test_learning_navigation.MainEntryCoverageTest` 使用真實保存的兩組學習成果，在首頁及 11 個子頁各操作四個主入口，共 48 次到達指定頁面；凍結評估資料供入口測試，未執行正式對局。
+- `tests.ui.test_learning_navigation`、`tests.test_candidate_inventory.InventoryUiTest` 及 `tests.ui.test_combination_training.CombinationUiTest.test_select_preview_train_reopen_export_both_kinds_and_load_battle` 驗證目的入口、跨來源成果、缺少前置、不同入口的位置路徑及比較返回原來源。
+- 合入 UI04 後 `tests.ui.test_learning_close tests.ui.test_learning_navigation tests.ui.test_learning_task_navigation` 共 28 項通過，涵蓋讀取返回、工作進度、停止及恢復；另於防護修改後執行群組、標記、先導與比較共 7 項通過。UI04 合入前相關回歸共 91 項通過。
+- 以 SDL dummy 實際渲染檢查 900×768 與 1280×960 首頁；非使用者操作。`tests.ui.test_learning_navigation` 與 `tests.ui.test_teacher_picker` 分開執行通過，同程序執行曾出現 Tcl_AsyncDelete 並以碼 1 結束，未宣稱該組合通過。
+- 獨立審查指出成果瀏覽時任務及標記來源、瀏覽模式、直接接續標記索引及比較返回來源等問題，均已修正並複審。上次選定的較早完成標記不被較新未完成標記取代。
+- 本票直接使用既有單次群組候選盤點；全來源候選與比較紀錄分別由 UI07、UI09 交付。人工重現步驟不等於已執行。
