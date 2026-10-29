@@ -24,6 +24,11 @@ class CombinationUiTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled,action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,pos=button.rect.center,button=1))
+                if action == 'learning_labels':
+                    future = app.learning.labels.loading
+                    if hasattr(app.executor, 'finish'): app.executor.finish()
+                    else: future.result(timeout=15)
+                    app.render()
             def open_view():
                 click('mode:learning'); app.learning.open(self.labels.parents[1])
                 click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
@@ -75,6 +80,11 @@ class CombinationUiTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                if action == 'learning_labels':
+                    future = app.learning.labels.loading
+                    if hasattr(app.executor, 'finish'): app.executor.finish()
+                    else: future.result(timeout=15)
+                    app.render()
             click('mode:learning'); app.learning.open(self.labels.parents[1])
             click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
             view = app.learning.combination

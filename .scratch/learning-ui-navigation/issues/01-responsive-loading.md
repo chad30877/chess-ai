@@ -46,4 +46,4 @@
 
 ## 驗收證據與限制
 
-教師標記進頁已改為背景讀取；`python -m unittest tests.ui.test_learning_loading` 通過，使用手動控制背景工作驗證載入未結束可返回。此為部分實作：其他慢載入頁、交錯來源及失效恢復、5,809 筆量測與畫面檢查尚未驗收；既有三個 UI 整合測試因假設同步載入而失敗，需調整等待並重跑。全部功能勾選保留未完成，依賴未解除。
+教師標記進頁已改為背景讀取；`python -m unittest tests.ui.test_learning_loading` 通過，使用手動控制背景工作驗證載入未結束可返回。此為部分實作：其他慢載入頁、交錯來源及失效恢復、5,809 筆量測與畫面檢查尚未驗收；已調整相關整合測試等待背景讀取；`python -m unittest tests.ui.test_learning_loading tests.ui.test_teacher_labeling tests.ui.test_weight_training tests.ui.test_group_training tests.ui.test_labeling_estimates` 共 6 例通過（新增交錯讀取案例後單獨重跑通過）。使用既有 5,809 筆資料由 UI 事件唯讀量測，快取未控制（資料集與目錄已讀）：首次載入畫面 0.002 秒，完整驗證 2.118 秒。全部功能勾選保留未完成，依賴未解除。
