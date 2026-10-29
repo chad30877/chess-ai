@@ -59,3 +59,5 @@ UI01、UI02、UI03 均已完成；本票合併後整合回歸發現錯誤，待�
 - 整合分支重跑 `tests.ui.test_learning_close tests.ui.test_learning_navigation tests.ui.test_learning_task_navigation tests.ui.test_learning_loading tests.ui.test_saved_selection`，55 項中 1 錯誤：`SavedTeacherSelectionTest.test_changing_label_while_training_preserves_running_task_context` 找不到 `learning_task_return`。單獨重跑相同錯誤；需修復並重新驗收。
 
 - 先前成果選擇錯誤由測試執行器誤完成訓練造成；修正後同一整合組 55 項通過。另獨立執行 `tests.ui.test_teacher_picker` 出現 `Tcl_AsyncDelete` 並以碼 1 結束，仍待排查；不可宣稱該測試已通過。
+
+教師選檔測試追查：原測試以對話框替身保留真實 Tk 視窗參照，造成視窗可能在背景執行緒回收；原版獨立執行 15 次有 2 次 Tcl_AsyncDelete。改以視窗及對話框作為作業系統邊界替身，仍經 UI 操作並驗證視窗關閉、實際路徑與教師程序；修正後獨立執行 20 次均通過，與導覽測試同程序共 7 項亦通過。真實系統選檔視窗未以此自動測試驗證。
