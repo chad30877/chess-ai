@@ -18,13 +18,22 @@ class LearnedComparisonView:
         self.rating_details=False; self.rating_page=0
         self.entries=[]; self.index=0; self.return_page='groups'
         self.refresh=ReportRefresh()
+        self.selected_origin=None
     def open(self,source):
+        self.selected_origin = None
         self.source=source; self.path=None; self.report=None; self.message=''; self.page=0; self.index=0; self.return_page='groups'
         self.roles={'original','learned'}; self.stable=False; self.baseline='material'; self.config=False
         self.entries=[]
         for file in sorted((self.root/'data/learning-comparisons').glob('*/snapshot.json'),key=lambda p:p.stat().st_mtime,reverse=True):
             if digest(load_comparison_plan(file.parent)['source'])==digest(source): self.entries.append(file.parent)
         if self.entries: self.open_plan(self.entries[0])
+    def open_selected(self, root, row):
+        from engine.learning.candidate_inventory import validate_candidate_row
+        source = validate_candidate_row(row)
+        self.open(source)
+        self.return_page = 'inventory'
+        self.selected_origin = (Path(root), row)
+
     def open_plan(self,path):
         self.path=Path(path); self.report=comparison_report(path); plan=self.report['plan']; self.source=plan['source']
         self.roles=set(plan['roles']); self.stable='stable' in plan['definitions']; self.baseline='material'; self.page=0; self.candidate=0
@@ -41,6 +50,9 @@ class LearnedComparisonView:
 
     def action(self,action,app):
         try:
+            if self.selected_origin and action in ('learning_compare_freeze', 'learning_compare_start'):
+                from engine.learning.candidate_inventory import validate_candidate_row
+                validate_candidate_row(self.selected_origin[1])
             if self.refresh.error and action!='learning_compare_back': return
             if action=='learning_compare_back': app.learning.page=self.return_page; return
             if action=='learning_compare_config': self.config=not self.config; self.config_page=0; return

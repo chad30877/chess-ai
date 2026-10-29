@@ -1,7 +1,7 @@
 """學習實驗的資料來源、背景處理與保存預覽。"""
 
 import json
-from copy import copy
+from copy import copy, deepcopy
 from datetime import datetime
 from pathlib import Path
 from engine.storage.batch_storage import write_json_atomic
@@ -18,6 +18,7 @@ from ui.combination_view import CombinationView
 from ui.candidate_inventory_view import InventoryView
 from ui.screening_view import ScreeningView
 from ui.heldout_view import HeldoutView
+from ui.comparison_setup_view import ComparisonSetupView
 from ui.controls import ui_font
 from ui.unfinished_tasks import unfinished, RecoveredWork
 
@@ -26,11 +27,22 @@ STAGE_LABELS = {'opening': '開局', 'middlegame': '中局', 'endgame': '殘局'
 START_ACTIONS = {'learning_create', 'learning_pilot_start', 'learning_labels_new', 'learning_labels_resume',
                  'learning_training_new', 'learning_training_resume', 'learning_groups_new', 'learning_groups_resume',
                  'learning_combination_new', 'learning_combination_resume', 'learning_combination_batch', 'learning_combination_batch_resume',
-                 'learning_compare_start', 'learning_screening_start'}
+                 'learning_compare_start', 'learning_screening_start', 'learning_setup_start'}
 
 EXCLUSION_LABELS = {'first_8_plies': '前八手', 'terminal': '終局', 'in_check': '受將',
                     'not_sampled': '抽樣上限', 'cross_split_duplicate': '跨組重複',
                     'within_split_duplicate': '同組重複'}
+
+
+class _PendingComparison:
+    def __init__(self, executor, root, data_root, rows, purpose):
+        from engine.learning.comparison_setup import freeze_setup
+        self.data_root = Path(data_root)
+        self.rows = deepcopy(rows)
+        self.future = executor.submit(freeze_setup, root, data_root, self.rows, purpose)
+        self.cancelled = False
+    def stop(self): self.cancelled = True
+    def snapshot(self): return dict(status='stopping' if self.cancelled else 'running', completed=0, total=0)
 
 
 class _DatasetGroups(GroupTrainingView):
@@ -106,6 +118,9 @@ class LearningView:
         self.screening = ScreeningView(root)
         self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
+        self.setup = ComparisonSetupView(root)
+        self.batch_setup = None
+        self.pending_setup = None
         self.inventory_return = 'groups'
         self.result_browser = _SavedGroupResults()
         self.browse_result = False
@@ -199,9 +214,11 @@ class LearningView:
                             candidate, self.page, executor)
 
     def active(self):
-        return bool(self._detached_task and not self._detached_task[2].future.done()) or (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active() or self.combination.active()
+        return self.pending_setup is not None or bool(self._detached_task and not self._detached_task[2].future.done()) or (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active() or self.combination.active()
 
     def active_task(self):
+        if self.pending_setup is not None:
+            return 'setup', '比較準備', self.pending_setup
         if self._detached_task and not self._detached_task[2].future.done():
             return self._detached_task
         for page, label, view in (('data', '資料準備', self), ('teacher', '教師先導', self.teacher),
@@ -224,12 +241,44 @@ class LearningView:
         return None
 
     def close(self, wait=False):
+        if self.pending_setup is not None:
+            self.pending_setup.stop()
+            if wait: self.pending_setup.future.result()
         detached = self._detached_task[2] if self._detached_task else None
         for run in (detached, self.run, self.teacher.run, self.labels.run, self.training.run, self.group_training.run, self.combination.run):
             if run and not run.future.done():
                 run.stop()
                 if wait:
                     run.future.result()
+
+    def begin_comparison_setup(self, view, app):
+        if self.active_task() or (app.batch and not app.batch.future.done()):
+            view.message = '請先停止目前工作'
+            return
+        self.pending_setup = _PendingComparison(app.read_executor, view.root, view.data_root,
+                                                view.rows, view.purpose)
+        self.pending_setup.view = view
+        view.message = '驗證候選並準備比較…'
+
+    def poll_comparison_setup(self, app):
+        pending = self.pending_setup
+        if pending is None or not pending.future.done(): return
+        self.pending_setup = None
+        if pending.cancelled:
+            pending.view.message = '已停止準備'
+            return
+        try:
+            setup = pending.future.result()
+            from engine.learning.comparison_setup import ComparisonBundleRun
+            app.batch = ComparisonBundleRun(setup['work'], setup['planned_games'], app.executor,
+                                            data_root=pending.data_root, rows=pending.rows)
+            app.learning_batch = app.batch; app.batch_mode = 'evaluation'; app.batch_games_page = 0
+            self.batch_return_page = 'setup'
+            self.batch_setup = pending.view
+            pending.view.message = ''
+            if app.mode == 'learning' and self.page == 'setup': app.mode = 'auto'
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            pending.view.message = f'無法準備比較：{exc}'
 
     def commit(self):
         if self.focus == 'path':
@@ -288,6 +337,7 @@ class LearningView:
 
     def _preserve_task_context(self):
         task = self.active_task()
+        if task and task[0] == 'setup': return
         if task and self._detached_task and self._detached_task[2].future.done():
             self._detached_task = self._task_context = None
         if task and task[0] != 'data' and self._task_context is None:
@@ -304,6 +354,7 @@ class LearningView:
 
     def _preserve_browsing_context(self):
         task = self.active_task()
+        if task and task[0] == 'setup': return
         if self._detached_task and self._detached_task[2].future.done():
             self._detached_task = self._task_context = None
         if not task or self._task_context is not None: return
@@ -457,7 +508,7 @@ class LearningView:
         parents = {'teacher': ('teacher', '教師評分'), 'labeling': ('teacher', '教師評分'),
                    'groups': ('groups', '評分權重學習'), 'results': ('groups', '評分權重學習'), 'training': ('groups', '評分權重學習'),
                    'combination': ('groups', '評分權重學習'), 'inventory': ('inventory', '比較候選'),
-                   'screening': ('inventory', '比較候選'), 'comparison': ('inventory', '比較候選'),
+                   'screening': ('inventory', '比較候選'), 'setup': ('inventory', '比較候選'), 'comparison': ('inventory', '比較候選'),
                    'heldout': ('inventory', '比較候選')}
         app.button('learning_breadcrumb_data', '學習實驗', (25, 98, 120, 27))
         if self.page in parents:
@@ -465,7 +516,7 @@ class LearningView:
             app.button('learning_breadcrumb_' + parent, label, (160, 98, 190, 27))
         titles = {'home':'首頁', 'data':'資料準備', 'teacher':'教師先導', 'labeling':'教師標記', 'training':'棋子位置學習',
                   'groups':'單群組學習', 'results':'學習成果', 'combination':'組合', 'inventory':'候選清單',
-                  'screening':'快速篩選', 'comparison':'比較', 'heldout':'教師誤差評估'}
+                  'screening':'快速篩選', 'setup':'比較用途', 'comparison':'比較', 'heldout':'教師誤差評估'}
         app.text('› ' + titles.get(self.page, ''), 365 if self.page in parents else 160, 101, width=260)
         if self.path:
             teacher = ('完成' if self.teacher.state.get('choice') else '未完成') if self.teacher.dataset == self.path and self.teacher.loading is None else '尚未載入'
@@ -590,6 +641,7 @@ class LearningView:
             return
         if action == 'learning_task_return' and (task or self.failed_task()):
             target = task or self.failed_task()
+            if target[0] == 'setup': self.setup = target[2].view
             if self._task_context and target is self._detached_task:
                 for key, value in self._task_context.items(): setattr(self, key, value)
                 self._task_context = self._detached_task = None
@@ -644,6 +696,16 @@ class LearningView:
             return
         if self.page == 'inventory':
             if action == 'learning_inventory_back': self.page = self.inventory_return
+            elif action == 'learning_inventory_setup' and self.inventory.report.get('all_sources'):
+                rows = [self.inventory.report['candidates'][i] for i in sorted(self.inventory.selected_indices)]
+                if not rows: return
+                self._open_page('setup', 'setup', lambda: ComparisonSetupView(self.teacher.project_root),
+                                (self.root, rows), 'inventory', app.read_executor)
+            elif action == 'learning_inventory_compare' and self.inventory.report.get('all_sources'):
+                if len(self.inventory.selected_indices) != 1: return
+                selected = self.inventory.report['candidates'][self.inventory.selected]
+                self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root),
+                                (self.root, selected), 'inventory', app.read_executor, 'open_selected')
             elif action == 'learning_inventory_screen':
                 if self.inventory.report.get('all_sources') and len(self.inventory.selected_indices) != 1:
                     return
@@ -682,6 +744,9 @@ class LearningView:
                 return view
             self._open_page('comparison', 'comparison', selected_comparison, current.entries[index],
                             'comparison', app.read_executor, 'open_plan')
+            return
+        if self.page == 'setup':
+            self.setup.action(action, app)
             return
         if self.page == 'comparison':
             self.comparison.action(action,app)
@@ -895,6 +960,9 @@ class LearningView:
             return
         if self.page == 'screening':
             self.screening.render(app)
+            return
+        if self.page == 'setup':
+            self.setup.render(app)
             return
         if self.page == 'comparison':
             self.comparison.render(app)

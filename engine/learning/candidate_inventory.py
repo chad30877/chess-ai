@@ -157,3 +157,29 @@ def load_all_candidate_inventory(root):
     rows.sort(key=lambda row: (row['source']['dataset_identity'], row['source']['label_identity'],
                                row['origin'], row['path'], row['kind'], row['groups']))
     return dict(candidates=rows, errors=errors)
+
+
+def validate_candidate_row(row):
+    """重讀指定來源並核對完整候選身分，不依賴先前盤點快取。"""
+    path = Path(row['path']); origin = row['origin']; source = row['source']
+    if origin == 'legacy':
+        current = load_legacy_candidate(path)
+    elif origin == 'group':
+        group = source['groups'][0]
+        saved = load_group_training(path, only_group=group)
+        inputs = json.loads((path / 'inputs.json').read_text(encoding='utf-8'))
+        _validate_inputs(saved['snapshot'], inputs)
+        current = load_group_candidate(path, group)
+    elif origin == 'combination':
+        saved = load_combination(path, only_kind=source['kind'])
+        inputs = json.loads((path / 'inputs.json').read_text(encoding='utf-8'))
+        _validate_inputs(saved['snapshot'], inputs)
+        for item in saved['snapshot']['sources']:
+            source_path = Path(item['label_path']) / 'group-training' / item['experiment_id']
+            if load_group_candidate(source_path, item['groups'][0]) != item:
+                raise ValueError('組合來源與凍結單群組不符')
+        current = load_combination_candidate(path, source['kind'])
+    else:
+        raise ValueError('候選來源類型不符')
+    if current != source: raise ValueError('候選來源已變更')
+    return current

@@ -456,6 +456,7 @@ class ChessApplication:
         self.selected = square if self.live.legal_from(square) else None
 
     def tick(self):
+        self.learning.poll_comparison_setup(self)
         worker = self.batch
         if self.pending_leave and (worker is None or worker.future.done()) and (self.pending_leave != 'quit' or not self.learning.active()):
             action, self.pending_leave = self.pending_leave, None
@@ -590,6 +591,8 @@ class ChessApplication:
             self.mode = "records"
             return
         if action == 'learning_comparison_return':
+            if self.learning.batch_return_page == 'setup' and self.learning.batch_setup is not None:
+                self.learning.setup = self.learning.batch_setup
             self.mode = 'learning'
             self.learning.page = self.learning.batch_return_page
             return
@@ -924,6 +927,7 @@ class ChessApplication:
                   MUTED if muted else TEXT, width)
 
     def render(self):
+        self.learning.poll_comparison_setup(self)
         self.buttons = []
         self.screen.fill(BACKGROUND)
         if self.mode == "home":
