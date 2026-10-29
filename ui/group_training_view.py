@@ -15,15 +15,20 @@ class GroupTrainingView:
         self.root = Path(root); self.labels = self.path = self.run = self._loaded_run = None
         self.state = {}; self.entries = []; self.index = 0; self.message = ''; self.saved = None
         self.selected = set(GROUPS); self.group = next(iter(GROUPS)); self.stage = 0
-        self.detail = self.advanced = False; self.weight_page = 0
+        self.detail = self.advanced = False; self.weight_page = 0; self.load_error = False
     def active(self): return self.run is not None and not self.run.future.done()
-    def open(self, labels):
+    def open(self, labels, preferred=None):
         self.labels = Path(labels); self.path = self.run = self._loaded_run = None
         self.state = {}; self.message = ''; self.saved = None; self.index = 0
         self.entries = sorted((self.labels/'group-training').glob('*/snapshot.json'),key=lambda p:p.stat().st_mtime,reverse=True)
-        if self.entries: self.load(self.entries[0].parent)
+        chosen = Path(preferred) if preferred else (self.entries[0].parent if self.entries else None)
+        if chosen:
+            self.index = next((i for i, e in enumerate(self.entries) if e.parent == chosen), 0)
+            try: self.load(chosen)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                self.path = chosen; self.state = {}; self.load_error = True; self.message = f'無法讀取 {chosen}：{exc}'
     def load(self, path):
-        self.path = Path(path); self.state = load_group_training(path); self.saved = None
+        self.path = Path(path); self.state = load_group_training(path); self.saved = None; self.load_error = False
         if self.group not in self.state['groups']: self.group = next(iter(self.state['groups']))
     def action(self, action, app):
         try:
@@ -47,7 +52,7 @@ class GroupTrainingView:
                 self.path = self.labels/'group-training'/uuid4().hex
                 self.state = {}; self.saved = None; self.message = ''; self.index = 0
                 self.run = GroupTrainingRun(self.path,app.executor,label_path=self.labels,groups=groups)
-            elif action == 'learning_groups_resume' and self.path:
+            elif action == 'learning_groups_resume' and self.path and not self.load_error:
                 self.run = GroupTrainingRun(self.path,app.executor); self.message = ''
             elif action in ('learning_groups_prev','learning_groups_next'):
                 self.index = (self.index+(1 if action.endswith('next') else -1))%len(self.entries)
@@ -90,7 +95,7 @@ class GroupTrainingView:
             app.button('learning_groups_toggle:'+group,('[x] ' if group in self.selected else '[ ] ')+label,
                        (50+index*160,164,148,32),enabled=not active)
         app.button('learning_groups_new','新建並學習',(50,210,230,36),enabled=bool(self.selected) and not active,primary=True)
-        app.button('learning_groups_resume','續跑／重試',(300,210,230,36),enabled=bool(self.path) and s.get('status')!='completed' and not active)
+        app.button('learning_groups_resume','續跑／重試',(300,210,230,36),enabled=bool(self.path) and not self.load_error and s.get('status')!='completed' and not active)
         app.button('learning_groups_stop','停止',(550,210,130,36),enabled=active)
         app.button('learning_combinations','組合',(700,210,140,36),enabled=bool(s.get('completed_groups')))
         statuses = {'ready':'待開始','queued':'準備中','running':'訓練中','completed':'完成','stopped':'已停止','failed':'失敗','partial':'部分失敗','interrupted':'待續跑','incomplete':'未完成'}

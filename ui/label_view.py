@@ -1,5 +1,6 @@
 """逐局面標記、手動停止與保存續跑介面。"""
 from pathlib import Path
+import json
 from engine.learning.labeling import LabelRun, create_labeling, load_labeling
 
 SPLITS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
@@ -29,22 +30,35 @@ class LabelView:
                       key=lambda p: p.stat().st_mtime, reverse=True)
 
     @staticmethod
-    def _read_saved(dataset, path=None):
+    def _read_saved(dataset, path=None, pilot=None):
         entries = sorted((dataset / 'teacher-labels').glob('*/snapshot.json'),
                          key=lambda p: p.stat().st_mtime, reverse=True)
-        selected = Path(path) if path is not None else (entries[0].parent if entries else None)
+        selected = Path(path) if path is not None else None
+        if selected is None:
+            for entry in entries:
+                try:
+                    snapshot = json.loads(entry.read_text(encoding='utf-8'))
+                    if pilot and Path(snapshot['pilot_path']).resolve() != Path(pilot).resolve(): continue
+                except (OSError, ValueError, KeyError, TypeError):
+                    pass
+                selected = entry.parent
+                break
         try:
-            return entries, selected, load_labeling(selected) if selected else {}, None
+            state = load_labeling(selected) if selected else {}
+            snapshot = state.get('snapshot')
+            if snapshot and pilot and Path(snapshot['pilot_path']).resolve() != Path(pilot).resolve():
+                raise ValueError('標記來源與目前教師先導不符')
+            return entries, selected, state, None
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             return entries, selected, {}, str(exc)
 
-    def open(self, dataset, pilot, executor):
+    def open(self, dataset, pilot, executor, preferred=None):
         self.dataset, self.pilot = Path(dataset), Path(pilot)
         self.path = self.run = self._loaded_run = None
         self.state, self.message, self.index = {}, '', 0
         self._entries = []
         self._loading_runtime = None
-        self.loading = executor.submit(self._read_saved, self.dataset)
+        self.loading = executor.submit(self._read_saved, self.dataset, preferred, self.pilot)
 
     def _poll_loading(self):
         future = self.loading
@@ -52,6 +66,7 @@ class LabelView:
         self.loading = None
         try:
             self._entries, self.path, self.state, error = future.result()
+            self.index = next((i for i, entry in enumerate(self._entries) if entry.parent == self.path), 0)
             self.load_error = bool(error)
             self.message = f'無法讀取標記 {self.path}：{error}' if error else ''
             runtime, self._loading_runtime = self._loading_runtime, None
@@ -76,7 +91,7 @@ class LabelView:
                 self.state = {}
                 self.message = ''
                 self._loading_runtime = None
-                self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.path)
+                self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.path, self.pilot)
                 return
             if self.loading is not None and action not in ('learning_labels_prev', 'learning_labels_next'): return
             if action == 'learning_labels_stop' and self.active():
@@ -99,7 +114,7 @@ class LabelView:
                 self.path = entries[self.index].parent
                 self.state, self.message = {}, ''
                 self._loading_runtime = None
-                self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.path)
+                self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.path, self.pilot)
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             self.message = str(exc)
 
@@ -112,7 +127,7 @@ class LabelView:
             elif self._loaded_run is not self.run:
                 self._loading_runtime = self.run.snapshot()
                 self.state = self._loading_runtime
-                self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.run.path)
+                self.loading = app.read_executor.submit(self._read_saved, self.dataset, self.run.path, self.pilot)
                 self._loaded_run = self.run
                 loading = True
         state = self.state

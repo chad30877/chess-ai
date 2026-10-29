@@ -20,11 +20,11 @@ class CombinationView:
         self.selected = {'mobility','king-safety'}; self.sources = {}; self.preview = {}; self.state = {}
         self.entries = []; self.index = self.stage = self.weight_page = 0
         self.batch_path = None; self.batch_state = {}; self.batch_active = False
-        self.kind = 'direct'; self.weights = self.advanced = False; self.saved = None; self.message = ''
+        self.kind = 'direct'; self.weights = self.advanced = False; self.saved = None; self.message = ''; self.load_error = False
     def active(self): return self.run is not None and not self.run.future.done()
     def selection_changed(self):
         return bool(self.state.get('snapshot')) and self.selected != set(self.state['snapshot']['groups'])
-    def open(self, source_path):
+    def open(self, source_path, preferred=None):
         self.source_path = Path(source_path)
         groups = load_group_training(source_path)
         self.sources = {g:load_group_candidate(source_path,g) for g,r in groups['groups'].items() if r['report']}
@@ -42,7 +42,14 @@ class CombinationView:
         for entry in sorted((self.source_path.parents[1]/'combinations').glob('*/snapshot.json'),key=lambda p:p.stat().st_mtime,reverse=True):
             snapshot = json.loads(entry.read_text(encoding='utf-8'))
             if snapshot['sources'][0]['snapshot_identity'] == groups['snapshot']['identity']: self.entries.append(entry)
-        if self.entries: self.load(self.entries[0].parent)
+        chosen = Path(preferred) if preferred else (self.entries[0].parent if self.entries else None)
+        if chosen:
+            self.index = next((i for i, e in enumerate(self.entries) if e.parent == chosen), 0)
+            try:
+                if chosen not in [e.parent for e in self.entries]: raise ValueError('組合來源不符或不可用')
+                self.load(chosen)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                self.path = chosen; self.state = {}; self.load_error = True; self.message = f'無法讀取 {chosen}：{exc}'
     def update_preview(self):
         self.preview = {}; self.message = ''
         if not self.selected: self.message = '請選擇群組'; return
@@ -50,7 +57,7 @@ class CombinationView:
         if missing: self.message = '請先完成：'+'、'.join(GROUPS[g] for g in GROUPS if g in missing); return
         self.preview = preview_combination([self.sources[g] for g in GROUPS if g in self.selected])
     def load(self, path):
-        self.path = Path(path); self.state = load_combination(path); self.saved = None
+        self.path = Path(path); self.state = load_combination(path); self.saved = None; self.load_error = False
         self.selected = set(self.state['snapshot']['groups']); self.update_preview()
     def action(self, action, app):
         try:
@@ -79,7 +86,7 @@ class CombinationView:
                 self.path = self.source_path.parents[1]/'combinations'/uuid4().hex
                 self.state = {}; self.saved = None; self.message = ''
                 self.batch_active = False; self.run = CombinationRun(self.path,app.executor,source_path=self.source_path,groups=self.preview['groups'])
-            elif action == 'learning_combination_resume' and self.path:
+            elif action == 'learning_combination_resume' and self.path and not self.load_error:
                 self.batch_active = False; self.run = CombinationRun(self.path,app.executor)
             elif action in ('learning_combination_prev','learning_combination_next'):
                 self.index = (self.index+(1 if action.endswith('next') else -1))%len(self.entries)
@@ -134,7 +141,7 @@ class CombinationView:
         for i,(g,label) in enumerate(GROUPS.items()):
             app.button('learning_combination_toggle:'+g,('[x] ' if g in self.selected else '[ ] ')+label,(50+i*160,164,148,32),enabled=not active)
         app.button('learning_combination_new','新建組合＋聯合三候選',(50,210,260,36),enabled=bool(self.preview) and not active,primary=True)
-        app.button('learning_combination_resume','續跑／重試',(330,210,210,36),enabled=bool(self.path) and state.get('status')!='completed' and not active)
+        app.button('learning_combination_resume','續跑／重試',(330,210,210,36),enabled=bool(self.path) and not self.load_error and state.get('status')!='completed' and not active)
         app.button('learning_combination_stop','停止',(550,210,75,36),enabled=active)
         app.button('learning_combination_batch','補齊選取組合',(635,210,205,36),enabled=len(self.selected)>=2 and bool(self.preview) and not active)
         statuses = dict(ready='待開始',queued='準備中',running='執行中',completed='完成',stopped='已停止',failed='失敗',interrupted='待續跑')

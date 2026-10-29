@@ -171,6 +171,7 @@ class ChessApplication:
         if self.live:
             self.live.stop()
         self.mode = mode
+        if mode == 'learning': self.learning.restore(self.read_executor)
         self.live = self.replay = self.replay_data = None
         if not (self.learning_batch and not self.learning_batch.future.done()):
             self.batch = None

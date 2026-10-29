@@ -43,6 +43,7 @@ data/**/*.csv
 data/**/*.jsonl
 data/batches/
 data/learning/
+data/learning-ui.json
 data/learning-comparisons/
 data/.sequences.sqlite3*
 data/replays/[0-9]*.json

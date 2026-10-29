@@ -38,7 +38,7 @@ class TeacherView:
         return sorted((self.dataset / 'teacher-pilots').glob('*/status.json'),
                       key=lambda p: p.stat().st_mtime, reverse=True)
 
-    def open(self, dataset):
+    def open(self, dataset, preferred=None):
         self.loading = None
         self.dataset = Path(dataset)
         self.run, self._loaded_run = None, None
@@ -46,10 +46,12 @@ class TeacherView:
         self.workers = default_teacher_workers()
         self.command = self.default_command
         entries = self.entries()
-        if entries:
-            try: self.load(entries[0].parent)
+        chosen = Path(preferred) if preferred else (entries[0].parent if entries else None)
+        if chosen:
+            self.index = next((i for i, entry in enumerate(entries) if entry.parent == chosen), 0)
+            try: self.load(chosen)
             except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
-                self.path = entries[0].parent
+                self.path = chosen
                 self.state = {}
                 self.load_error = True
                 self.message = f'無法讀取先導 {self.path}：{exc}'

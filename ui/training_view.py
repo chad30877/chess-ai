@@ -7,15 +7,20 @@ class TrainingView:
     def __init__(self, root):
         self.root=Path(root); self.labels=self.path=self.run=self._loaded_run=None
         self.state={}; self.message=''; self.advanced=False; self.stage=0; self.index=0; self.saved=None
-        self.entries=[]
+        self.entries=[]; self.load_error=False
     def active(self): return self.run is not None and not self.run.future.done()
-    def open(self,labels):
+    def open(self,labels,preferred=None):
         self.labels=Path(labels); self.run=self._loaded_run=None; self.message=''; self.index=0
         self.entries=sorted((self.labels/'training').glob('*/snapshot.json'),key=lambda p:p.stat().st_mtime,reverse=True)
         self.state={}; self.path=None; self.saved=None
-        if self.entries: self.load(self.entries[0].parent)
+        chosen=Path(preferred) if preferred else (self.entries[0].parent if self.entries else None)
+        if chosen:
+            self.index=next((i for i,e in enumerate(self.entries) if e.parent==chosen),0)
+            try: self.load(chosen)
+            except (OSError,ValueError,KeyError,TypeError) as exc:
+                self.path=chosen; self.state={}; self.load_error=True; self.message=f'無法讀取 {chosen}：{exc}'
     def load(self,path):
-        self.path=Path(path); self.state=load_training(path); self.saved=None
+        self.path=Path(path); self.state=load_training(path); self.saved=None; self.load_error=False
     def action(self,action,app):
         try:
             if action=='learning_training_stop' and self.active(): self.run.stop(); return
@@ -24,7 +29,7 @@ class TrainingView:
                 self.path=self.labels/'training'/uuid4().hex
                 self.index=0; self.saved=None; self.state={}
                 self.run=TrainingRun(self.path,app.executor,label_path=self.labels)
-            elif action=='learning_training_resume' and self.path and not self.state.get('report'):
+            elif action=='learning_training_resume' and self.path and not self.load_error and not self.state.get('report'):
                 self.run=TrainingRun(self.path,app.executor)
             elif action=='learning_training_advanced': self.advanced=not self.advanced
             elif action=='learning_training_stage': self.stage=(self.stage+1)%4
@@ -72,7 +77,7 @@ class TrainingView:
             source=s['snapshot']
             app.text(f'沿用標記 {source["label_identity"][:10]}… · 已有 {len(source.get("prior_test_experiments",[]))} 份實驗使用同資料測試',260,128,muted=True,width=580)
         app.button('learning_training_new','新建並學習',(50,166,210,36),enabled=not active,primary=True)
-        app.button('learning_training_resume','續跑／重試',(280,166,210,36),enabled=bool(self.path) and not report and not active)
+        app.button('learning_training_resume','續跑／重試',(280,166,210,36),enabled=bool(self.path) and not self.load_error and not report and not active)
         app.button('learning_training_stop','停止',(510,166,130,36),enabled=active)
         statuses={'queued':'準備中','running':'訓練中','completed':'完成','stopped':'已停止','failed':'失敗','interrupted':'待續跑','ready':'待開始'}
         if s:

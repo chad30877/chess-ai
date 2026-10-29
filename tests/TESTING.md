@@ -8,6 +8,7 @@
 
 | 檔案 | 測試內容 |
 | --- | --- |
+| `ui/test_saved_selection.py` | 學習資料與成果清單、改名、同名身分、失效恢復、跨來源與任務脈絡 |
 | `ui/test_profile_selector.py` | 共用設定選擇小視窗的名稱／群組查找、捲動、取消、各入口實際套用、多候選比較及損壞檔案恢復 |
 | `rules/test_game_rules.py` | 共用棋規、特殊走法、重複歷史與終局 |
 | `evaluation/test_evaluation_config.py`、`test_evaluator_semantics.py` | 設定驗證、舊版本讀取、保存、總分與白方視角 |
