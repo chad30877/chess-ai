@@ -49,3 +49,5 @@
 資料集、教師先導、教師標記、訓練、組合及候選盤點進頁已改為背景讀取；`python -m unittest tests.ui.test_learning_loading` 通過，使用手動控制背景工作驗證載入未結束可返回。此為部分實作：其他頁面與各項驗收尚待全面核對；已調整相關整合測試等待背景讀取；`python -m unittest tests.ui.test_learning_loading tests.ui.test_teacher_labeling tests.ui.test_weight_training tests.ui.test_group_training tests.ui.test_labeling_estimates` 共 6 例通過（新增交錯讀取案例後單獨重跑通過）。使用既有 5,809 筆資料由 UI 事件唯讀量測，快取未控制（資料集與目錄已讀）：首次載入畫面 0.002 秒，完整驗證 2.118 秒。5,809 筆量測項已完成；其餘未逐項完成全面驗收，依賴未解除。
 
 Agent 以 pygame 實際繪製並檢視 1280×960 教師標記載入畫面：載入提示可讀、返回可用、訓練與標記操作停用。資料與教師先導的背景讀取事件及損壞標記重試已新增測試；仍需檢查其餘慢頁與跨來源失效等完整情境。
+
+回歸：`python -m unittest tests.ui.test_learning_loading tests.ui.test_teacher_pilot tests.ui.test_teacher_labeling tests.ui.test_labeling_estimates tests.ui.test_weight_training tests.ui.test_group_training tests.ui.test_chess_application` 共 63 例通過；`tests.ui.test_combination_training` 共 2 例、候選盤點完整覆蓋案例及 `tests.ui.test_heldout` 各 1 例通過。

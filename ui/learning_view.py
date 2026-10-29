@@ -201,7 +201,7 @@ class LearningView:
         if self.page == 'screening':
             if action == 'learning_screening_heldout':
                 try:
-                    self.heldout.open(self.screening.final_path); self.page = 'heldout'
+                    self._open_page('heldout', 'heldout', lambda: HeldoutView(self.teacher.project_root), self.screening.final_path, 'screening', app.executor)
                 except (OSError, ValueError, KeyError, TypeError) as exc: self.screening.message = str(exc)
                 return
             self.screening.action(action, app)
@@ -294,7 +294,7 @@ class LearningView:
                     self.path = path
                     self.data = None
                     self.run = None
-                    self.message = saved.get('error', '資料尚未完成；請建立新實驗重試')
+                    self.message = f'{path}：' + saved.get('error', '資料尚未完成或不可用；請建立新實驗重試')
             elif action in ('learning_prev', 'learning_next') and self.data:
                 self.sample_index = (self.sample_index + (1 if action.endswith('next') else -1)) % max(1, len(self.data['positions']))
             elif action in ('learning_recent_prev', 'learning_recent_next'):
