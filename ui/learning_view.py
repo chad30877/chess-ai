@@ -780,13 +780,8 @@ class LearningView:
                 self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root), (work['path'], work['baseline']), 'history_bundle', app.read_executor, 'open_history')
             elif action == 'learning_bundle_resume':
                 from engine.learning.comparison_setup import ComparisonBundleRun
-                try:
-                    from ui.comparison_history_view import load_bundle
-                    data, self.history_bundle.reports = load_bundle(self.history_bundle.path)
-                except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
-                    self.history_bundle.message = f'無法讀取比較 {self.history_bundle.path}：{exc}'
-                    return
-                app.batch = ComparisonBundleRun(data['work'], data['planned_games'], app.executor)
+                data = self.history_bundle.data
+                app.batch = ComparisonBundleRun(data['work'], data['planned_games'], app.executor, bundle_path=self.history_bundle.path)
                 app.learning_batch = app.batch; app.batch_mode = 'evaluation'; app.mode = 'auto'; app.batch_games_page = 0
                 self.batch_return_page = 'history_bundle'
             return

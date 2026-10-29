@@ -1,4 +1,5 @@
 """比較用途預覽及以既有研究契約凍結多個候選。"""
+import json
 from copy import deepcopy
 from pathlib import Path
 from uuid import uuid4
@@ -6,7 +7,7 @@ from dataclasses import asdict
 from engine.sessions.evaluation_comparison import ComparisonSearchConfig
 from engine.evaluation.config import EvaluationConfig
 from engine.learning.candidate_inventory import validate_candidate_row
-from engine.learning.comparison import load_comparison_plan
+from engine.learning.comparison import load_comparison_plan, comparison_report
 from engine.learning.final_comparison import freeze_final_comparison, load_final_comparison
 from engine.learning.screening import create_screening, screening_report, load_screening
 from engine.learning.teacher import digest
@@ -95,14 +96,41 @@ def freeze_setup(root, data_root, rows, purpose):
     write_json_atomic(path / 'snapshot.json', snapshot)
     return dict(**snapshot, path=str(path))
 
+def load_saved_setup(path):
+    path = Path(path)
+    data = json.loads((path / "snapshot.json").read_text(encoding="utf-8"))
+    content = dict(data); identity = content.pop("identity", None)
+    if data.get("format_version") != 1 or data.get("purpose") not in ("screening", "final") or digest(content) != identity:
+        raise ValueError("比較紀錄身份或版本不符")
+    work = data["work"]; seen = set(); planned = 0; reports = []
+    expected = {(digest(source), baseline) for source in data["sources"] for baseline in (["stable"] if data["purpose"] == "screening" else ["material", "stable"])}
+    if len(expected) != len(data["sources"]) * (1 if data["purpose"] == "screening" else 2): raise ValueError("比較候選重複")
+    actual = set()
+    root = path.parents[2]
+    for item in work:
+        source_path = Path(item["path"])
+        if not source_path.resolve().is_relative_to((root / "data").resolve()): raise ValueError("比較計畫路徑不符")
+        key = (str(source_path.resolve()), item["baseline"])
+        if key in seen: raise ValueError("比較計畫重複")
+        seen.add(key)
+        report = comparison_report(source_path); plan = report["plan"]
+        source_key = (digest(plan["source"]), item["baseline"])
+        if source_key not in expected or source_key in actual or plan["roles"] != ["learned"]: raise ValueError("比較來源或用途不符")
+        if data["purpose"] == "screening" and set(plan["definitions"]) != {"stable"}: raise ValueError("快速篩選基準不符")
+        actual.add(source_key)
+        planned += plan["definitions"][item["baseline"]]["planned_games"]
+        reports.append(report["baselines"][item["baseline"]])
+    if not work or actual != expected or planned != data["planned_games"]: raise ValueError("比較工作量不符")
+    return data, reports
+
 class ComparisonBundleRun:
     """以單一背景工作依序執行已凍結計畫；每份仍用既有保存契約。"""
     mode = 'evaluation'
     can_pause = False
 
-    def __init__(self, work, planned_games, executor, *, data_root=None, rows=None, project_root=None, purpose=None):
+    def __init__(self, work, planned_games, executor, *, data_root=None, rows=None, project_root=None, purpose=None, bundle_path=None):
         self._worker = _BundleExecution(work, planned_games, executor, data_root=data_root, rows=rows,
-                                        project_root=project_root, purpose=purpose)
+                                        project_root=project_root, purpose=purpose, bundle_path=bundle_path)
         self.future = self._worker.future
 
     def snapshot(self): return self._worker.snapshot()
@@ -116,7 +144,8 @@ class _BundleExecution(BatchExecution):
     mode = 'evaluation'
     can_pause = False
 
-    def __init__(self, work, planned_games, executor, *, data_root=None, rows=None, project_root=None, purpose=None):
+    def __init__(self, work, planned_games, executor, *, data_root=None, rows=None, project_root=None, purpose=None, bundle_path=None):
+        self.bundle_path = bundle_path
         self.project_root = project_root
         self.purpose = purpose
         self.data_root = data_root
@@ -130,6 +159,10 @@ class _BundleExecution(BatchExecution):
     def _execute(self):
         from engine.learning.comparison import comparison_options
         from engine.sessions.evaluation_comparison import run_evaluation_comparison
+        if self.bundle_path is not None:
+            data, _ = load_saved_setup(self.bundle_path)
+            if data["work"] != self.work or data["planned_games"] != self.planned_games:
+                raise ValueError("比較紀錄已變更")
         if self.rows is not None:
             if self.purpose == 'final':
                 preview = preview_setup(self.project_root, self.data_root, self.rows, 'final')

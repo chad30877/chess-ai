@@ -6,26 +6,8 @@ from engine.learning.teacher import digest
 from engine.learning.comparison import comparison_report
 
 
-def load_bundle(path):
-    path = Path(path)
-    data = json.loads((path / "snapshot.json").read_text(encoding="utf-8"))
-    content = dict(data); identity = content.pop("identity", None)
-    if data.get("format_version") != 1 or data.get("purpose") not in ("screening", "final") or digest(content) != identity:
-        raise ValueError("比較紀錄身份或版本不符")
-    work = data["work"]; seen = set(); planned = 0; reports = []
-    root = path.parents[2]
-    for item in work:
-        source_path = Path(item["path"])
-        if not source_path.resolve().is_relative_to((root / "data").resolve()): raise ValueError("比較計畫路徑不符")
-        key = (str(source_path.resolve()), item["baseline"])
-        if key in seen: raise ValueError("比較計畫重複")
-        seen.add(key)
-        report = comparison_report(source_path); plan = report["plan"]
-        if plan["source"] not in data["sources"]: raise ValueError("比較來源不符")
-        planned += plan["definitions"][item["baseline"]]["planned_games"]
-        reports.append(report["baselines"][item["baseline"]])
-    if not work or planned != data["planned_games"]: raise ValueError("比較工作量不符")
-    return data, reports
+from engine.learning.comparison_setup import load_saved_setup as load_bundle
+
 from engine.learning.final_comparison import load_final_comparison
 
 class ComparisonHistoryView:
@@ -64,7 +46,10 @@ class ComparisonHistoryView:
                 self.entries.append(dict(path=path, purpose=bundle['purpose'], source=bundle['sources'][0], status=status, error='', bundle=True))
             except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
                 self.entries.append(dict(path=path, purpose='comparison', source=None, status='invalid', error=str(exc), bundle=True))
-        self.entries.sort(key=lambda row: row['path'].stat().st_mtime, reverse=True)
+        def modified(row):
+            try: return row['path'].stat().st_mtime
+            except OSError: return 0
+        self.entries.sort(key=modified, reverse=True)
 
     def render(self, app):
         labels = {'screening':'快速篩選', 'final':'完整比較', 'comparison':'原始／學習對照'}
@@ -77,7 +62,9 @@ class ComparisonHistoryView:
         for i, entry in enumerate(self.entries[self.page*6:self.page*6+6]):
             index = self.page*6+i; source = entry['source']
             key = str(entry['path'])
-            date = datetime.fromtimestamp(entry['path'].stat().st_mtime).strftime('%Y-%m-%d %H:%M')
+            try: date = datetime.fromtimestamp(entry['path'].stat().st_mtime).strftime('%Y-%m-%d %H:%M')
+            except OSError:
+                date = '日期不明'; entry['status'] = 'invalid'; entry['error'] = '紀錄已不存在'; entry['source'] = source = None
             name = app.learning.saved_state.get('names', {}).get(key, date + ' ' + labels[entry['purpose']])
             detail = source['experiment_id'][-8:] if source else entry['error']
             app.button('learning_history_open:'+str(index), f'{name} · {labels[entry["purpose"]]} · {statuses[entry["status"]]} · {detail}', (50, 175+i*65, 790, 42))
