@@ -38,11 +38,16 @@ class _PendingComparison:
     def __init__(self, executor, root, data_root, rows, purpose):
         from engine.learning.comparison_setup import freeze_setup
         self.data_root = Path(data_root)
+        self.root = Path(root)
+        self.purpose = purpose
         self.rows = deepcopy(rows)
         self.future = executor.submit(freeze_setup, root, data_root, self.rows, purpose)
         self.cancelled = False
+        self.error = ''
     def stop(self): self.cancelled = True
-    def snapshot(self): return dict(status='stopping' if self.cancelled else 'running', completed=0, total=0)
+    def snapshot(self):
+        return dict(status='failed' if self.error else 'stopping' if self.cancelled else 'running',
+                    completed=0, total=0, error=self.error)
 
 
 class _DatasetGroups(GroupTrainingView):
@@ -127,6 +132,7 @@ class LearningView:
         self.setup = ComparisonSetupView(root)
         self.batch_setup = None
         self.pending_setup = None
+        self.failed_setup = None
         self.inventory_return = 'groups'
         self.result_browser = _SavedGroupResults()
         self.browse_result = False
@@ -236,6 +242,8 @@ class LearningView:
         return None
 
     def failed_task(self):
+        if self.failed_setup is not None:
+            return 'setup', '比較準備', self.failed_setup
         if self._detached_task and self._detached_task[2].future.done() and self._detached_task[2].snapshot().get('status') == 'failed':
             return self._detached_task
         for page, label, view in (('data', '資料準備', self), ('teacher', '教師先導', self.teacher),
@@ -249,7 +257,9 @@ class LearningView:
     def close(self, wait=False):
         if self.pending_setup is not None:
             self.pending_setup.stop()
-            if wait: self.pending_setup.future.result()
+            if wait:
+                try: self.pending_setup.future.result()
+                except Exception: pass
         detached = self._detached_task[2] if self._detached_task else None
         for run in (detached, self.run, self.teacher.run, self.labels.run, self.training.run, self.group_training.run, self.combination.run):
             if run and not run.future.done():
@@ -261,6 +271,7 @@ class LearningView:
         if self.active_task() or (app.batch and not app.batch.future.done()):
             view.message = '請先停止目前工作'
             return
+        self.failed_setup = None
         self.pending_setup = _PendingComparison(app.read_executor, view.root, view.data_root,
                                                 view.rows, view.purpose)
         self.pending_setup.view = view
@@ -277,14 +288,17 @@ class LearningView:
             setup = pending.future.result()
             from engine.learning.comparison_setup import ComparisonBundleRun
             app.batch = ComparisonBundleRun(setup['work'], setup['planned_games'], app.executor,
-                                            data_root=pending.data_root, rows=pending.rows)
+                                            data_root=pending.data_root, rows=pending.rows,
+                                            project_root=pending.root, purpose=pending.purpose)
             app.learning_batch = app.batch; app.batch_mode = 'evaluation'; app.batch_games_page = 0
             self.batch_return_page = 'setup'
             self.batch_setup = pending.view
             pending.view.message = ''
             if app.mode == 'learning' and self.page == 'setup': app.mode = 'auto'
-        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+        except Exception as exc:
+            pending.error = str(exc)
             pending.view.message = f'無法準備比較：{exc}'
+            self.failed_setup = pending
 
     def commit(self):
         if self.focus == 'path':
@@ -441,6 +455,8 @@ class LearningView:
         view, error = future.result()
         if error:
             source = self.page_load_request[3]
+            if isinstance(source, tuple):
+                source = next((item for item in source if isinstance(item, dict) and 'path' in item), source[0])
             if isinstance(source, dict): source = source.get('path', source.get('experiment_id', '成果'))
             self.page_load_error = f'無法讀取 {source}：{error}'
         else:

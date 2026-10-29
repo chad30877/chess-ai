@@ -476,6 +476,8 @@ class ChessApplication:
         return [], 0
 
     def learning_failure(self):
+        if self.mode == 'learning' and self.learning.page == 'setup' and self.learning.failed_setup:
+            return self.learning.failed_setup.error
         if self.mode == 'auto' and self.batch is self.learning_batch:
             run = self.batch
         elif self.mode == 'learning':
@@ -969,7 +971,8 @@ class ChessApplication:
             task = failed_task
         if task and (self.mode != 'auto' or task[0] != 'batch'):
             state = task[2].snapshot()
-            progress = f'{state.get("completed", state.get("saved_games", 0))}/{state.get("total", state.get("requested_games", 0))}'
+            progress = ('正在停止' if state.get('status') == 'stopping' else
+                        f'{state.get("completed", state.get("saved_games", 0))}/{state.get("total", state.get("requested_games", 0))}')
             self.text(f'{task[1]} {"失敗" if failed_task else progress}', 190, 15, width=220)
             self.button('learning_task_return', '返回任務', (420, 10, 110, 36))
             if not failed_task:

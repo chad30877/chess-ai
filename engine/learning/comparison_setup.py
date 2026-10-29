@@ -53,7 +53,7 @@ def screening_passed(root, source):
                 definition['candidates'][0]['config'] != EvaluationConfig.from_dict(source['config']).to_dict()):
                 continue
             report = screening_report(entry.parent)
-            if report['complete'] and not report['eliminated']:
+            if report['complete'] and report['eliminated'] is False:
                 return True
         except (OSError, ValueError, KeyError, TypeError, IndexError):
             continue
@@ -82,7 +82,7 @@ def freeze_setup(root, data_root, rows, purpose):
             path = create_screening(root, source)
             work.append(dict(path=str(path), baseline='stable'))
     else:
-        final_path = freeze_final_comparison(root, sources)
+        final_path = freeze_final_comparison(root, sources, learned_only=True)
         final = load_final_comparison(final_path)
         for entry in final['candidates']:
             work.extend(dict(path=entry['path'], baseline=baseline) for baseline in ('material', 'stable'))
@@ -100,8 +100,9 @@ class ComparisonBundleRun:
     mode = 'evaluation'
     can_pause = False
 
-    def __init__(self, work, planned_games, executor, *, data_root=None, rows=None):
-        self._worker = _BundleExecution(work, planned_games, executor, data_root=data_root, rows=rows)
+    def __init__(self, work, planned_games, executor, *, data_root=None, rows=None, project_root=None, purpose=None):
+        self._worker = _BundleExecution(work, planned_games, executor, data_root=data_root, rows=rows,
+                                        project_root=project_root, purpose=purpose)
         self.future = self._worker.future
 
     def snapshot(self): return self._worker.snapshot()
@@ -115,7 +116,9 @@ class _BundleExecution(BatchExecution):
     mode = 'evaluation'
     can_pause = False
 
-    def __init__(self, work, planned_games, executor, *, data_root=None, rows=None):
+    def __init__(self, work, planned_games, executor, *, data_root=None, rows=None, project_root=None, purpose=None):
+        self.project_root = project_root
+        self.purpose = purpose
         self.data_root = data_root
         self.rows = deepcopy(rows)
         self.work = deepcopy(work)
@@ -128,7 +131,11 @@ class _BundleExecution(BatchExecution):
         from engine.learning.comparison import comparison_options
         from engine.sessions.evaluation_comparison import run_evaluation_comparison
         if self.rows is not None:
-            verify_selection(self.data_root, self.rows)
+            if self.purpose == 'final':
+                preview = preview_setup(self.project_root, self.data_root, self.rows, 'final')
+                if not all(preview['passed']): raise ValueError('請先完成並通過快速篩選')
+            else:
+                verify_selection(self.data_root, self.rows)
         totals = {key: 0 for key in ('saved_games', 'completed_games', 'unfinished', 'finished_games',
                                       'completed_pairs', 'incomplete_pairs', 'saved_pairs', 'finished_work')}
         last = {}

@@ -45,6 +45,9 @@ class SetupPlanTest(unittest.TestCase):
         definitions = [p['definitions']['stable'] for p in plans]
         for field in ('search', 'opening_lines', 'baseline', 'workers', 'claim_draw'):
             self.assertTrue(all(d[field] == definitions[0][field] for d in definitions))
+        from engine.learning.comparison import create_comparison
+        old = create_comparison(self.root, rows[0]['source'], roles=('original', 'learned'), stable=True)
+        self.assertEqual(load_comparison_plan(old)['planned_games'], 256)
         with patch('engine.learning.comparison_setup.screening_report') as report:
             report.side_effect = lambda path: {'complete': True, 'eliminated': str(path) == setup['work'][1]['path']}
             preview = preview_setup(self.root, self.root / 'data', rows, 'final')
@@ -80,3 +83,11 @@ class SetupPlanTest(unittest.TestCase):
             self.assertGreaterEqual(state['saved_games'], 1)
             self.assertEqual(state['requested_games'], 32)
             self.assertTrue(Path(state['last_replay']).exists())
+            saved_dir = Path(state['path']) / 'replays'
+            committed = {file: file.read_bytes() for file in saved_dir.glob('*.json')
+                         if json.loads(file.read_text(encoding='utf-8'))['metadata']['termination'] != 'user_stop'}
+            resumed = ComparisonBundleRun([dict(path=str(path), baseline='material') for path in paths], 32, executor)
+            resumed.future.result(timeout=30)
+            self.assertEqual(resumed.snapshot()['status'], 'completed')
+            self.assertEqual(resumed.snapshot()['saved_games'], 32)
+            self.assertTrue(all(file.read_bytes() == content for file, content in committed.items()))

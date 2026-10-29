@@ -25,7 +25,10 @@ class LearnedComparisonView:
         self.roles={'original','learned'}; self.stable=False; self.baseline='material'; self.config=False
         self.entries=[]
         for file in sorted((self.root/'data/learning-comparisons').glob('*/snapshot.json'),key=lambda p:p.stat().st_mtime,reverse=True):
-            if digest(load_comparison_plan(file.parent)['source'])==digest(source): self.entries.append(file.parent)
+            try:
+                if digest(load_comparison_plan(file.parent)['source'])==digest(source): self.entries.append(file.parent)
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
         if self.entries: self.open_plan(self.entries[0])
     def open_selected(self, root, row):
         from engine.learning.candidate_inventory import validate_candidate_row
@@ -100,7 +103,10 @@ class LearnedComparisonView:
                 target=self.root/'configs/evaluation'/f'comparison-{row["role"]}-{uuid4().hex[:12]}.json'
                 target.parent.mkdir(parents=True,exist_ok=True); write_json_atomic(target,row['config'])
                 self.message='已另存 '+target.name
-        except (OSError,ValueError,KeyError,TypeError,IndexError) as exc: self.message=str(exc)
+        except (OSError,ValueError,KeyError,TypeError,IndexError) as exc:
+            if self.selected_origin and action in ('learning_compare_freeze', 'learning_compare_start'):
+                self.message = f'無法讀取候選 {self.selected_origin[1]["path"]}：{exc}'
+            else: self.message=str(exc)
     def render(self,app):
         app.text('學習結果 · 共同開局比較',50,78,large=True)
         app.button('learning_compare_back','學習結果',(50,120,180,32))

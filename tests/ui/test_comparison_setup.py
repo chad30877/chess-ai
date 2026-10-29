@@ -29,6 +29,9 @@ class ComparisonSetupUiTest(unittest.TestCase):
             click('learning_goal_compare'); executor.finish(); app.render()
             click('learning_inventory_candidate:0')
             selected = app.learning.inventory.report['candidates'][0]['source']
+            broken = self.root / 'data/learning-comparisons/broken'
+            broken.mkdir(parents=True)
+            (broken / 'snapshot.json').write_text('{broken', encoding='utf-8')
             click('learning_inventory_compare'); executor.finish(); app.render()
             self.assertEqual(app.learning.page, 'comparison')
             self.assertEqual(app.learning.comparison.source, selected)
@@ -72,6 +75,16 @@ class ComparisonSetupUiTest(unittest.TestCase):
             self.assertFalse(next(b for b in app.buttons if b.action == 'learning_setup_start').enabled)
             click('learning_setup_to_screening')
             self.assertEqual(app.learning.setup.purpose, 'screening')
+            from engine.learning.screening import create_screening
+            for row in app.learning.setup.rows: create_screening(self.root, row['source'])
+            click('learning_setup_back')
+            with patch('engine.learning.comparison_setup.screening_report', return_value={'complete': True, 'eliminated': False}):
+                click('learning_inventory_setup'); executor.finish(); app.render()
+            click('learning_setup_final')
+            with patch.object(app, 'text', wraps=app.text) as draw: app.render()
+            self.assertTrue(any('384' in str(call.args[0]) for call in draw.call_args_list))
+            self.assertTrue(next(b for b in app.buttons if b.action == 'learning_setup_start').enabled)
+            click('learning_setup_screening')
             click('learning_setup_start')
             self.assertIsNone(app.batch)
             self.assertEqual(app.learning.active_task()[0], 'setup')
