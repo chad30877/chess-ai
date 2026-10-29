@@ -62,9 +62,21 @@ class TaskNavigationTest(unittest.TestCase):
                 app.learning.teacher.command = make_engine(root)
                 app.dispatch('learning_pilot_start')
                 self.assertEqual(len(executor.jobs), 1)
+                for page, action in (('labeling', 'learning_labels_new'),
+                                     ('labeling', 'learning_labels_resume'),
+                                     ('training', 'learning_training_new'),
+                                     ('training', 'learning_training_resume'),
+                                     ('groups', 'learning_groups_new'),
+                                     ('groups', 'learning_groups_resume'),
+                                     ('combination', 'learning_combination_new'),
+                                     ('combination', 'learning_combination_resume'),
+                                     ('combination', 'learning_combination_batch'),
+                                     ('comparison', 'learning_compare_start'),
+                                     ('screening', 'learning_screening_start')):
+                    app.learning.page = page
+                    app.dispatch(action)
+                    self.assertEqual(len(executor.jobs), 1, action)
                 app.learning.page = 'labeling'
-                app.dispatch('learning_labels_new')
-                self.assertEqual(len(executor.jobs), 1)
                 self.assertIn('教師先導', app.learning.labels.message)
                 app.dispatch('learning_task_stop')
                 app.dispatch('learning_labels_new')

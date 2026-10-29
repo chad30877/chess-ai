@@ -47,4 +47,4 @@
 
 ## 驗收證據與限制
 
-已以 `..\chess-ai\.venv\Scripts\python.exe -m unittest tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot` 驗證 10 項通過。教師先導、教師標記、群組學習與比較的事件測試涵蓋返回、跨頁停止或任務保留；以延遲執行工作確認停止後保存尚未完成時仍阻擋另一項開始。另執行相同命令並加入 `tests.ui.test_chess_application`，60 項通過。尚未驗收所有入口的互斥、失敗詳情與跨頁真實進度，故功能驗收項保留未勾選。人工重現步驟不等於已通過。
+已以 `..\chess-ai\.venv\Scripts\python.exe -m unittest tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot` 驗證 10 項通過。教師先導、教師標記、群組學習與比較的事件測試涵蓋返回、跨頁停止或任務保留；以延遲執行工作確認停止後保存尚未完成時仍阻擋另一項開始。另執行相同命令並加入 `tests.ui.test_chess_application`，60 項通過。追加事件測試驗證教師標記切頁期間完成數增加，以及注入摘要保存失敗後可展開錯誤詳情；教師工作期間各學習與比較開始入口的互斥亦經派發測試。尚未完成不同工作彼此交叉互斥、比較實際跨頁進度、其他失敗來源及畫面驗收，故功能驗收項保留未勾選。人工重現步驟不等於已通過。

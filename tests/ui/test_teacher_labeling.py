@@ -55,6 +55,12 @@ class LabelUiTest(unittest.TestCase):
                 click('learning_teacher')
                 self.assertEqual(app.learning.page, 'teacher')
                 self.assertIs(view.run, active_run)
+                completed = active_run.snapshot()['completed']
+                deadline = time.monotonic() + 10
+                while active_run.snapshot()['completed'] <= completed:
+                    self.assertLess(time.monotonic(), deadline)
+                    app.render()
+                    time.sleep(.01)
                 click('learning_task_return')
                 self.assertEqual(app.learning.page, 'labeling')
                 click('learning_teacher')
@@ -112,4 +118,9 @@ class LabelUiTest(unittest.TestCase):
                 self.assertEqual(app.learning.labels.state['completed'], recovered['completed'])
                 self.assertEqual(app.learning.labels.state['status'], 'failed')
                 self.assertTrue(app.learning.labels.state['error'])
+                click('learning_error_details')
+                with patch.object(app, 'text', wraps=app.text) as draw:
+                    app.render()
+                self.assertTrue(any('摘要保存中斷' in str(call.args[0]) for call in draw.call_args_list))
+                click('learning_error_close')
                 app.close()

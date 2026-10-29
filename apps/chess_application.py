@@ -4,6 +4,7 @@ import json
 import random
 import re
 import sqlite3
+import textwrap
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -104,6 +105,8 @@ class ChessApplication:
         self.batch_mode = "general"
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
         self.learning = LearningView(PROJECT_ROOT)
+        self.learning_error_open = False
+        self.learning_error_page = 0
         self.confirm_action: str | None = None
         self.confirm_was_running = False
         self.message = ""
@@ -445,7 +448,35 @@ class ChessApplication:
             return self.live.move_items, len(self.live.move_items)
         return [], 0
 
+    def learning_failure(self):
+        if self.mode == 'auto' and self.batch is self.learning_batch:
+            run = self.batch
+        elif self.mode == 'learning':
+            view = {'data': self.learning, 'teacher': self.learning.teacher,
+                    'labeling': self.learning.labels, 'training': self.learning.training,
+                    'groups': self.learning.group_training, 'combination': self.learning.combination}.get(self.learning.page)
+            run = view.run if view else None
+        else:
+            run = None
+        if run and run.future.done():
+            state = run.snapshot()
+            if state.get('status') == 'failed' and state.get('error'):
+                return str(state['error'])
+        return None
+
     def dispatch(self, action: str):
+        if action == 'learning_error_close':
+            self.learning_error_open = False
+            return
+        if action == 'learning_error_details' and self.learning_failure():
+            self.learning_error_open = True
+            self.learning_error_page = 0
+            return
+        if self.learning_error_open and action in ('learning_error_prev', 'learning_error_next'):
+            self.learning_error_page = max(0, self.learning_error_page + (1 if action.endswith('next') else -1))
+            return
+        if self.learning_error_open:
+            return
         if self.profile_selector is not None:
             self.profile_selector.action(action, self)
             return
@@ -893,6 +924,22 @@ class ChessApplication:
             self.text(f'{task[1]} {progress}', 190, 15, width=220)
             self.button('learning_task_return', '返回任務', (420, 10, 110, 36))
             self.button('learning_task_stop', '停止', (540, 10, 90, 36))
+        failure = self.learning_failure()
+        if failure and not self.confirm_action:
+            self.button('learning_error_details', '錯誤詳情', (640, 10, 130, 36))
+        if self.learning_error_open and failure:
+            self.draw_rect(PANEL, (45, 210, 810, 350), border_radius=8)
+            self.text('工作失敗', 70, 230, large=True)
+            lines = textwrap.wrap(failure, width=58)
+            pages = max(1, (len(lines) + 7) // 8)
+            self.learning_error_page = min(self.learning_error_page, pages - 1)
+            for row, line in enumerate(lines[self.learning_error_page * 8:(self.learning_error_page + 1) * 8]):
+                self.text(line, 70, 280 + row * 25, width=760)
+            if pages > 1:
+                self.button('learning_error_prev', '上頁', (70, 505, 120, 36), enabled=self.learning_error_page > 0)
+                self.text(f'{self.learning_error_page + 1}/{pages}', 210, 513)
+                self.button('learning_error_next', '下頁', (270, 505, 120, 36), enabled=self.learning_error_page + 1 < pages)
+            self.button('learning_error_close', '關閉', (650, 505, 170, 36))
         if self.confirm_action:
             self._render_confirmation()
         elif self.promotions:
