@@ -260,3 +260,30 @@ class ComparisonHistoryTest(unittest.TestCase):
                 self.assertTrue(any('尚未比較' in str(call.args[0]) for call in draw.call_args_list))
                 app.close()
         finally: case.doCleanups()
+    def test_half_pair_shows_saved_and_remaining_work_before_resume(self):
+        from engine.learning.comparison import comparison_options
+        from engine.sessions.evaluation_comparison import run_evaluation_comparison
+        pygame.init(); self.addCleanup(pygame.quit)
+        with tempfile.TemporaryDirectory() as folder, patch('apps.chess_application.PROJECT_ROOT', Path(folder)):
+            lines = [dict(initial_fen='7k/5Q2/6K1/8/8/8/8/8 w - - 0 1', moves_uci=[], name='', source={})]
+            path = create_comparison(folder, candidate(), roles=('learned',), stable=True, opening_lines=lines)
+            states = []
+            run_evaluation_comparison(**comparison_options(path, 'stable'), progress=states.append,
+                                      control=lambda: not states or states[-1]['saved_games'] < 1)
+            executor = ManualExecutor(); app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.new_setup('learning')
+            def click(action):
+                app.render(); button = next(b for b in app.buttons if b.action == action)
+                self.assertTrue(button.enabled, action)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            click('learning_goal_compare'); executor.finish(); app.render()
+            click('learning_inventory_history'); executor.finish(); app.render()
+            index = next(i for i, row in enumerate(app.learning.comparison_history.entries) if row['path'] == path)
+            click('learning_history_open:'+str(index)); executor.finish(); app.render()
+            click('learning_compare_baseline:stable')
+            row = app.learning.comparison.report['baselines']['stable']['candidates'][0]
+            self.assertEqual((row['planned_games']-row['pending_games'], row['pending_games']), (1, 1))
+            with patch.object(app, 'text', wraps=app.text) as draw: app.render()
+            self.assertTrue(any('已保存 1/2 局' in str(call.args[0]) for call in draw.call_args_list))
+            self.assertEqual(row['rating']['status'], 'unrated')
+            app.close()
