@@ -93,6 +93,7 @@ class GroupTrainingUiTest(unittest.TestCase):
             click('learning_labels')
             click('learning_task_stop'); view.run.future.result(timeout=5)
             click('learning_groups'); app.render()
+            self.assertTrue(next(b for b in app.buttons if b.action == 'learning_groups_resume').enabled)
             path = view.path
             saved = load_group_training(path)
             self.assertGreaterEqual(saved['completed_groups'],3)

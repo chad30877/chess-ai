@@ -259,7 +259,7 @@ class LearningView:
             self._detached_task = self._task_context = None
         if task and task[0] != 'data' and self._task_context is None:
             keys = ('data', 'path', 'sample_index', 'teacher', 'labels', 'training', 'group_training',
-                    'comparison', 'combination', 'inventory', 'screening', 'heldout')
+                    'comparison', 'combination', 'inventory', 'screening', 'heldout', 'browse_result')
             self._task_context = {key: getattr(self, key) for key in keys}
             self._detached_task = task
             root = self.root.parents[1]
@@ -267,6 +267,7 @@ class LearningView:
             self.group_training, self.combination = GroupTrainingView(root), CombinationView(root)
             self.comparison, self.inventory = LearnedComparisonView(root), InventoryView()
             self.screening, self.heldout = ScreeningView(root), HeldoutView(root)
+            self.browse_result = False
 
     def _preserve_browsing_context(self):
         task = self.active_task()
@@ -274,7 +275,7 @@ class LearningView:
             self._detached_task = self._task_context = None
         if not task or self._task_context is not None: return
         keys = ('data', 'path', 'sample_index', 'teacher', 'labels', 'training', 'group_training',
-                'comparison', 'combination', 'inventory', 'screening', 'heldout')
+                'comparison', 'combination', 'inventory', 'screening', 'heldout', 'browse_result')
         self._task_context = {key: getattr(self, key) for key in keys}
         self._detached_task = task
         running_view = {'teacher': 'teacher', 'labeling': 'labels', 'training': 'training',
