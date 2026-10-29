@@ -1,12 +1,12 @@
 # UI03：統一跨頁任務進度與耗時工作互斥
 
-狀態：待驗收（部分實作）。
+狀態：已完成。
 阻擋來源：無。
 對應決策：Q9、Q13、Q18。
 規格：[學習實驗導覽與操作改善](../spec.md)。
 索引：[本批工作票](../README.md)。
 
-已實作部分跨頁與互斥切片；以下完整功能與結案項目尚未驗收。依賴票未完成必要驗收前，不宣稱本票已解除阻擋。
+已完成跨頁任務與互斥實作、驗證及審查；相關依賴可依其他前置票的狀態接續。
 
 ## 要交付的行為
 
@@ -36,10 +36,10 @@
 
 ## 文件與提交
 
-- [ ] 更新受影響操作說明，反映本票實際交付行為。
-- [ ] 記錄實際驗收證據及限制。
-- [ ] 同步本票、批次索引與開發計畫的狀態。
-- [ ] 建立繁體中文 Git commit，讀回核對提交與狀態。
+- [x] 更新受影響操作說明，反映本票實際交付行為。
+- [x] 記錄實際驗收證據及限制。
+- [x] 同步本票、批次索引與開發計畫的狀態。
+- [x] 建立繁體中文 Git commit，讀回核對提交與狀態。
 
 ## 人工重現方式（尚未執行）
 
@@ -47,8 +47,10 @@
 
 ## 驗收證據與限制
 
-已以 `..\chess-ai\.venv\Scripts\python.exe -m unittest tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot` 驗證 10 項通過。教師先導、教師標記、群組學習與比較的事件測試涵蓋返回、跨頁停止或任務保留；以延遲執行工作確認停止後保存尚未完成時仍阻擋另一項開始。另執行相同命令並加入 `tests.ui.test_chess_application`，60 項通過。追加事件測試驗證教師標記切頁期間完成數增加，以及注入摘要保存失敗後可展開錯誤詳情；教師工作期間各學習與比較開始入口的互斥亦經派發測試。另以 `tests.ui.test_group_training` 確認切頁後群組完成數增加並停止保存；以 `tests.ui.test_learning_task_navigation.TaskNavigationTest.test_short_comparison_keeps_saving_after_leaving_batch_page` 執行合法短對局，確認離開批次頁後繼續保存並跨頁停止。追加教師工作期間檢查一般評分比較開始按鈕、群組工作期間檢查教師及標記開始按鈕；工作完成之前均受阻。既有先導及比較測試確認保留實際 worker 數；延遲執行器測試確認停止後未完成保存前仍受阻。另以真實短比較執行中派發各學習開始入口，確認不產生其他工作；群組工作中嘗試變更已保存教師預算並編輯另一份草稿，逐位元確認原先導狀態與訓練快照不變。功能驗證已完成；尚待程式審查、整合後回歸及結案同步。人工重現步驟不等於已通過。
+已以 `..\chess-ai\.venv\Scripts\python.exe -m unittest tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot` 驗證 10 項通過。教師先導、教師標記、群組學習與比較的事件測試涵蓋返回、跨頁停止或任務保留；以延遲執行工作確認停止後保存尚未完成時仍阻擋另一項開始。另執行相同命令並加入 `tests.ui.test_chess_application`，60 項通過。追加事件測試驗證教師標記切頁期間完成數增加，以及注入摘要保存失敗後可展開錯誤詳情；教師工作期間各學習與比較開始入口的互斥亦經派發測試。另以 `tests.ui.test_group_training` 確認切頁後群組完成數增加並停止保存；以 `tests.ui.test_learning_task_navigation.TaskNavigationTest.test_short_comparison_keeps_saving_after_leaving_batch_page` 執行合法短對局，確認離開批次頁後繼續保存並跨頁停止。追加教師工作期間檢查一般評分比較開始按鈕、群組工作期間檢查教師及標記開始按鈕；工作完成之前均受阻。既有先導及比較測試確認保留實際 worker 數；延遲執行器測試確認停止後未完成保存前仍受阻。另以真實短比較執行中派發各學習開始入口，確認不產生其他工作；群組工作中嘗試變更已保存教師預算並編輯另一份草稿，逐位元確認原先導狀態與訓練快照不變。功能驗證已完成。人工重現步驟不等於已通過。
 
-審查修正：以實際事件確認工作期間切換另一份資料後返回原來源及任務、群組工作期間進入組合、紀錄頁續跑受互斥限制，以及背景標記失敗時跨頁提示並返回詳情。執行 `tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot tests.ui.test_chess_application` 共 61 項通過；仍待複審及整合後驗證。
+審查修正：以實際事件確認工作期間切換另一份資料後返回原來源及任務、群組工作期間進入組合、紀錄頁續跑受互斥限制，以及背景標記失敗時跨頁提示並返回詳情。執行 `tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot tests.ui.test_chess_application` 共 61 項通過；審查發現的問題已修正並複審。
 
 複審修正：以三份資料的真實 UI 事件驗證 A 執行、切換 B、A 完成、B 執行再切換 C，仍能返回與停止 B；`tests.ui.test_learning_task_navigation` 5 項通過。
+
+整合分支複跑 ` .\.venv\Scripts\python.exe -m unittest tests.ui.test_learning_task_navigation tests.ui.test_teacher_labeling tests.ui.test_group_training tests.ui.test_learned_comparison tests.ui.test_teacher_pilot tests.ui.test_chess_application`：62 項通過。獨立複審確認先前的互斥、跨頁瀏覽、背景失敗提示與連續跨資料任務問題已修正。未進行正式長實驗；人工重現方式仍僅供操作參考。
