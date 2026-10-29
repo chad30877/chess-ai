@@ -47,6 +47,12 @@ class _DatasetGroups(GroupTrainingView):
             super().open(labels.path, preferred)
 
 
+class _NewGroupDraft(GroupTrainingView):
+    def open(self, labels, preferred=None):
+        super().open(labels, preferred)
+        self.action('learning_groups_draft', None)
+
+
 class _SavedGroupResults:
     def __init__(self): self.entries, self.page = [], 0
     def open(self, root):
@@ -398,6 +404,9 @@ class LearningView:
                         selected[f'labeling:{self.path}:{self.teacher.path}'] = str(self.labels.path)
                     context = self._saved_context()
                     item = self.page_load_request[3]
+                    if item.get('new_draft'):
+                        self.browse_result = False
+                        self.group_training.action('learning_groups_draft', None)
                     if item['kind'] == 'combination_batch':
                         selected[f'groups:{self.labels.path}'] = str(self.group_training.path)
                     elif context and context[1].path:
@@ -585,6 +594,11 @@ class LearningView:
         if action in ('learning_labels_new', 'learning_labels_resume') and (not self._labels_current() or not self.teacher.state.get('choice') or self.labels.loading is not None or self.labels.load_error):
             self.labels.message = '請先選定對應教師先導'
             return
+        if self.browse_result and action == 'learning_groups_draft':
+            self.loading = self.loading_path = None
+            item = dict(kind='groups', path=self.group_training.path, new_draft=True)
+            self._open_page('groups', 'recovery', lambda: RecoveredWork(self.teacher.project_root), item, 'groups', app.read_executor)
+            return
         if self.browse_result and action in ('learning_groups_new', 'learning_groups_resume'):
             self.group_training.message = '請先選擇對應教師標記'
             return
@@ -695,6 +709,13 @@ class LearningView:
                 if self.group_training.active(): self.page = 'groups'
                 else: self._open_page('groups', 'group_training', lambda: GroupTrainingView(self.teacher.project_root), (self.labels.path, self.saved_state.get('selected', {}).get(f'groups:{self.labels.path}')), 'labeling', app.read_executor)
             except (OSError,ValueError,KeyError) as exc: self.labels.message = str(exc)
+            return
+        if action == 'learning_training_draft' and self.page == 'training':
+            if self.group_training.labels != self.labels.path:
+                self._open_page('groups', 'group_training', lambda: _NewGroupDraft(self.teacher.project_root), (self.labels.path, None), 'training', app.read_executor)
+            else:
+                self.page = 'groups'
+                self.group_training.action('learning_groups_draft', app)
             return
         if action == 'learning_training' and self.labels.path and self.labels.loading is None and self.labels.state.get('ready'):
             try:

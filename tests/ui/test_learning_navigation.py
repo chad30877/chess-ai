@@ -166,6 +166,8 @@ class MainEntryCoverageTest(unittest.TestCase):
         from concurrent.futures import ThreadPoolExecutor
         from engine.learning.group_training import create_group_training, run_group_training, load_group_candidate
         from engine.learning.final_comparison import freeze_final_comparison
+        from engine.learning.training import create_training
+        create_training(self.labels)
         source = create_group_training(self.labels, ['mobility', 'king-safety'])
         run_group_training(source)
         final_path = freeze_final_comparison(self.root, [load_group_candidate(source, 'mobility')])
@@ -192,8 +194,8 @@ class MainEntryCoverageTest(unittest.TestCase):
                 if page in ('labeling', 'groups', 'training', 'combination', 'comparison'):
                     click('learning_nav_teacher'); click('learning_labels')
                     if page == 'labeling': return
-                    if page == 'training': click('learning_training'); return
                     click('learning_groups')
+                    if page == 'training': click('learning_training'); return
                     if page == 'groups': return
                     if page == 'comparison':
                         click('learning_groups_select:mobility'); click('learning_groups_compare'); return

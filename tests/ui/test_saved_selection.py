@@ -140,6 +140,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
             click('learning_labels'); executor.finish(); app.render()
+            click('learning_groups'); executor.finish(); app.render()
             click('learning_training'); executor.finish(); app.render()
             click('learning_saved_list'); index = app.learning.saved_entries.index(older)
             click(f'learning_saved_select:{index}'); executor.finish(); app.render()
@@ -147,6 +148,7 @@ class SavedTeacherSelectionTest(unittest.TestCase):
             app.close(); app = ChessApplication(app.screen, executor=executor)
             app.mode = 'learning'; app.learning.open(dataset); app.learning.page = 'teacher'
             click('learning_labels'); executor.finish(); app.render()
+            click('learning_groups'); executor.finish(); app.render()
             click('learning_training'); executor.finish(); app.render()
             self.assertEqual(app.learning.training.path, older)
             app.close()
