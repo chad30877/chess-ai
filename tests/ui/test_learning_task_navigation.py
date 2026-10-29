@@ -169,3 +169,43 @@ class TaskNavigationTest(unittest.TestCase):
             click('learning_task_stop')
             run.future.result(timeout=20)
             self.assertGreater(run.snapshot()['saved_games'], before)
+
+    def test_finished_detached_task_does_not_hide_next_task_after_switch(self):
+        pygame.init()
+        self.addCleanup(pygame.quit)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / 'games.pgn'
+            source.write_text(pgn_games(8), encoding='utf-8')
+            for _ in range(3):
+                create_dataset(root / 'data/learning', source)
+            executor = ManualExecutor()
+            with patch('apps.chess_application.PROJECT_ROOT', root):
+                app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+                self.addCleanup(app.close)
+                def click(action):
+                    app.render()
+                    button = next(b for b in app.buttons if b.action == action)
+                    self.assertTrue(button.enabled, action)
+                    app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+                click('mode:learning')
+                click('learning_open:0')
+                click('learning_teacher')
+                app.learning.teacher.command = make_engine(root)
+                click('learning_pilot_start')
+                first = app.learning.teacher.run
+                click('learning_data')
+                click('learning_open:1')
+                executor.finish(0)
+                self.assertEqual(first.snapshot()['status'], 'completed')
+                click('learning_teacher')
+                app.learning.teacher.command = make_engine(root)
+                click('learning_pilot_start')
+                second = app.learning.teacher.run
+                click('learning_data')
+                click('learning_open:2')
+                click('learning_task_return')
+                self.assertIs(app.learning.teacher.run, second)
+                click('learning_task_stop')
+                executor.finish(1)
+                self.assertEqual(second.snapshot()['status'], 'stopped')

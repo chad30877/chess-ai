@@ -139,6 +139,8 @@ class LearningView:
 
     def open(self, path):
         task = self.active_task()
+        if task and self._detached_task and self._detached_task[2].future.done():
+            self._detached_task = self._task_context = None
         if task and task[0] != 'data' and self._task_context is None:
             keys = ('data', 'path', 'sample_index', 'teacher', 'labels', 'training', 'group_training',
                     'comparison', 'combination', 'inventory', 'screening', 'heldout')
