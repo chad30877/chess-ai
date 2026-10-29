@@ -141,6 +141,9 @@ class RecordsView:
             app.new_setup("auto")
             app.batch_mode = "evaluation"
         elif action == "records_resume" and self.summary:
+            if app.learning.active_task():
+                self.message = f"目前執行中：{app.learning.active_task()[1]}，請先停止或等待完成"
+                return
             if app.batch and not app.batch.future.done():
                 self.message = "請先停止目前對戰"
                 return
@@ -227,7 +230,7 @@ class RecordsView:
         app.button("records_back", "返回清單" if self.choosing_date else "返回", (64, 625, 180, 36))
         app.button("records_refresh", "重新整理", (64, 672, 180, 40))
         app.button("comparison_new", "新增比較", (258, 672, 180, 40), primary=True,
-                   enabled=app.batch is None or app.batch.future.done())
+                   enabled=(app.batch is None or app.batch.future.done()) and not app.learning.active_task())
 
     def _summary(self, app):
         summary, comparison = self.summary, self.summary.comparison
@@ -285,7 +288,7 @@ class RecordsView:
         app.button("records_back", "返回紀錄清單", (64, 672, 200, 40))
         if (summary.settings or {}).get("experiment"):
             app.button("records_resume", "續跑實驗", (280, 672, 180, 40),
-                       enabled=app.batch is None or app.batch.future.done())
+                       enabled=(app.batch is None or app.batch.future.done()) and not app.learning.active_task())
             if summary.settings['experiment'].get('learning_source'):
                 app.button('records_learning_report','學習研究報告',(480,672,210,40))
 

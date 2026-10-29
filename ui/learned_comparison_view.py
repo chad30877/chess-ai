@@ -57,7 +57,7 @@ class LearnedComparisonView:
             elif action=='learning_compare_start' and self.path:
                 if app.batch and not app.batch.future.done(): raise ValueError('請先停止目前批次')
                 app.batch=ComparisonRun(comparison_options(self.path,self.baseline),app.executor)
-                app.batch_mode='evaluation'; app.mode='auto'; app.batch_games_page=0
+                app.learning_batch = app.batch; app.batch_mode='evaluation'; app.mode='auto'; app.batch_games_page=0
                 app.learning.batch_return_page='comparison'
             elif action=='learning_compare_records' and self.path:
                 data=comparison_report(self.path)['baselines'][self.baseline]

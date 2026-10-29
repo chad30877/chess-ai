@@ -4,6 +4,7 @@ import json
 import random
 import re
 import sqlite3
+import textwrap
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -23,7 +24,7 @@ from engine.sessions.batch_execution import start_batch
 from ui.batch_setup import EvaluationFields
 from ui.evaluation_profiles import profile_name, profile_summary, config_summary
 from ui.profile_selector import ProfileSelector, rating_search
-from ui.learning_view import LearningView
+from ui.learning_view import LearningView, START_ACTIONS
 from engine.sessions.live_session import LiveSession, LiveSettings
 from engine.search.transposition import DEFAULT_TRANSPOSITION_CAPACITY
 from engine.replay.replay_loader import load_replay_json
@@ -81,6 +82,7 @@ class ChessApplication:
         self.batch_evaluation_files = {side: self.live_evaluation_file for side in ("white", "black")}
         self.game_count = 20
         self.batch = None
+        self.learning_batch = None
         self.batch_games_page = 0
         self.pending_leave = None
         self.numeric_focus = None
@@ -103,6 +105,8 @@ class ChessApplication:
         self.batch_mode = "general"
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
         self.learning = LearningView(PROJECT_ROOT)
+        self.learning_error_open = False
+        self.learning_error_page = 0
         self.confirm_action: str | None = None
         self.confirm_was_running = False
         self.message = ""
@@ -161,7 +165,9 @@ class ChessApplication:
             self.live.stop()
         self.mode = mode
         self.live = self.replay = self.replay_data = None
-        self.batch = None
+        if not (self.learning_batch and not self.learning_batch.future.done()):
+            self.batch = None
+            self.learning_batch = None
         self.batch_mode = "general"
         self.evaluation_fields = EvaluationFields(PROJECT_ROOT)
         self.saved_path = None
@@ -189,6 +195,9 @@ class ChessApplication:
         )
 
     def start_game(self):
+        if self.mode == 'auto' and self.learning.active_task():
+            self.message = f'目前執行中：{self.learning.active_task()[1]}，請先停止或等待完成'
+            return
         if not self._commit_number():
             return
         if self.mode == "auto":
@@ -369,6 +378,9 @@ class ChessApplication:
         return self.live is not None and (self.live.active or (bool(self.live.move_items) and not self.saved))
 
     def request_leave(self, action: str):
+        if action == 'home' and self.learning_batch is not None and self.batch is self.learning_batch and not self.batch.future.done():
+            self.mode = 'home'
+            return
         if self.confirm_action:
             return
         if self.needs_confirmation():
@@ -439,9 +451,47 @@ class ChessApplication:
             return self.live.move_items, len(self.live.move_items)
         return [], 0
 
+    def learning_failure(self):
+        if self.mode == 'auto' and self.batch is self.learning_batch:
+            run = self.batch
+        elif self.mode == 'learning':
+            view = {'data': self.learning, 'teacher': self.learning.teacher,
+                    'labeling': self.learning.labels, 'training': self.learning.training,
+                    'groups': self.learning.group_training, 'combination': self.learning.combination}.get(self.learning.page)
+            run = view.run if view else None
+        else:
+            run = None
+        if run and run.future.done():
+            state = run.snapshot()
+            if state.get('status') == 'failed' and state.get('error'):
+                return str(state['error'])
+        return None
+
     def dispatch(self, action: str):
+        if action == 'learning_error_close':
+            self.learning_error_open = False
+            return
+        if action == 'learning_error_details' and self.learning_failure():
+            self.learning_error_open = True
+            self.learning_error_page = 0
+            return
+        if self.learning_error_open and action in ('learning_error_prev', 'learning_error_next'):
+            self.learning_error_page = max(0, self.learning_error_page + (1 if action.endswith('next') else -1))
+            return
+        if self.learning_error_open:
+            return
         if self.profile_selector is not None:
             self.profile_selector.action(action, self)
+            return
+        if action == 'learning_task_stop' and self.learning_batch and not self.learning_batch.future.done():
+            self.learning_batch.stop()
+            return
+        if action == 'learning_task_return' and self.learning_batch and (not self.learning_batch.future.done() or self.learning_batch.snapshot().get('status') == 'failed') and not self.learning.active_task():
+            self.mode = 'auto'
+            return
+        if action in ('learning_task_return', 'learning_task_stop') and (self.learning.active_task() or (action == 'learning_task_return' and self.learning.failed_task())):
+            self.learning.action(action, self)
+            if action == 'learning_task_return': self.mode = 'learning'
             return
         if self.mode == 'learning' and action.startswith('learning_'):
             self.learning.action(action, self)
@@ -824,6 +874,13 @@ class ChessApplication:
             self.move_view.handle_wheel(event.pos, 1 if event.button == 4 else -1, items)
 
     def button(self, action, label, rect, *, enabled=True, primary=False):
+        if action == 'start' and self.mode == 'auto' and self.learning.active_task():
+            enabled = False
+        if action.startswith('learning_budget:') and self.learning.active_task():
+            enabled = False
+        if action in START_ACTIONS and (self.learning.active_task() or
+                (self.batch and not self.batch.future.done())):
+            enabled = False
         button = Button(action, label, self.rect(rect), enabled, primary)
         self.buttons.append(button)
         button.draw(self.screen, self.font)
@@ -863,6 +920,38 @@ class ChessApplication:
             if self.mode not in ("auto", "records", "learning"):
                 self.button("flip", "翻轉 F", (664, 10, 104, 36))
             self.button("home", "回首頁", (780, 10, 104, 36))
+        task = self.learning.active_task()
+        if not task and self.learning_batch and not self.learning_batch.future.done():
+            task = ('batch', '比較', self.learning_batch)
+        failed_task = None
+        if not task:
+            failed_task = self.learning.failed_task()
+            if not failed_task and self.learning_batch and self.learning_batch.future.done() and self.learning_batch.snapshot().get('status') == 'failed':
+                failed_task = ('batch', '比較', self.learning_batch)
+            task = failed_task
+        if task and (self.mode != 'auto' or task[0] != 'batch'):
+            state = task[2].snapshot()
+            progress = f'{state.get("completed", state.get("saved_games", 0))}/{state.get("total", state.get("requested_games", 0))}'
+            self.text(f'{task[1]} {"失敗" if failed_task else progress}', 190, 15, width=220)
+            self.button('learning_task_return', '返回任務', (420, 10, 110, 36))
+            if not failed_task:
+                self.button('learning_task_stop', '停止', (540, 10, 90, 36))
+        failure = self.learning_failure()
+        if failure and not self.confirm_action:
+            self.button('learning_error_details', '錯誤詳情', (640, 10, 130, 36))
+        if self.learning_error_open and failure:
+            self.draw_rect(PANEL, (45, 210, 810, 350), border_radius=8)
+            self.text('工作失敗', 70, 230, large=True)
+            lines = textwrap.wrap(failure, width=58)
+            pages = max(1, (len(lines) + 7) // 8)
+            self.learning_error_page = min(self.learning_error_page, pages - 1)
+            for row, line in enumerate(lines[self.learning_error_page * 8:(self.learning_error_page + 1) * 8]):
+                self.text(line, 70, 280 + row * 25, width=760)
+            if pages > 1:
+                self.button('learning_error_prev', '上頁', (70, 505, 120, 36), enabled=self.learning_error_page > 0)
+                self.text(f'{self.learning_error_page + 1}/{pages}', 210, 513)
+                self.button('learning_error_next', '下頁', (270, 505, 120, 36), enabled=self.learning_error_page + 1 < pages)
+            self.button('learning_error_close', '關閉', (650, 505, 170, 36))
         if self.confirm_action:
             self._render_confirmation()
         elif self.promotions:
@@ -1232,6 +1321,8 @@ class ChessApplication:
             self.text(self.message, 64, 642, width=772, muted=True)
             return
         state = self.batch.snapshot()
+        if self.batch is self.learning_batch:
+            self.button('learning_comparison_return', '返回學習實驗', (460, 672, 376, 40))
         status = state["status"]
         labels = {"running": "生成中（暫時結果）", "paused": "已暫停", "stopping": "正在停止並保存",
                   "completed": "批次完成", "stopped": "已停止", "failed": "生成失敗"}

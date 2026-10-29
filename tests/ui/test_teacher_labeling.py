@@ -51,8 +51,22 @@ class LabelUiTest(unittest.TestCase):
                     state = view.run.snapshot()
                     if state['completed'] > state['summary']['reused_pilot']: break
                     time.sleep(.01)
-                click('learning_labels_stop')
+                active_run = view.run
+                click('learning_teacher')
+                self.assertEqual(app.learning.page, 'teacher')
+                self.assertIs(view.run, active_run)
+                completed = active_run.snapshot()['completed']
+                deadline = time.monotonic() + 10
+                while active_run.snapshot()['completed'] <= completed:
+                    self.assertLess(time.monotonic(), deadline)
+                    app.render()
+                    time.sleep(.01)
+                click('learning_task_return')
+                self.assertEqual(app.learning.page, 'labeling')
+                click('learning_teacher')
+                click('learning_task_stop')
                 view.run.future.result(timeout=5)
+                click('learning_labels')
                 app.render()
                 self.assertEqual(view.state['status'], 'stopped')
                 path = view.path
@@ -98,10 +112,20 @@ class LabelUiTest(unittest.TestCase):
                         writes[0] += 1
                         if writes[0] >= 2: raise OSError('摘要保存中斷')
                     return original(src, target)
+                click('learning_teacher')
                 with patch('os.replace', fail_summary): manual.finish()
+                with patch.object(app, 'text', wraps=app.text) as draw:
+                    app.render()
+                self.assertTrue(any('教師標記 失敗' in str(call.args[0]) for call in draw.call_args_list))
+                click('learning_task_return')
                 app.render()
                 recovered = load_labeling(path)
                 self.assertEqual(app.learning.labels.state['completed'], recovered['completed'])
                 self.assertEqual(app.learning.labels.state['status'], 'failed')
                 self.assertTrue(app.learning.labels.state['error'])
+                click('learning_error_details')
+                with patch.object(app, 'text', wraps=app.text) as draw:
+                    app.render()
+                self.assertTrue(any('摘要保存中斷' in str(call.args[0]) for call in draw.call_args_list))
+                click('learning_error_close')
                 app.close()
