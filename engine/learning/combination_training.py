@@ -102,20 +102,22 @@ def create_combination(source_path, groups=None, *, run_path=None):
     return path
 
 
-def load_combination(path):
+def load_combination(path, *, only_kind=None):
     """僅讀已提交結果；來源移除後仍能恢復已保存實驗。"""
     path = Path(path); snapshot = _verified(path/'snapshot.json')
     if snapshot.get('format_version') != 1 or snapshot.get('kind') != 'combination': raise ValueError('組合格式不符')
     preview = preview_combination(snapshot['sources'])
     if any(preview[k] != snapshot[k] for k in ('original','direct','groups','terms')): raise ValueError('組合快照與來源權重不符')
+    if only_kind not in (None, 'direct', 'joint'): raise ValueError('組合種類不符')
     candidates = {}
-    for file in (path/'candidates').glob('*.json'):
+    for file in (() if only_kind == 'direct' else (path/'candidates').glob('*.json')):
         item = _verified(file)
         if item['snapshot_identity'] != snapshot['identity'] or item['strength'] != file.stem or item['calibration_identity'] != snapshot['calibration_identity']:
             raise ValueError('聯合候選來源身份不符')
         EvaluationConfig.from_dict(item['config']); candidates[file.stem] = item
     results = {}
     for kind in ('direct','joint'):
+        if only_kind is not None and kind != only_kind: continue
         frozen = _verified(path/kind/'frozen.json') if (path/kind/'frozen.json').exists() else None
         report = _verified(path/kind/'report.json') if (path/kind/'report.json').exists() else None
         if frozen:
@@ -130,7 +132,7 @@ def load_combination(path):
         if report and (not frozen or report['frozen_identity'] != frozen['identity'] or report['calibration_identity'] != snapshot['calibration_identity']):
             raise ValueError('組合報告來源不符')
         results[kind] = dict(frozen=frozen, report=report)
-    controls = _verified(path/'controls.json') if (path/'controls.json').exists() else None
+    controls = _verified(path/'controls.json') if only_kind is None and (path/'controls.json').exists() else None
     if controls and (controls['snapshot_identity'] != snapshot['identity'] or controls['calibration_identity'] != snapshot['calibration_identity']):
         raise ValueError('固定四設定來源不符')
     state = _read(path/'status.json')
@@ -244,7 +246,7 @@ def run_combination(path, *, stop=None, progress=lambda state:None, now=monotoni
 def load_combination_candidate(path, kind='joint'):
     """與單組候選相同的設定及來源契約，供既有對戰比較使用。"""
     if kind not in ('direct','joint'): raise ValueError('請選直接組合或聯合訓練')
-    saved = load_combination(path); snapshot = saved['snapshot']; result = saved['results'][kind]
+    saved = load_combination(path, only_kind=kind); snapshot = saved['snapshot']; result = saved['results'][kind]
     if not result['report']: raise ValueError('此組合尚未完成凍結測試')
     frozen = result['frozen']
     return dict(kind=kind, groups=snapshot['groups'], experiment_id=snapshot['id'], snapshot_identity=snapshot['identity'],

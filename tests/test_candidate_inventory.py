@@ -67,7 +67,7 @@ class InventoryUiTest(unittest.TestCase):
             click('learning_nav_inventory')
             app.learning.page_loading.result(timeout=30); app.render()
             self.assertTrue(app.learning.inventory.report['candidates'])
-            self.assertEqual(app.learning.inventory.report['source_identity'],
+            self.assertEqual(app.learning.inventory.report['candidates'][0]['source']['snapshot_identity'],
                              load_candidate_inventory(source)['source_identity'])
             self.assertIsNone(app.batch)
             click('learning_nav_data'); app.learning.open(self.labels.parents[1])
