@@ -27,6 +27,27 @@ class AllCandidatesTest(unittest.TestCase):
         plan = create_comparison(self.root, candidate, roles=('learned',))
         self.assertEqual(load_comparison_plan(plan)['source'], candidate)
         self.assertEqual({p.name: p.read_bytes() for p in path.glob('*.json')}, before)
+        import pygame
+        from unittest.mock import patch
+        from apps.chess_application import ChessApplication, APP_SIZE
+        from tests.helpers.executors import ManualExecutor
+        pygame.init(); self.addCleanup(pygame.quit)
+        executor = ManualExecutor()
+        with patch('apps.chess_application.PROJECT_ROOT', self.root):
+            app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            self.addCleanup(app.close)
+            app.learning.root = self.root / 'data'; app.new_setup('learning')
+            def click(action):
+                app.render(); button = next(b for b in app.buttons if b.action == action)
+                self.assertTrue(button.enabled, action)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            click('learning_goal_compare'); executor.finish(); app.render()
+            click('learning_inventory_candidate:0')
+            self.assertIsNone(app.batch)
+            click('learning_inventory_screen'); executor.finish(); app.render()
+            self.assertEqual(app.learning.screening.report['plan']['source'], candidate)
+            self.assertIsNone(app.batch)
+            self.assertEqual({p.name: p.read_bytes() for p in path.glob('*.json')}, before)
 
     def test_mixed_sources_keep_equal_configs_and_skip_damaged_experiment(self):
         from engine.learning.candidate_inventory import load_all_candidate_inventory
