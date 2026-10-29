@@ -56,3 +56,5 @@ UI04、UI05 已完成；本票已依下列證據驗收。
 - `tests.ui.test_group_training` 實際執行五群組、停止並重開續跑，核對已保存候選及結果；`tests.ui.test_combination_training` 檢查組合入口、凍結來源與對戰設定。相關核心求解與任務導覽回歸共 19 項通過；導覽、成果選擇及群組／舊訓練 UI 回歸共 24 項通過；最後執行關閉、導覽、成果選擇回歸 36 項通過。
 - 以 SDL dummy 渲染並檢查 900×768 的草稿、完成、未完成與殘局無資料畫面；以實際報告核對分階段數值。這不是使用者手動操作。
 - 沒有執行正式長實驗；操作教學截圖為舊版示意，已標明以現行介面為準。人工重現方式未由使用者執行。
+
+- 合入 UI07 後執行 `tests.ui.test_group_draft tests.ui.test_learning_navigation tests.test_candidate_inventory tests.ui.test_group_training` 共 15 項通過；原有候選 UI 測試更新為先開新建草稿。
