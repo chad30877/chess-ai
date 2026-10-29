@@ -133,6 +133,8 @@ class LearningView:
         self.screening = ScreeningView(root)
         self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
+        self.batch_comparison = None
+        self.replay_comparison = None
         self.setup = ComparisonSetupView(root)
         self.batch_setup = None
         self.pending_setup = None
@@ -581,7 +583,7 @@ class LearningView:
                 item = self.recovery_entries[int(action.split(':')[1])]
                 self.loading = None
                 self.recovery_list = False
-                self._open_page('combination' if item['kind'] == 'combination_batch' else item['kind'], 'recovery', lambda: RecoveredWork(self.teacher.project_root), item, 'data', app.read_executor)
+                self._open_page({'combination_batch': 'combination', 'comparison_bundle': 'history_bundle'}.get(item['kind'], item['kind']), 'recovery', lambda: RecoveredWork(self.teacher.project_root), item, 'data', app.read_executor)
             return
         if action == 'learning_recovery_list':
             if self.active_task() or (app.batch and not app.batch.future.done()): return
@@ -969,11 +971,11 @@ class LearningView:
                 return
             pages = max(1, (len(self.recovery_entries) + 7) // 8)
             self.recovery_page = min(self.recovery_page, pages - 1)
-            titles = {'teacher':'教師先導', 'labeling':'教師標記', 'training':'棋子位置學習', 'groups':'單群組學習', 'combination':'組合', 'combination_batch':'組合批次', 'comparison':'比較'}
+            titles = {'teacher':'教師先導', 'labeling':'教師標記', 'training':'棋子位置學習', 'groups':'單群組學習', 'combination':'組合', 'combination_batch':'組合批次', 'comparison':'比較', 'comparison_bundle':'整組比較'}
             for row, item in enumerate(self.recovery_entries[self.recovery_page * 8:self.recovery_page * 8 + 8]):
                 name = self.saved_name(item['path'], titles[item['kind']])
                 app.button(f'learning_recovery_open:{self.recovery_page * 8 + row}', name, (50, 180 + row * 50, 485, 40))
-                statuses = {'ready':'待開始', 'queued':'未完成', 'running':'未完成', 'stopped':'已停止', 'failed':'失敗', 'interrupted':'未完成', 'unavailable':'不可用', 'generating':'未完成', 'partial':'部分失敗'}
+                statuses = {'ready':'待開始', 'queued':'未完成', 'running':'未完成', 'stopped':'已停止', 'failed':'失敗', 'interrupted':'未完成', 'unavailable':'不可用', 'generating':'未完成', 'partial':'部分失敗', 'not-started':'待開始'}
                 status = statuses.get(item['status'], item['status'])
                 if item['kind'] == 'teacher': status += ' · 需重新量測'
                 baseline = {'material': '純子力', 'stable': 'stable'}.get(item.get('baseline'), '')
