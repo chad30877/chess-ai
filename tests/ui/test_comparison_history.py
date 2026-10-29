@@ -106,3 +106,33 @@ class ComparisonHistoryTest(unittest.TestCase):
             click('learning_history_open:' + str(index)); executor.finish(); app.render()
             self.assertEqual(app.learning.comparison.path, good)
             app.close()
+    def test_multi_candidate_setup_can_resume_all_saved_work(self):
+        import json
+        from engine.learning.teacher import digest
+        from engine.storage.batch_storage import write_json_atomic
+        pygame.init(); self.addCleanup(pygame.quit)
+        with tempfile.TemporaryDirectory() as folder, patch('apps.chess_application.PROJECT_ROOT', Path(folder)):
+            lines = [dict(initial_fen='7k/8/8/8/8/8/P7/K7 w - - 0 1', moves_uci=[], name=str(i), source={}) for i in range(2)]
+            plans = [create_comparison(folder, candidate(), roles=('learned',), opening_lines=lines, max_plies=1, screening=True) for _ in range(2)]
+            bundle = Path(folder) / 'data/learning-setup/group'; bundle.mkdir(parents=True)
+            data = dict(format_version=1, purpose='screening', sources=[candidate(), candidate()],
+                        work=[dict(path=str(p), baseline='stable') for p in plans], planned_games=8)
+            data['identity'] = digest(data); write_json_atomic(bundle / 'snapshot.json', data)
+            executor = ManualExecutor(); app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
+            app.new_setup('learning')
+            def click(action):
+                app.render(); button = next(b for b in app.buttons if b.action == action)
+                self.assertTrue(button.enabled, action)
+                app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+            click('learning_goal_compare'); executor.finish(); app.render()
+            click('learning_inventory_history'); executor.finish(); app.render()
+            rows = app.learning.comparison_history.entries
+            index = next(i for i, row in enumerate(rows) if row['path'] == bundle)
+            click('learning_history_open:' + str(index)); executor.finish(); app.render()
+            self.assertEqual(app.learning.page, 'history_bundle')
+            click('learning_bundle_resume')
+            self.assertEqual(app.batch.snapshot()['requested_games'], 8)
+            executor.finish(); self.assertEqual(app.batch.snapshot()['status'], 'completed')
+            from engine.learning.comparison import comparison_report
+            self.assertTrue(all(comparison_report(p)['baselines']['stable']['status'] == 'completed' for p in plans))
+            app.close()

@@ -41,9 +41,12 @@ class LearnedComparisonView:
         self.path=Path(path); self.report=comparison_report(path); plan=self.report['plan']; self.source=plan['source']
         self.roles=set(plan['roles']); self.stable='stable' in plan['definitions']; self.baseline=next(iter(plan['definitions'])); self.page=0; self.candidate=0
         self.rating_details=False; self.rating_page=0
-    def open_history(self, path):
+    def open_history(self, path, baseline=None):
         self.selected_origin = None
         self.open_plan(path)
+        if baseline is not None:
+            if baseline not in self.report['baselines']: raise ValueError('比較基準不存在')
+            self.baseline = baseline
         self.return_page = 'history'
 
     def open_final(self, path, index):
@@ -178,7 +181,7 @@ class LearnedComparisonView:
                 app.text('來源 '+str(line.get('source',{}).get('url',line.get('source',{}).get('repository','已保存來源快照'))),50,550,muted=True,width=790)
                 app.button('learning_compare_opening_back','返回逐開局報告',(50,592,300,32))
             else:
-                app.text(f'勝 {row["wins"]}／和 {row["draws"]}／敗 {row["losses"]} · 未完成 {row["unfinished"]} · 待執行 {row["pending_games"]}',310,348,width=530)
+                app.text(f'勝 {row["wins"]}／和 {row["draws"]}／敗 {row["losses"]} · 已保存 {row["planned_games"]-row["pending_games"]}/{row["planned_games"]} 局 · 待執行 {row["pending_games"]}',310,348,width=530)
                 app.text(f'完整配對 {row["completed_pairs"]}/{len(row["openings"])} · 不完整 {row["incomplete_pairs"]} · 中斷嘗試 {row["interrupted_attempts"]} · 對局 {row["elapsed_seconds"]:.1f}秒',50,390,width=790)
                 def metric(split):
                     value=row['teacher'][split]

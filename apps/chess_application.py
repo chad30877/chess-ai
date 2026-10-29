@@ -597,6 +597,10 @@ class ChessApplication:
                 self.learning.setup = self.learning.batch_setup
             self.mode = 'learning'
             self.learning.page = self.learning.batch_return_page
+            if self.learning.page == 'history_bundle':
+                from ui.comparison_history_view import ComparisonBundleHistory
+                self.learning._open_page('history_bundle', 'history_bundle', ComparisonBundleHistory,
+                                         self.learning.history_bundle.path, 'history', self.read_executor)
             return
         if self.mode == "records" and (action.startswith("records_") or action == "comparison_new"):
             self.records_view.action(action, self)
