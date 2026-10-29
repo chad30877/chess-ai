@@ -18,6 +18,7 @@ from ui.combination_view import CombinationView
 from ui.candidate_inventory_view import InventoryView
 from ui.screening_view import ScreeningView
 from ui.heldout_view import HeldoutView
+from ui.controls import ui_font
 from ui.unfinished_tasks import unfinished, RecoveredWork
 
 SPLIT_LABELS = {'train': '訓練', 'validation': '驗證', 'test': '測試'}
@@ -30,6 +31,53 @@ START_ACTIONS = {'learning_create', 'learning_pilot_start', 'learning_labels_new
 EXCLUSION_LABELS = {'first_8_plies': '前八手', 'terminal': '終局', 'in_check': '受將',
                     'not_sampled': '抽樣上限', 'cross_split_duplicate': '跨組重複',
                     'within_split_duplicate': '同組重複'}
+
+
+class _DatasetGroups(GroupTrainingView):
+    def open(self, dataset, pilot, preferred_label, selections):
+        labels = LabelView()
+        labels.dataset, labels.pilot = Path(dataset), Path(pilot)
+        labels._entries, labels.path, labels.state, error = labels._read_saved(labels.dataset, preferred_label, labels.pilot)
+        labels.index = next((i for i, entry in enumerate(labels._entries) if entry.parent == labels.path), 0)
+        labels.load_error = bool(error)
+        if error: labels.message = f'無法讀取標記 {labels.path}：{error}'
+        self.navigation_labels = labels
+        if labels.path and labels.state.get('ready'):
+            preferred = selections.get(f'groups:{labels.path}')
+            super().open(labels.path, preferred)
+
+
+class _SavedGroupResults:
+    def __init__(self): self.entries, self.page = [], 0
+    def open(self, root):
+        self.entries = sorted(root.glob('*/teacher-labels/*/group-training/*/snapshot.json'), reverse=True)
+
+
+class _LearningContent:
+    """將既有頁面壓入共用導覽下方，保持按鈕與文字對齊。"""
+    def __init__(self, app):
+        self.app = app
+        if getattr(app, '_learning_font_scale', None) != app.scale:
+            app._learning_fonts = (ui_font(round(15 * app.scale)), ui_font(round(23 * app.scale)))
+            app._learning_font_scale = app.scale
+    def __getattr__(self, name): return getattr(self.app, name)
+    def text(self, value, x, y, **kwargs):
+        app = self.app
+        old = app.font, app.title_font
+        app.font, app.title_font = app._learning_fonts
+        try: app.text(value, x, 170 + (y - 74) * .84, **kwargs)
+        finally: app.font, app.title_font = old
+    def button(self, action, label, rect, **kwargs):
+        x, y, w, h = rect
+        app = self.app
+        if action in ('learning_groups_new', 'learning_groups_resume') and app.learning.browse_result:
+            kwargs['enabled'] = False
+        if action in ('learning_labels_new', 'learning_labels_resume') and not app.learning._labels_current():
+            kwargs['enabled'] = False
+        old = app.font
+        app.font = app._learning_fonts[0]
+        try: app.button(action, label, (x, 170 + (y - 74) * .84, w, h * .84), **kwargs)
+        finally: app.font = old
 
 
 class LearningView:
@@ -47,7 +95,7 @@ class LearningView:
         self.message = ''
         self.sample_index = 0
         self.recent_page = 0
-        self.page = 'data'
+        self.page = 'home'
         self.teacher = TeacherView(root)
         self.labels = LabelView()
         self.training = TrainingView(root)
@@ -58,6 +106,9 @@ class LearningView:
         self.screening = ScreeningView(root)
         self.heldout = HeldoutView(root)
         self.batch_return_page = 'comparison'
+        self.inventory_return = 'groups'
+        self.result_browser = _SavedGroupResults()
+        self.browse_result = False
         self.loading = None
         self.loading_path = None
         self.page_loading = None
@@ -83,7 +134,7 @@ class LearningView:
             self.saved_state = {}
 
     def _saved_context(self):
-        if self.page == 'data': return 'data', self, [p.parent for p in self.entries()], '資料'
+        if self.page in ('home', 'data'): return 'data', self, [p.parent for p in self.entries()], '資料'
         if self.page == 'teacher': return f'teacher:{self.path}', self.teacher, [p.parent for p in self.teacher.entries()], '教師先導'
         if self.page == 'labeling': return f'labeling:{self.path}:{self.teacher.path}', self.labels, [p.parent for p in self.labels._entries], '教師標記'
         if self.page == 'training': return f'training:{self.labels.path}', self.training, [p.parent for p in self.training.entries], '棋子位置學習'
@@ -141,6 +192,7 @@ class LearningView:
     def open_comparison(self, candidate, executor=None):
         if executor is None:
             self.comparison.open(candidate)
+            if self.page in ('groups', 'combination', 'training'): self.comparison.return_page = self.page
             self.page = 'comparison'
         else:
             self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root),
@@ -240,7 +292,7 @@ class LearningView:
             self._detached_task = self._task_context = None
         if task and task[0] != 'data' and self._task_context is None:
             keys = ('data', 'path', 'sample_index', 'teacher', 'labels', 'training', 'group_training',
-                    'comparison', 'combination', 'inventory', 'screening', 'heldout')
+                    'comparison', 'combination', 'inventory', 'screening', 'heldout', 'browse_result')
             self._task_context = {key: getattr(self, key) for key in keys}
             self._detached_task = task
             root = self.root.parents[1]
@@ -248,6 +300,7 @@ class LearningView:
             self.group_training, self.combination = GroupTrainingView(root), CombinationView(root)
             self.comparison, self.inventory = LearnedComparisonView(root), InventoryView()
             self.screening, self.heldout = ScreeningView(root), HeldoutView(root)
+            self.browse_result = False
 
     def _preserve_browsing_context(self):
         task = self.active_task()
@@ -255,7 +308,7 @@ class LearningView:
             self._detached_task = self._task_context = None
         if not task or self._task_context is not None: return
         keys = ('data', 'path', 'sample_index', 'teacher', 'labels', 'training', 'group_training',
-                'comparison', 'combination', 'inventory', 'screening', 'heldout')
+                'comparison', 'combination', 'inventory', 'screening', 'heldout', 'browse_result')
         self._task_context = {key: getattr(self, key) for key in keys}
         self._detached_task = task
         running_view = {'teacher': 'teacher', 'labeling': 'labels', 'training': 'training',
@@ -351,10 +404,88 @@ class LearningView:
                         selected[context[0]] = str(context[1].path)
                     self._save_ui_state()
             else:
+                if self.page_load_request[1] == 'comparison' and self.page_load_request[5] == 'open' and self.page_load_request[4] in ('groups', 'combination', 'training'):
+                    view.return_page = self.page_load_request[4]
                 setattr(self, self.page_load_request[1], view)
+                if hasattr(view, 'navigation_labels'):
+                    self.labels = view.navigation_labels
             self.page_load_request = None
 
+    def _labels_current(self):
+        return (self.path is not None and self.labels.dataset == self.path and
+                self.teacher.path is not None and self.labels.pilot == self.teacher.path)
+
+    def _navigate(self, page, app):
+        self.saved_list = False
+        self.recovery_list = False
+        self.page_loading = self.page_load_request = None
+        self.page_load_error = ''
+        if page in ('home', 'data'):
+            self.page = page
+        elif page == 'teacher':
+            self.page = 'teacher'
+        elif page == 'labeling':
+            if self.path and self.teacher.path and self.teacher.state.get('choice'):
+                if not self.labels.active() and not (self._labels_current() and (self.labels.path or self.labels.loading)):
+                    self._preserve_browsing_context()
+                    key = f'labeling:{self.path}:{self.teacher.path}'
+                    self.labels.open(self.path, self.teacher.path, app.read_executor, self.saved_state.get('selected', {}).get(key))
+            self.page = 'labeling'
+        elif page == 'groups':
+            self.browse_result = False
+            if (self.path and self.data and self.teacher.path and self.teacher.loading is None and
+                    self.teacher.state.get('choice') and not self._labels_current() and not self.group_training.active()):
+                self._preserve_browsing_context()
+                key = f'labeling:{self.path}:{self.teacher.path}'
+                selections = dict(self.saved_state.get('selected', {}))
+                self._open_page('groups', 'group_training', lambda: _DatasetGroups(self.teacher.project_root),
+                                (self.path, self.teacher.path, selections.get(key), selections), 'home', app.read_executor)
+            elif self._labels_current() and self.labels.path and self.labels.loading is None and not self.group_training.active():
+                self._open_page('groups', 'group_training', lambda: GroupTrainingView(self.teacher.project_root),
+                                (self.labels.path, self.saved_state.get('selected', {}).get(f'groups:{self.labels.path}')), 'data', app.read_executor)
+            else: self.page = 'groups'
+        elif page == 'results':
+            self._open_page('results', 'result_browser', _SavedGroupResults, self.root, 'home', app.read_executor)
+        elif page == 'inventory':
+            self.inventory_return = 'groups'
+            self._open_page('inventory', 'inventory', InventoryView, self.root, 'data', app.read_executor, 'open_first')
+
+    def _render_navigation(self, app):
+        for x, action, title in ((25, 'data', '資料準備'), (240, 'teacher', '教師評分'),
+                                  (455, 'groups', '評分權重學習'), (670, 'inventory', '比較候選')):
+            app.button('learning_nav_' + action, title, (x, 60, 205, 30))
+        parents = {'teacher': ('teacher', '教師評分'), 'labeling': ('teacher', '教師評分'),
+                   'groups': ('groups', '評分權重學習'), 'results': ('groups', '評分權重學習'), 'training': ('groups', '評分權重學習'),
+                   'combination': ('groups', '評分權重學習'), 'inventory': ('inventory', '比較候選'),
+                   'screening': ('inventory', '比較候選'), 'comparison': ('inventory', '比較候選'),
+                   'heldout': ('inventory', '比較候選')}
+        app.button('learning_breadcrumb_data', '學習實驗', (25, 98, 120, 27))
+        if self.page in parents:
+            parent, label = parents[self.page]
+            app.button('learning_breadcrumb_' + parent, label, (160, 98, 190, 27))
+        titles = {'home':'首頁', 'data':'資料準備', 'teacher':'教師先導', 'labeling':'教師標記', 'training':'棋子位置學習',
+                  'groups':'單群組學習', 'results':'學習成果', 'combination':'組合', 'inventory':'候選清單',
+                  'screening':'快速篩選', 'comparison':'比較', 'heldout':'教師誤差評估'}
+        app.text('› ' + titles.get(self.page, ''), 365 if self.page in parents else 160, 101, width=260)
+        if self.path:
+            teacher = ('完成' if self.teacher.state.get('choice') else '未完成') if self.teacher.dataset == self.path and self.teacher.loading is None else '尚未載入'
+            labels = ('完成' if self.labels.state.get('ready') else '未完成') if self._labels_current() and self.labels.loading is None else '尚未載入'
+            group = '尚未載入'
+            if self._labels_current() and self.labels.path and self.group_training.labels == self.labels.path:
+                group = '完成' if self.group_training.state.get('status') == 'completed' else '未完成'
+            app.text(f'資料 {self.path.name[-8:]} · 教師先導 {teacher} · 教師標記 {labels} · 學習 {group}', 25, 135, width=850)
+
     def action(self, action, app):
+        routes = {'learning_nav_data':'data', 'learning_nav_teacher':'teacher', 'learning_nav_groups':'groups',
+                  'learning_nav_inventory':'inventory', 'learning_breadcrumb_data':'home',
+                  'learning_goal_create':'data', 'learning_goal_resume':'groups',
+                  'learning_goal_compare':'inventory', 'learning_goal_results':'results',
+                  'learning_breadcrumb_teacher':'teacher', 'learning_breadcrumb_groups':'groups',
+                  'learning_breadcrumb_inventory':'inventory', 'learning_need_data':'data',
+                  'learning_need_teacher':'teacher', 'learning_need_labels':'labeling', 'learning_need_groups':'groups'}
+        if action in routes:
+            self._navigate(routes[action], app)
+            return
         if self.recovery_list and action not in ('learning_task_return', 'learning_task_stop'):
             if action == 'learning_recovery_back': self.recovery_list = False
             elif action == 'learning_recovery_retry': self.scan_unfinished(app._scan_executor)
@@ -374,6 +505,9 @@ class LearningView:
                 self.rename_focus = False; pygame.key.stop_text_input()
             self.recovery_list = True; self.recovery_page = 0
             return
+        if self.page == 'home' and not action.startswith('learning_task_'):
+            self.page = 'data'
+
         if self.saved_list and action not in ('learning_task_return', 'learning_task_stop'):
             if action == 'learning_saved_back': self.saved_list = False
             elif action == 'learning_saved_next': self.saved_page += 1
@@ -434,6 +568,26 @@ class LearningView:
                         'comparison': self.comparison, 'screening': self.screening}.get(self.page, self)
                 view.message = f'目前執行中：{running}，請先停止或等待完成'
                 return
+        if action in START_ACTIONS and (self.page_load_request is not None or self.loading is not None):
+            return
+        if action in ('learning_groups_new', 'learning_groups_resume') and self.group_training.labels != self.labels.path:
+            self.group_training.message = '請先載入對應教師標記'
+            return
+        if action in ('learning_training_new', 'learning_training_resume') and self.training.labels != self.labels.path:
+            self.training.message = '請先載入對應教師標記'
+            return
+        if action in ('learning_groups_new', 'learning_groups_resume', 'learning_training_new', 'learning_training_resume') and (not self._labels_current() or self.labels.loading is not None or not self.labels.state.get('ready')):
+            self.message = '請先完成對應教師標記'
+            return
+        if action == 'learning_pilot_start' and (not self.data or self.teacher.dataset != self.path or self.teacher.loading is not None or self.teacher.load_error):
+            self.teacher.message = '請先選擇有效資料'
+            return
+        if action in ('learning_labels_new', 'learning_labels_resume') and (not self._labels_current() or not self.teacher.state.get('choice') or self.labels.loading is not None or self.labels.load_error):
+            self.labels.message = '請先選定對應教師先導'
+            return
+        if self.browse_result and action in ('learning_groups_new', 'learning_groups_resume'):
+            self.group_training.message = '請先選擇對應教師標記'
+            return
         if action == 'learning_task_return' and (task or self.failed_task()):
             target = task or self.failed_task()
             if self._task_context and target is self._detached_task:
@@ -477,8 +631,19 @@ class LearningView:
                     return view
                 self._open_page(self.page, attribute, selected_view, path, self.page, app.read_executor, 'load')
                 return
+        if self.page == 'results':
+            if action in ('learning_results_prev', 'learning_results_next'):
+                self.result_browser.page = max(0, self.result_browser.page + (1 if action.endswith('next') else -1))
+            elif action.startswith('learning_results_open:'):
+                index = int(action.split(':')[1])
+                path = self.result_browser.entries[index].parent
+                self._preserve_browsing_context()
+                self.browse_result = True
+                self._open_page('groups', 'group_training', lambda: GroupTrainingView(self.teacher.project_root),
+                                (path.parents[1], path), 'results', app.read_executor)
+            return
         if self.page == 'inventory':
-            if action == 'learning_inventory_back': self.page = 'combination'
+            if action == 'learning_inventory_back': self.page = self.inventory_return
             elif action == 'learning_inventory_screen':
                 try:
                     selected = self.inventory.report['candidates'][self.inventory.selected]
@@ -501,6 +666,7 @@ class LearningView:
             return
         if action == 'learning_inventory' and self.page == 'combination':
             try:
+                self.inventory_return = 'combination'
                 self._open_page('inventory', 'inventory', InventoryView, self.combination.source_path, 'combination', app.read_executor)
             except (OSError, ValueError, KeyError) as exc: self.combination.message = str(exc)
             return
@@ -541,9 +707,13 @@ class LearningView:
             self.teacher.commit()
             self.page = 'data'
             return
+        if action == 'learning_labels' and self.page == 'teacher' and self.teacher.loading is None and not (self.teacher.path and self.teacher.state.get('choice')):
+            self.page = 'labeling'
+            return
         if action == 'learning_labels' and self.teacher.path and self.teacher.loading is None and self.teacher.state.get('choice'):
             try:
-                if not self.labels.active() and (not self.labels.run or self.labels._loaded_run is self.labels.run):
+                if not self.labels.active() and (not self.labels.run or self.labels._loaded_run is self.labels.run) and not (self._labels_current() and (self.labels.path or self.labels.loading)):
+                    self._preserve_browsing_context()
                     key = f'labeling:{self.path}:{self.teacher.path}'
                     preferred = self.saved_state.get('selected', {}).get(key)
                     self.labels.open(self.path, self.teacher.path, app.read_executor, preferred)
@@ -593,7 +763,7 @@ class LearningView:
         if not self.commit():
             return
         try:
-            if action == 'learning_stop' and self.active():
+            if action == 'learning_stop' and self.run and not self.run.future.done():
                 self.run.stop()
                 return
             if self.active() and not (action in ('learning_teacher', 'learning_prev', 'learning_next', 'learning_sample', 'learning_recent_prev', 'learning_recent_next') or (action.startswith('learning_open:') and not (self.run and not self.run.future.done()))):
@@ -640,6 +810,8 @@ class LearningView:
             self.message = f'無法開啟資料 {self.path or self.root}：{exc}'
 
     def render(self, app):
+        self._render_navigation(app)
+        app = _LearningContent(app)
         self._poll_loading()
         self._poll_page()
         self.poll_unfinished()
@@ -684,11 +856,36 @@ class LearningView:
             app.text(self.page_load_error or '載入已保存成果…', 50, 190, width=790)
             if self.page_load_error: app.button('learning_loading_retry', '重新讀取', (50, 240, 180, 34))
             return
+        if self.page == 'home':
+            app.text('學習實驗', 50, 78, large=True)
+            app.button('learning_goal_create', '建立新實驗', (50, 160, 370, 46), primary=True)
+            app.button('learning_goal_resume', '接續學習', (470, 160, 370, 46))
+            app.button('learning_goal_compare', '比較候選', (50, 230, 370, 46))
+            app.button('learning_goal_results', '查看學習成果', (470, 230, 370, 46))
+            if self.loading is not None: app.text('載入已選資料…', 50, 320)
+            elif self.path: app.text('目前資料：' + self.saved_name(self.path, '資料'), 50, 320, width=790)
+            return
         context = self._saved_context()
-        if context and self.page != 'data':
+        if context and self.page not in ('home', 'data'):
             app.button('learning_saved_list', '選擇成果', (360, 74, 130, 36), enabled=not context[1].active())
             app.button('learning_saved_rename', self.rename_draft + ' |' if self.rename_focus else '重新命名', (500, 74, 140, 36), enabled=self._current_saved_path() is not None)
+        if self.page == 'results':
+            entries = self.result_browser.entries
+            pages = max(1, (len(entries) + 7) // 8)
+            self.result_browser.page = min(self.result_browser.page, pages - 1)
+            app.text('學習成果', 50, 78, large=True)
+            if not entries: app.text('尚無學習成果', 50, 150)
+            for row, entry in enumerate(entries[self.result_browser.page * 8:self.result_browser.page * 8 + 8]):
+                index = self.result_browser.page * 8 + row
+                app.button(f'learning_results_open:{index}', self.saved_name(entry.parent, '單群組學習') + ' · ' + self._saved_label(entry.parent), (50, 140 + row * 55, 790, 40))
+            app.button('learning_results_prev', '上頁', (50, 620, 150, 34), enabled=self.result_browser.page > 0)
+            app.button('learning_results_next', '下頁', (220, 620, 150, 34), enabled=self.result_browser.page + 1 < pages)
+            return
         if self.page == 'inventory':
+            if not self.inventory.report:
+                app.text('尚無可用候選', 50, 78, large=True)
+                app.button('learning_need_groups', '前往評分權重學習', (50, 140, 250, 36))
+                return
             self.inventory.render(app)
             return
         if self.page == 'heldout':
@@ -704,19 +901,32 @@ class LearningView:
             self.combination.render(app)
             return
         if self.page == 'groups':
+            if not self.browse_result and (not self._labels_current() or not self.labels.path or self.labels.loading is not None or not self.labels.state.get('ready')):
+                app.text('教師標記尚未完成', 50, 78, large=True)
+                app.button('learning_need_labels', '前往接續標記', (50, 140, 230, 36))
+                return
             self.group_training.render(app)
             return
         if self.page == 'training':
             self.training.render(app)
             return
         if self.page == 'labeling':
+            if (not self.path or not self.teacher.path or not self.teacher.state.get('choice')) and not (self.path is None and self.labels.path and self.labels.state.get('ready')):
+                app.text('請先選定教師先導預算', 50, 78, large=True)
+                app.button('learning_need_teacher', '前往教師先導', (50, 140, 230, 36))
+                return
             self.labels.render(app)
             return
         if self.page == 'teacher':
+            if (self.path and self.teacher.dataset and self.teacher.dataset != self.path) or (not self.data and not self.teacher.path and not self.teacher.dataset):
+                app.text('請先選擇資料', 50, 78, large=True)
+                app.button('learning_need_data', '前往資料準備', (50, 140, 230, 36))
+                app.button('learning_need_labels', '教師標記', (300, 140, 230, 36))
+                return
             self.teacher.render(app)
             return
         active = self.active()
-        app.text('學習實驗 · 資料準備', 50, 78, large=True)
+        app.text('學習實驗' if self.page == 'home' else '學習實驗 · 資料準備', 50, 78, large=True)
         app.button('learning_saved_list', '選擇資料', (340, 74, 140, 36), enabled=not (self.run and not self.run.future.done()))
         app.button('learning_saved_rename', self.rename_draft + ' |' if self.rename_focus else '重新命名', (490, 74, 150, 36), enabled=self.path is not None)
         app.button('learning_teacher', '教師先導', (650, 74, 190, 36), enabled=self.data is not None)
@@ -730,7 +940,7 @@ class LearningView:
         app.button('learning_field:seed', '種子：' + (self.draft + ' |' if self.focus == 'seed' else self.seed),
                    (50, 220, 270, 36), enabled=not active)
         app.button('learning_create', '建立新實驗', (340, 220, 220, 36), enabled=not active and self.loading is None, primary=True)
-        app.button('learning_stop', '停止', (580, 220, 110, 36), enabled=active)
+        app.button('learning_stop', '停止', (580, 220, 110, 36), enabled=bool(self.run and not self.run.future.done()))
         state = self.run.snapshot() if self.run else {}
         if state.get('status') == 'completed' and self._loaded_run is not self.run:
             try:
@@ -747,7 +957,7 @@ class LearningView:
             app.text('載入已保存資料…', 50, 310, width=790)
         elif self.message or state.get('error'):
             app.text(self.message or state['error'], 50, 310, width=790)
-        if self.data:
+        if self.data and self.page != 'home':
             data = self.data
             summary = data['summary']
             app.text(f'{summary["selected_games"]}/500 盤 · {summary["positions"]}/6000 局面 · 來源不足 {summary["shortfall_games"]} 盤 · 重複棋譜 {summary["duplicate_games"]}', 50, 310, width=790)

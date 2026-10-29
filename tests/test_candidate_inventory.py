@@ -36,6 +36,7 @@ class InventoryUiTest(unittest.TestCase):
         from unittest.mock import patch
         import pygame
         from apps.chess_application import ChessApplication, APP_SIZE
+        from engine.learning.candidate_inventory import load_candidate_inventory
         source = create_group_training(self.labels, ['mobility', 'king-safety'])
         run_group_training(source)
         pygame.init(); self.addCleanup(pygame.quit)
@@ -54,7 +55,22 @@ class InventoryUiTest(unittest.TestCase):
                     if hasattr(app.executor, 'finish'): app.executor.finish()
                     else: future.result(timeout=15)
                     app.render()
-            click('mode:learning'); app.learning.open(self.labels.parents[1])
+            click('mode:learning')
+            app.learning.root = self.root / 'data'
+            click('learning_goal_results')
+            app.learning.page_loading.result(timeout=30); app.render()
+            click('learning_results_open:0')
+            app.learning.page_loading.result(timeout=30); app.render()
+            self.assertEqual(app.learning.group_training.path, source)
+            self.assertGreater(app.learning.group_training.state['completed_groups'], 0)
+            self.assertFalse(next(b for b in app.buttons if b.action == 'learning_groups_new').enabled)
+            click('learning_nav_inventory')
+            app.learning.page_loading.result(timeout=30); app.render()
+            self.assertTrue(app.learning.inventory.report['candidates'])
+            self.assertEqual(app.learning.inventory.report['source_identity'],
+                             load_candidate_inventory(source)['source_identity'])
+            self.assertIsNone(app.batch)
+            click('learning_nav_data'); app.learning.open(self.labels.parents[1])
             click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
             click('learning_inventory')
             self.assertEqual(app.learning.page, 'inventory')

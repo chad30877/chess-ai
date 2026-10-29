@@ -14,6 +14,17 @@ class InventoryView:
         self.report = load_candidate_inventory(path)
         self.tab = 'candidates'; self.page = self.selected = 0
 
+    def open_first(self, root):
+        for entry in sorted(root.glob('*/teacher-labels/*/group-training/*/snapshot.json'), reverse=True):
+            try:
+                report = load_candidate_inventory(entry.parent)
+                if report.get('candidates'):
+                    self.report = report
+                    return
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
+        self.report = None
+
     def action(self, action):
         if action == 'learning_inventory_tab':
             self.tab = 'coverage' if self.tab == 'candidates' else 'candidates'; self.page = 0
@@ -25,7 +36,7 @@ class InventoryView:
     def render(self, app):
         report = self.report
         app.text('組合研究 · 候選盤點', 50, 78, large=True)
-        app.button('learning_inventory_back', '返回組合', (50, 120, 170, 34))
+        app.button('learning_inventory_back', '返回組合' if app.learning.inventory_return == 'combination' else '返回學習', (50, 120, 170, 34))
         app.button('learning_inventory_tab', '查看覆蓋' if self.tab == 'candidates' else '查看候選', (240, 120, 170, 34))
         app.text('完整排名' if report['complete'] else '部分排名：仍有缺漏、失敗或不相容紀錄', 50, 170, width=790)
         app.text('資料 ' + report['dataset_identity'][:14] + ' · 標記 ' + report['label_identity'][:14], 50, 202, width=790)

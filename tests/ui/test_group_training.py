@@ -30,10 +30,11 @@ class GroupTrainingUiTest(unittest.TestCase):
                     app.render()
                 if action == 'learning_labels':
                     future = app.learning.labels.loading
-                    if hasattr(app.executor, 'finish'): app.executor.finish()
-                    else: future.result(timeout=15)
-                    app.render()
-            click('mode:learning'); app.learning.open(self.labels.parents[1])
+                    if future is not None:
+                        if hasattr(app.executor, 'finish'): app.executor.finish()
+                        else: future.result(timeout=15)
+                        app.render()
+            click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
             click('learning_teacher'); click('learning_labels'); click('learning_groups')
             click('learning_groups_new')
             view = app.learning.group_training
@@ -42,6 +43,18 @@ class GroupTrainingUiTest(unittest.TestCase):
                 self.assertLess(time.monotonic(),deadline)
                 app.render(); time.sleep(.01)
             active_run = view.run
+            from engine.learning.labeling import create_labeling
+            newer_label = create_labeling(self.labels.parents[1], app.learning.teacher.path)
+            self.assertNotEqual(newer_label, self.labels)
+            app.learning.root = self.root / 'data'
+            click('learning_breadcrumb_data')
+            click('learning_goal_results')
+            app.learning.page_loading.result(timeout=30); app.render()
+            click('learning_results_open:0')
+            app.learning.page_loading.result(timeout=30); app.render()
+            self.assertIs(app.learning.active_task()[2], active_run)
+            click('learning_task_return')
+            self.assertIs(app.learning.group_training.run, active_run)
             click('learning_combinations')
             self.assertEqual(app.learning.page, 'combination')
             click('learning_task_return')
@@ -51,6 +64,7 @@ class GroupTrainingUiTest(unittest.TestCase):
             pilot_status = (pilot_path / 'status.json').read_bytes()
             click('learning_labels')
             self.assertEqual(app.learning.page, 'labeling')
+            self.assertEqual(app.learning.labels.path, self.labels)
             self.assertIs(view.run, active_run)
             click('learning_teacher')
             app.render()
@@ -79,15 +93,18 @@ class GroupTrainingUiTest(unittest.TestCase):
             click('learning_labels')
             click('learning_task_stop'); view.run.future.result(timeout=5)
             click('learning_groups'); app.render()
+            self.assertTrue(next(b for b in app.buttons if b.action == 'learning_groups_resume').enabled)
             path = view.path
             saved = load_group_training(path)
             self.assertGreaterEqual(saved['completed_groups'],3)
             self.assertEqual(saved['status'],'stopped')
             committed = {str(p.relative_to(path)):p.read_bytes() for p in path.glob('groups/*/report.json')}
             committed.update({str(p.relative_to(path)):p.read_bytes() for p in path.glob('groups/*/candidates/*.json')})
+            import shutil
+            shutil.rmtree(newer_label)
             app.close()
             app = ChessApplication(app.screen,executor=executor)
-            click('mode:learning'); app.learning.open(self.labels.parents[1])
+            click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
             click('learning_teacher'); click('learning_labels'); click('learning_groups')
             self.assertEqual(app.learning.group_training.state['completed_groups'],saved['completed_groups'])
             click('learning_groups_resume'); app.learning.group_training.run.future.result(timeout=45); app.render()

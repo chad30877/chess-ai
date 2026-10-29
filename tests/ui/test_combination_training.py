@@ -24,7 +24,7 @@ class CombinationUiTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled,action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,pos=button.rect.center,button=1))
-                if action in ('learning_groups', 'learning_training', 'learning_combinations', 'learning_inventory', 'learning_combination_compare') and app.learning.page_loading is not None:
+                if action in ('learning_groups', 'learning_training', 'learning_combinations', 'learning_inventory', 'learning_combination_compare', 'learning_groups_compare') and app.learning.page_loading is not None:
                     if hasattr(app.executor, 'finish'): app.executor.finish()
                     else: app.learning.page_loading.result(timeout=30)
                     app.render()
@@ -34,9 +34,14 @@ class CombinationUiTest(unittest.TestCase):
                     else: future.result(timeout=15)
                     app.render()
             def open_view():
-                click('mode:learning'); app.learning.open(self.labels.parents[1])
+                click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
                 click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
             open_view(); view = app.learning.combination
+            click('learning_groups'); click('learning_groups_select:mobility'); click('learning_groups_compare')
+            app.render()
+            group_breadcrumb = next(b.label for b in app.buttons if b.action == 'learning_breadcrumb_inventory')
+            click('learning_compare_back'); click('learning_combinations')
+            view = app.learning.combination
             self.assertEqual(view.selected,{'mobility','king-safety'})
             click('learning_combination_toggle:king-safety')
             self.assertFalse(view.preview['direct']['terms']['king_pawn_shield']['enabled'])
@@ -55,19 +60,28 @@ class CombinationUiTest(unittest.TestCase):
             self.assertFalse(next(b for b in app.buttons if b.action == 'learning_combination_save').enabled)
             self.assertFalse(view.preview['direct']['terms']['king_pawn_shield']['enabled'])
             click('learning_combination_toggle:king-safety')
+            breadcrumb = None
             for kind in ('direct','joint'):
                 click('learning_combination_kind:'+kind); click('learning_combination_weights'); click('learning_combination_weights')
                 click('learning_combination_save')
                 self.assertTrue(view.saved.exists())
                 click('learning_combination_compare')
                 self.assertEqual(app.learning.page,'comparison')
+                app.render()
+                current = next(b.label for b in app.buttons if b.action == 'learning_breadcrumb_inventory')
+                if breadcrumb is None: breadcrumb = current
+                self.assertEqual(current, breadcrumb)
+                self.assertEqual(current, group_breadcrumb)
+                selected_source = app.learning.path
                 click('learning_compare_freeze')
                 plan=app.learning.comparison.report['plan']
                 expected=load_combination_candidate(path,kind)
                 self.assertEqual(plan['source'],expected)
                 self.assertEqual(plan['definitions']['material']['candidates'][1]['config'],expected['config'])
                 self.assertEqual(plan['planned_games'],128)
-                click('learning_compare_back'); click('learning_combinations')
+                click('learning_compare_back')
+                self.assertEqual(app.learning.page, 'combination')
+                self.assertEqual(app.learning.path, selected_source)
             app.close(); app = ChessApplication(app.screen,executor=executor); open_view()
             self.assertEqual(app.learning.combination.path,path)
             click('learning_combination_kind:direct'); click('learning_combination_battle')
@@ -84,7 +98,7 @@ class CombinationUiTest(unittest.TestCase):
                 app.render(); button = next(b for b in app.buttons if b.action == action)
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
-                if action in ('learning_groups', 'learning_training', 'learning_combinations', 'learning_inventory', 'learning_combination_compare') and app.learning.page_loading is not None:
+                if action in ('learning_groups', 'learning_training', 'learning_combinations', 'learning_inventory', 'learning_combination_compare', 'learning_groups_compare') and app.learning.page_loading is not None:
                     if hasattr(app.executor, 'finish'): app.executor.finish()
                     else: app.learning.page_loading.result(timeout=30)
                     app.render()
@@ -93,7 +107,7 @@ class CombinationUiTest(unittest.TestCase):
                     if hasattr(app.executor, 'finish'): app.executor.finish()
                     else: future.result(timeout=15)
                     app.render()
-            click('mode:learning'); app.learning.open(self.labels.parents[1])
+            click('mode:learning'); click('learning_nav_data'); app.learning.open(self.labels.parents[1])
             click('learning_teacher'); click('learning_labels'); click('learning_groups'); click('learning_combinations')
             view = app.learning.combination
             click('learning_combination_batch')

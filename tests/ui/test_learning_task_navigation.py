@@ -34,14 +34,14 @@ class TaskNavigationTest(unittest.TestCase):
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
                     if action.startswith('learning_open:') and app.learning.loading is not None:
                         executor.finish(); app.render()
-                click('mode:learning')
+                click('mode:learning'); click('learning_nav_data')
                 click('learning_open:0')
                 click('learning_teacher')
                 app.learning.teacher.command = make_engine(root)
                 click('learning_pilot_start')
                 run = app.learning.teacher.run
                 original_path = app.learning.path
-                click('learning_data')
+                click('learning_nav_data')
                 self.assertEqual(app.learning.page, 'data')
                 self.assertFalse(run.future.done())
                 click('learning_open:1')
@@ -192,7 +192,7 @@ class TaskNavigationTest(unittest.TestCase):
                     app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
                     if action.startswith('learning_open:') and app.learning.loading is not None:
                         executor.finish(); app.render()
-                click('mode:learning')
+                click('mode:learning'); click('learning_nav_data')
                 click('learning_open:0')
                 click('learning_teacher')
                 app.learning.teacher.command = make_engine(root)

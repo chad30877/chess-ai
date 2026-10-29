@@ -28,7 +28,7 @@ class ChessApplicationTest(unittest.TestCase):
         from tests.test_learning_dataset import pgn_games
         source = self.project / 'small.pgn'
         source.write_text(pgn_games(), encoding='utf-8')
-        self.click('mode:learning')
+        self.click('mode:learning'); self.click('learning_nav_data')
         self.click('learning_source')
         self.click('learning_field:path')
         self.app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=str(source)))
@@ -45,7 +45,7 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.close()
         self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
         self.addCleanup(self.app.close)
-        self.click('mode:learning')
+        self.click('mode:learning'); self.click('learning_nav_data')
         self.click('learning_open:0')
         self.executor.finish()
         self.app.render()
@@ -62,7 +62,7 @@ class ChessApplicationTest(unittest.TestCase):
         self.app.close()
         self.app = ChessApplication(self.screen, executor=self.executor, now=lambda: 100)
         self.addCleanup(self.app.close)
-        self.click('mode:learning')
+        self.click('mode:learning'); self.click('learning_nav_data')
         self.click('learning_open:0')
         self.assertTrue(self.app.learning.message)
         self.assertIsNone(self.app.learning.data)
@@ -71,7 +71,7 @@ class ChessApplicationTest(unittest.TestCase):
         from tests.test_learning_dataset import pgn_games
         source = self.project / 'small.pgn'
         source.write_text(pgn_games(3), encoding='utf-8')
-        self.click('mode:learning')
+        self.click('mode:learning'); self.click('learning_nav_data')
         self.app.learning.source = 'local'
         self.app.learning.local_path = str(source)
         self.click('learning_create')
@@ -134,7 +134,7 @@ class ChessApplicationTest(unittest.TestCase):
         source = self.project / 'teacher-games.pgn'
         source.write_text(pgn_games(8), encoding='utf-8')
         dataset = create_dataset(self.project / 'data/learning', source)
-        self.click('mode:learning')
+        self.click('mode:learning'); self.click('learning_nav_data')
         self.app.learning.open(dataset)
         self.click('learning_teacher')
         self.app.learning.teacher.command = make_engine(self.project)

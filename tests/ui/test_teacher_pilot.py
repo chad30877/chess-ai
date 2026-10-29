@@ -38,7 +38,7 @@ class PilotUiTest(unittest.TestCase):
                         if hasattr(app.executor, 'finish'): app.executor.finish()
                         else: app.learning.loading.result(timeout=15)
                         app.render()
-                click('mode:learning')
+                click('mode:learning'); click('learning_nav_data')
                 click('learning_open:0')
                 click('learning_teacher')
                 view = app.learning.teacher
@@ -87,7 +87,7 @@ class PilotUiTest(unittest.TestCase):
                     app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=pygame.KMOD_CTRL))
                     app.handle_event(pygame.event.Event(pygame.TEXTINPUT, text=text))
                     click('learning_pilot_start')
-                click('mode:learning')
+                click('mode:learning'); click('learning_nav_data')
                 click('learning_open:0')
                 click('learning_teacher')
                 view = app.learning.teacher
@@ -127,7 +127,7 @@ class PilotUiTest(unittest.TestCase):
                         if hasattr(app.executor, 'finish'): app.executor.finish()
                         else: app.learning.loading.result(timeout=15)
                         app.render()
-                click('mode:learning')
+                click('mode:learning'); click('learning_nav_data')
                 click('learning_open:0')
                 click('learning_teacher')
                 app.learning.teacher.command = command
@@ -145,7 +145,7 @@ class PilotUiTest(unittest.TestCase):
                 self.assertEqual(choice['nodes'], 50000)
                 app.close()
                 app = ChessApplication(app.screen, executor=executor)
-                click('mode:learning')
+                click('mode:learning'); click('learning_nav_data')
                 click('learning_open:0')
                 click('learning_teacher')
                 self.assertEqual(app.learning.teacher.state['choice'], choice)

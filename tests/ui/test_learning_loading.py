@@ -125,7 +125,7 @@ class LoadingUiTest(unittest.TestCase):
             executor = ManualExecutor()
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
             app.learning.saved_state_path = root / 'ui-state.json'; app.learning.saved_state = {}
-            app.mode = 'learning'; app.learning.root = root
+            app.mode = 'learning'; app.learning.root = root; app.learning.page = 'data'
             app.render()
             button = next(b for b in app.buttons if b.action == 'learning_open:0')
             app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
@@ -356,7 +356,7 @@ class RealLabelRecoveryTest(unittest.TestCase):
         with patch('apps.chess_application.PROJECT_ROOT', self.root):
             app = ChessApplication(pygame.display.set_mode(APP_SIZE), executor=executor)
             app.learning.saved_state_path = self.root / 'ui-state.json'; app.learning.saved_state = {}
-            app.mode = 'learning'; app.learning.root = dataset.parent
+            app.mode = 'learning'; app.learning.page = 'data'; app.learning.root = dataset.parent
             def click(action):
                 app.render()
                 button = next(b for b in app.buttons if b.action == action)

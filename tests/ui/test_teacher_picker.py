@@ -33,13 +33,15 @@ class TeacherPickerTest(unittest.TestCase):
         app.render()
         button = next(b for b in app.buttons if b.action == action)
         app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
+        if action.startswith('learning_open:') and app.learning.loading:
+            self.executor.finish(); app.render()
 
     def open_teacher(self, app, root):
         source = root / 'games.pgn'
         source.parent.mkdir(parents=True, exist_ok=True)
         source.write_text(pgn_games(2), encoding='utf-8')
         create_dataset(root / 'data/learning', source)
-        for action in ('mode:learning', 'learning_open:0', 'learning_teacher'):
+        for action in ('mode:learning', 'learning_nav_data', 'learning_open:0', 'learning_teacher'):
             self.click(app, action)
 
     def test_new_project_default_and_cancel_picker(self):
@@ -94,7 +96,7 @@ class TeacherPickerTest(unittest.TestCase):
         self.assertEqual((saved_path / 'snapshot.json').read_bytes(), saved)
         app.close()
         app = self.app_at(self.root)
-        for action in ('mode:learning', 'learning_open:0', 'learning_teacher'):
+        for action in ('mode:learning', 'learning_nav_data', 'learning_open:0', 'learning_teacher'):
             self.click(app, action)
         self.assertEqual(app.learning.teacher.command, str(engine))
         self.assertEqual((saved_path / 'snapshot.json').read_bytes(), saved)

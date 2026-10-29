@@ -44,7 +44,7 @@ class LabelingEstimatesUiTest(unittest.TestCase):
                         else: future.result(timeout=15)
                         app.render()
                 def open_teacher():
-                    click('mode:learning')
+                    click('mode:learning'); click('learning_nav_data')
                     click('learning_open:0')
                     click('learning_teacher')
                 open_teacher()
