@@ -28,7 +28,7 @@ class GroupTrainingView:
     def action(self, action, app):
         try:
             if action == 'learning_groups_compare' and not self.active():
-                app.learning.open_comparison(load_group_candidate(self.path,self.group)); return
+                app.learning.open_comparison(load_group_candidate(self.path,self.group), app.executor); return
             if action == 'learning_groups_stop' and self.active(): self.run.stop(); return
             if action.startswith('learning_groups_select:'):
                 self.group = action.split(':')[1]; self.saved = None; self.weight_page = 0; return

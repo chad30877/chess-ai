@@ -1,6 +1,7 @@
 """學習實驗的資料來源、背景處理與保存預覽。"""
 
 import json
+from copy import copy
 from pathlib import Path
 
 import pygame
@@ -55,9 +56,13 @@ class LearningView:
         self.page_load_error = ''
         self.page_load_request = None
 
-    def open_comparison(self, candidate):
-        self.comparison.open(candidate)
-        self.page = 'comparison'
+    def open_comparison(self, candidate, executor=None):
+        if executor is None:
+            self.comparison.open(candidate)
+            self.page = 'comparison'
+        else:
+            self._open_page('comparison', 'comparison', lambda: LearnedComparisonView(self.teacher.project_root),
+                            candidate, self.page, executor)
 
     def active(self):
         return (self.run is not None and not self.run.future.done()) or self.teacher.active() or self.labels.active() or self.training.active() or self.group_training.active() or self.combination.active()
@@ -151,19 +156,20 @@ class LearningView:
             self.message = f'無法開啟資料 {self.loading_path}：{exc}'
 
     @staticmethod
-    def _read_page(factory, path):
+    def _read_page(factory, path, method):
         try:
             view = factory()
-            view.open(path)
+            args = path if isinstance(path, tuple) else (path,)
+            getattr(view, method)(*args)
             return view, None
         except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             return None, str(exc)
 
-    def _open_page(self, page, attribute, factory, path, back, executor):
+    def _open_page(self, page, attribute, factory, path, back, executor, method='open'):
         self.page = page
         self.page_load_error = ''
-        self.page_load_request = (page, attribute, factory, Path(path), back)
-        self.page_loading = executor.submit(self._read_page, factory, Path(path))
+        self.page_load_request = (page, attribute, factory, path, back, method)
+        self.page_loading = executor.submit(self._read_page, factory, path, method)
 
     def _poll_page(self):
         if self.page_loading is None or not self.page_loading.done(): return
@@ -182,15 +188,34 @@ class LearningView:
                 self.page_loading = self.page_load_request = None
                 self.page_load_error = ''
             elif action == 'learning_loading_retry' and self.page_loading is None:
-                self._open_page(*self.page_load_request, app.executor)
+                page, attribute, factory, path, back, method = self.page_load_request
+                self._open_page(page, attribute, factory, path, back, app.executor, method)
             return
+        selected_pages = {'training': ('training', 'learning_training_'),
+                          'groups': ('group_training', 'learning_groups_'),
+                          'combination': ('combination', 'learning_combination_')}
+        if self.page in selected_pages:
+            attribute, prefix = selected_pages[self.page]
+            if action in (prefix + 'prev', prefix + 'next'):
+                current = getattr(self, attribute)
+                if current.active() or not current.entries: return
+                index = (current.index + (1 if action.endswith('next') else -1)) % len(current.entries)
+                entry = current.entries[index]
+                path = entry.parent
+                def selected_view():
+                    view = copy(current)
+                    view.index = index
+                    view.run = view._loaded_run = None
+                    return view
+                self._open_page(self.page, attribute, selected_view, path, self.page, app.executor, 'load')
+                return
         if self.page == 'inventory':
             if action == 'learning_inventory_back': self.page = 'combination'
             elif action == 'learning_inventory_screen':
                 try:
                     selected = self.inventory.report['candidates'][self.inventory.selected]
-                    self.screening.open(selected['source'], self.inventory.report['source_identity'])
-                    self.page = 'screening'
+                    self._open_page('screening', 'screening', lambda: ScreeningView(self.teacher.project_root),
+                                    (selected['source'], self.inventory.report['source_identity']), 'inventory', app.executor)
                 except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
                     self.combination.message = str(exc)
             else: self.inventory.action(action)
