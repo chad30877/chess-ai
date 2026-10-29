@@ -69,6 +69,13 @@ class AllCandidatesTest(unittest.TestCase):
         pilot = run_pilot(dataset, make_engine(self.root)); choose_budget(pilot, 50000)
         labels = create_labeling(dataset, pilot); run_labeling(labels)
         third = create_training(labels); run_training(third)
+        import json
+        from engine.storage.batch_storage import write_json_atomic
+        for path, value in ((first, 1.0), (second, 3.0), (third, 2.0)):
+            report_path = path / 'report.json'
+            stored = json.loads(report_path.read_text(encoding='utf-8'))
+            stored['validation']['learned']['mae'] = value
+            write_json_atomic(report_path, stored)
         broken = labels / 'training' / 'broken'; broken.mkdir()
         (broken / 'snapshot.json').write_text('{broken', encoding='utf-8')
         report = load_all_candidate_inventory(self.root / 'data')
@@ -77,6 +84,8 @@ class AllCandidatesTest(unittest.TestCase):
         self.assertGreaterEqual(len({r['source']['dataset_identity'] for r in report['candidates']}), 2)
         legacy = [r for r in report['candidates'] if r['origin'] == 'legacy']
         self.assertEqual(len(legacy), 3)
+        self.assertEqual(sorted(row['mae'] for row in legacy), [1.0, 2.0, 3.0])
+        self.assertNotEqual([row['mae'] for row in legacy], [1.0, 2.0, 3.0])
         first_row = next(row for row in legacy if row['path'] == str(first))
         second_row = next(row for row in legacy if row['path'] == str(second))
         self.assertEqual(first_row['config_identity'], second_row['config_identity'])
