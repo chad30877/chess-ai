@@ -57,3 +57,5 @@ UI01、UI02、UI03 均已完成；本票合併後整合回歸發現錯誤，待�
 - 本票直接使用既有單次群組候選盤點；全來源候選與比較紀錄分別由 UI07、UI09 交付。人工重現步驟不等於已執行。
 
 - 整合分支重跑 `tests.ui.test_learning_close tests.ui.test_learning_navigation tests.ui.test_learning_task_navigation tests.ui.test_learning_loading tests.ui.test_saved_selection`，55 項中 1 錯誤：`SavedTeacherSelectionTest.test_changing_label_while_training_preserves_running_task_context` 找不到 `learning_task_return`。單獨重跑相同錯誤；需修復並重新驗收。
+
+- 先前成果選擇錯誤由測試執行器誤完成訓練造成；修正後同一整合組 55 項通過。另獨立執行 `tests.ui.test_teacher_picker` 出現 `Tcl_AsyncDelete` 並以碼 1 結束，仍待排查；不可宣稱該測試已通過。
