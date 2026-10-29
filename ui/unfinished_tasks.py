@@ -15,6 +15,8 @@ from ui.label_view import LabelView
 from ui.learned_comparison_view import LearnedComparisonView
 from ui.teacher_view import TeacherView
 from ui.training_view import TrainingView
+from ui.comparison_history_view import ComparisonBundleHistory, _status
+from engine.learning.comparison_setup import load_saved_setup
 
 
 def unfinished(root, project):
@@ -38,12 +40,24 @@ def unfinished(root, project):
                     items.append(dict(kind=kind, path=path, status=status))
             except (OSError, ValueError, KeyError, TypeError, IndexError):
                 items.append(dict(kind=kind, path=path, status='unavailable'))
+    bundled = set()
+    for path in (project / 'data/learning-setup').glob('*'):
+        if not path.is_dir(): continue
+        try:
+            bundle, reports = load_saved_setup(path)
+            bundled.update((Path(item['path']), item['baseline']) for item in bundle['work'])
+            status = _status([report['status'] for report in reports])
+            if status != 'completed':
+                items.append(dict(kind='comparison_bundle', path=path, status=status))
+        except (OSError, ValueError, KeyError, TypeError, IndexError):
+            items.append(dict(kind='comparison_bundle', path=path, status='unavailable'))
     for folder in ('learning-comparisons', 'learning-screening'):
+
         for file in (project / 'data' / folder).glob('*/snapshot.json'):
             try:
                 report = comparison_report(file.parent)
                 for baseline, data in report['baselines'].items():
-                    if data['status'] not in ('completed', 'not-started'):
+                    if (file.parent, baseline) not in bundled and data['status'] not in ('completed', 'not-started'):
                         items.append(dict(kind='comparison', path=file.parent, baseline=baseline, status=data['status']))
             except (OSError, ValueError, KeyError, TypeError, IndexError):
                 items.append(dict(kind='comparison', path=file.parent, baseline=None, status='unavailable'))
@@ -57,6 +71,10 @@ class RecoveredWork:
 
     def open(self, item):
         kind, path = item['kind'], Path(item['path'])
+        if kind == 'comparison_bundle':
+            view = ComparisonBundleHistory(); view.open(path)
+            self.context = dict(history_bundle=view)
+            return
         if kind == 'comparison':
             view = LearnedComparisonView(self.root)
             view.open_plan(path)

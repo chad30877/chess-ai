@@ -1,6 +1,7 @@
 """學習來源、不可變比較預覽及各基準獨立研究報告。"""
 from ui.report_refresh import ReportRefresh
 from pathlib import Path
+from copy import copy
 from uuid import uuid4
 from engine.learning.comparison import create_comparison, load_comparison_plan, comparison_options, comparison_report
 from engine.learning.teacher import digest
@@ -104,14 +105,16 @@ class LearnedComparisonView:
                 app.batch=ComparisonRun(comparison_options(self.path,self.baseline),app.executor)
                 app.learning_batch = app.batch; app.batch_mode='evaluation'; app.mode='auto'; app.batch_games_page=0
                 app.learning.batch_return_page='comparison'
+                app.learning.batch_comparison=copy(self)
+                app.learning.batch_comparison.refresh=ReportRefresh()
             elif action=='learning_compare_records' and self.path:
                 data=comparison_report(self.path)['baselines'][self.baseline]
                 if data['path']: app.show_records(batch_id=data['path'].name)
             elif action=='learning_compare_replay' and self.path:
                 data=comparison_report(self.path)['baselines'][self.baseline]
                 if data['replays']:
-                    app.learning.batch_return_page = 'comparison'
-                    app.open_replay(str(data['replays'][-1]),return_to='learning')
+                    if app.open_replay(str(data['replays'][-1]),return_to='learning'):
+                        app.learning.replay_comparison = self
             elif action=='learning_compare_save' and self.path:
                 data=comparison_report(self.path)['baselines'][self.baseline]['candidates']
                 row=data[self.candidate%len(data)]

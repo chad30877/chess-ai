@@ -593,6 +593,16 @@ class ChessApplication:
             self.mode = "records"
             return
         if action == 'learning_comparison_return':
+            if self.mode == 'replay' and self.learning.replay_comparison is not None:
+                self.learning.comparison = self.learning.replay_comparison
+                self.learning.replay_comparison = None
+                self.mode = 'learning'; self.learning.page = 'comparison'
+                return
+            if self.learning.batch_return_page == 'comparison' and self.learning.batch_comparison is not None:
+                from copy import copy
+                from ui.report_refresh import ReportRefresh
+                self.learning.comparison = copy(self.learning.batch_comparison)
+                self.learning.comparison.refresh = ReportRefresh()
             if self.learning.batch_return_page == 'setup' and self.learning.batch_setup is not None:
                 self.learning.setup = self.learning.batch_setup
             self.mode = 'learning'
@@ -994,7 +1004,7 @@ class ChessApplication:
             if not failed_task:
                 self.button('learning_task_stop', '停止', (540, 10, 90, 36))
         if self.mode == 'learning' and not task and (self.learning.recovery_entries or self.learning.recovery_error or self.learning.recovery_future) and not self.learning.recovery_list:
-            kinds = {'teacher':'先導', 'labeling':'標記', 'training':'學習', 'groups':'學習', 'combination':'組合', 'combination_batch':'組合', 'comparison':'比較'}
+            kinds = {'teacher':'先導', 'labeling':'標記', 'training':'學習', 'groups':'學習', 'combination':'組合', 'combination_batch':'組合', 'comparison':'比較', 'comparison_bundle':'比較'}
             labels = '、'.join(dict.fromkeys(kinds[item['kind']] for item in self.learning.recovery_entries))
             title = ('查找未完成工作…' if self.learning.recovery_future else
                      '未完成工作：讀取失敗' if self.learning.recovery_error else
