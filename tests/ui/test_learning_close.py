@@ -176,6 +176,11 @@ class UnfinishedWorkTest(unittest.TestCase):
             click('learning_labels'); executor.finish(); app.render()
             click('learning_groups'); executor.finish(); app.render()
             click('learning_groups_new'); run = app.learning.group_training.run
+            app.render()
+            self.assertTrue(all('未選取' not in next(b.label for b in app.buttons if b.action == 'learning_groups_select:' + group)
+                                for group in run.groups))
+            click('learning_nav_data')
+            self.assertIs(app.learning.active_task()[2], run)
             app.handle_event(pygame.event.Event(pygame.QUIT)); click('cancel')
             self.assertIs(app.learning.group_training.run, run)
             self.assertFalse(run.future.done())
@@ -186,6 +191,19 @@ class UnfinishedWorkTest(unittest.TestCase):
             from engine.learning.group_training import load_group_training
             saved = load_group_training(run.path)
             self.assertIn(saved['status'], ('stopped', 'interrupted'))
+            original = (run.path / 'snapshot.json').read_bytes()
+            app.close(); app = ChessApplication(app.screen, executor=executor)
+            app.learning.root = dataset.parent; app.new_setup('learning')
+            app.learning.recovery_future.result(timeout=30); app.render()
+            click('learning_recovery_list')
+            index = next(i for i, item in enumerate(app.learning.recovery_entries) if item['path'] == run.path)
+            click(f'learning_recovery_open:{index}'); executor.finish(); app.render()
+            self.assertEqual(app.learning.path, dataset)
+            self.assertEqual(app.learning.group_training.path, run.path)
+            click('learning_groups_resume'); executor.finish(); app.render()
+            self.assertEqual(load_group_training(run.path)['status'], 'completed')
+            self.assertEqual((run.path / 'snapshot.json').read_bytes(), original)
+            app.close()
     def test_comparison_close_cancel_then_stop_waits_for_saved_batch(self):
         from engine.learning.comparison import create_comparison
         from tests.test_learned_comparison import candidate
@@ -202,6 +220,8 @@ class UnfinishedWorkTest(unittest.TestCase):
                 self.assertTrue(button.enabled, action)
                 app.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=button.rect.center, button=1))
             click('learning_compare_start'); run = app.batch
+            click('learning_comparison_return'); click('learning_nav_data')
+            self.assertIs(app.batch, run)
             app.handle_event(pygame.event.Event(pygame.QUIT)); click('cancel')
             self.assertIs(app.batch, run); self.assertFalse(run.future.done())
             app.handle_event(pygame.event.Event(pygame.QUIT)); click('confirm')
@@ -210,6 +230,18 @@ class UnfinishedWorkTest(unittest.TestCase):
             self.assertFalse(app.running)
             from engine.learning.comparison import comparison_report
             self.assertEqual(comparison_report(plan)['baselines']['material']['status'], 'stopped')
+            original = (plan / 'snapshot.json').read_bytes()
+            app.close(); app = ChessApplication(app.screen, executor=executor); app.new_setup('learning')
+            app.learning.recovery_future.result(timeout=30); app.render()
+            click('learning_recovery_list')
+            index = next(i for i, item in enumerate(app.learning.recovery_entries) if item['path'] == plan)
+            click(f'learning_recovery_open:{index}'); executor.finish(); app.render()
+            self.assertEqual(app.learning.comparison.path, plan)
+            click('learning_compare_start'); resumed = app.batch
+            executor.finish(next(i for i, job in enumerate(executor.jobs) if job[0] is resumed.future)); app.render()
+            self.assertEqual(comparison_report(plan)['baselines']['material']['status'], 'completed')
+            self.assertEqual((plan / 'snapshot.json').read_bytes(), original)
+            app.close()
     def test_labeling_close_cancel_then_stop_saves_committed_records(self):
         dataset = self.labels.parents[1]
         pygame.init(); self.addCleanup(pygame.quit)
@@ -225,6 +257,8 @@ class UnfinishedWorkTest(unittest.TestCase):
             click('learning_labels'); executor.finish(); app.render()
             click('learning_labels_new'); run = app.learning.labels.run
             before = {p.name: p.read_bytes() for p in (run.path / 'records').glob('*.json')}
+            click('learning_nav_data')
+            self.assertIs(app.learning.active_task()[2], run)
             app.handle_event(pygame.event.Event(pygame.QUIT)); click('cancel')
             self.assertIs(app.learning.labels.run, run); self.assertFalse(run.future.done())
             app.handle_event(pygame.event.Event(pygame.QUIT)); click('confirm')
@@ -235,6 +269,18 @@ class UnfinishedWorkTest(unittest.TestCase):
             state = load_labeling(run.path)
             self.assertEqual(state['status'], 'stopped')
             for name, content in before.items(): self.assertEqual((run.path / 'records' / name).read_bytes(), content)
+            app.close(); app = ChessApplication(app.screen, executor=executor)
+            app.learning.root = dataset.parent; app.new_setup('learning')
+            app.learning.recovery_future.result(timeout=30); app.render()
+            click('learning_recovery_list')
+            index = next(i for i, item in enumerate(app.learning.recovery_entries) if item['path'] == run.path)
+            click(f'learning_recovery_open:{index}'); executor.finish(); app.render()
+            self.assertEqual(app.learning.path, dataset)
+            self.assertEqual(app.learning.labels.path, run.path)
+            click('learning_labels_resume'); executor.finish(); app.render(); executor.finish(); app.render()
+            self.assertEqual(load_labeling(run.path)['status'], 'completed')
+            for name, content in before.items(): self.assertEqual((run.path / 'records' / name).read_bytes(), content)
+            app.close()
     def test_failed_labeling_can_be_manually_resumed_with_committed_records_intact(self):
         from engine.learning.labeling import create_labeling, load_labeling
         from engine.storage.batch_storage import write_json_atomic

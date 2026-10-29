@@ -158,7 +158,10 @@ class AllCandidatesTest(unittest.TestCase):
             click('learning_inventory_origin')
             click('learning_inventory_group')
             self.assertEqual(len(app.learning.inventory.filtered()), 11)
-            click('learning_inventory_next'); click('learning_inventory_next')
+            for _ in range(2):
+                app.render()
+                app.handle_event(pygame.event.Event(pygame.MOUSEWHEEL, x=0, y=-1))
+            app.render(); self.assertEqual(app.learning.inventory.page, 2)
             click('learning_inventory_candidate:10')
             self.assertIn(10, app.learning.inventory.selected_indices)
             self.assertEqual(app.learning.inventory.report['candidates'][10]['source']['snapshot_identity'], report['candidates'][10]['source']['snapshot_identity'])
