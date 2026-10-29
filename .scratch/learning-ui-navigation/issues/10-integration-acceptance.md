@@ -84,3 +84,5 @@ UI06 與 UI09 的直接依賴閉包涵蓋 UI01～UI09，九票均完成必要驗
 - 本票不要求正式長研究，未執行完整正式局數；真實系統選檔視窗、不同桌面 DPI 與輸入法亦未由本次自動驗收覆蓋。人工重現步驟僅供操作參考。
 
 - 獨立審查指出需由 UI 實際選擇跨來源候選並執行整組比較，已補測並複審；滾輪、模態與群組啟動狀態亦經複審。
+
+- 整合分支再以專案虛擬環境執行 `tests.ui.test_learning_close tests.ui.test_learning_integration tests.ui.test_saved_selection.SavedTeacherSelectionTest.test_long_named_dataset_list_can_reach_last_page`，21 項通過；獨立複審未確認其他阻擋。
