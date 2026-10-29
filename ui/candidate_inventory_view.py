@@ -30,7 +30,7 @@ class InventoryView:
                 if not path.is_dir(): continue
                 try:
                     result = comparison_report(path)
-                    if any(row['wins'] + row['draws'] + row['losses'] for baseline in result['baselines'].values() for row in baseline['candidates']):
+                    if any(row['role'] == 'learned' and row['wins'] + row['draws'] + row['losses'] for baseline in result['baselines'].values() for row in baseline['candidates']):
                         compared.add(digest(result['plan']['source']))
                 except (OSError, ValueError, KeyError, TypeError, IndexError): uncertain = True
         for item in self.report['candidates']:

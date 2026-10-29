@@ -131,8 +131,15 @@ class LearnedComparisonView:
         if not self.source: return
         from engine.learning.group_training import GROUPS
         app.text(f'來源 {self.source["experiment_id"][:16]} · '+','.join(GROUPS.get(g,g) for g in self.source['groups'])+' · '+{'single':'單群組','direct':'直接組合','joint':'聯合訓練'}.get(self.source['kind'],self.source['kind']),50,165,width=790)
-        app.text('Alpha-Beta 3／q4 · 同時4局 · 每局1 worker · TT 4096',50,194,width=790)
-        app.text('32條共同線 × 換色2局／候選／基準 · 不申請和棋 · 無手數上限',50,223,width=790)
+        if self.path:
+            definition = self.report['plan']['definitions'][self.baseline]
+            search = definition['search']
+            app.text(f'Alpha-Beta {search["depth_plies"]}／q{search["quiescence_depth"]} · 同時{definition["workers"]}局 · 每局{search["search_workers"]} worker · TT {search["transposition_capacity"]}',50,194,width=790)
+            limit = f'{definition["max_plies"]}半手上限' if definition['max_plies'] is not None else '無手數上限'
+            app.text(f'{len(definition["opening_lines"])}條共同線 × 換色2局／候選／基準 · '+('申請和棋' if definition['claim_draw'] else '不申請和棋')+' · '+limit,50,223,width=790)
+        else:
+            app.text('Alpha-Beta 3／q4 · 同時4局 · 每局1 worker · TT 4096',50,194,width=790)
+            app.text('32條共同線 × 換色2局／候選／基準 · 不申請和棋 · 無手數上限',50,223,width=790)
         app.button('learning_compare_config','返回開局／結果' if self.config else '完整設定',(620,260,220,32))
         if not self.path:
             for index,role in enumerate(('original','learned')):

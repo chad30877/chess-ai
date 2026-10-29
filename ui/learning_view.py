@@ -736,7 +736,7 @@ class LearningView:
         if self.page == 'inventory':
             if action == 'learning_inventory_back': self.page = self.inventory_return
             elif action == 'learning_inventory_history':
-                self._open_page('history', 'comparison_history', ComparisonHistoryView, self.teacher.project_root, 'inventory', app.read_executor)
+                self._open_page('history', 'comparison_history', ComparisonHistoryView, (self.teacher.project_root, self.saved_state.get('selected', {}).get('comparison_history')), 'inventory', app.read_executor)
             elif action == 'learning_inventory_setup' and self.inventory.report.get('all_sources'):
                 rows = [self.inventory.report['candidates'][i] for i in sorted(self.inventory.selected_indices)]
                 if not rows: return

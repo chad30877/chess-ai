@@ -23,15 +23,16 @@ class ComparisonHistoryView:
         self.entries = []
         self.page = 0
 
-    def open(self, root):
+    def open(self, root, selected=None):
         root = Path(root)
         final_paths = set()
-        for file in (root / 'data/learning-final').glob('*/snapshot.json'):
-            try:
-                final_paths.update(Path(entry['path']) for entry in load_final_comparison(file.parent)['candidates'])
-            except (OSError, ValueError, KeyError, TypeError):
-                pass
         self.entries = []
+        for path in (root / 'data/learning-final').glob('*'):
+            if not path.is_dir(): continue
+            try:
+                final_paths.update(Path(entry['path']) for entry in load_final_comparison(path)['candidates'])
+            except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+                self.entries.append(dict(path=path, purpose='final', source=None, status='invalid', error=str(exc)))
         for folder, purpose in [('learning-screening', 'screening'), ('learning-comparisons', 'comparison')]:
             for path in (root / 'data' / folder).glob('*'):
                 if not path.is_dir(): continue
@@ -54,6 +55,9 @@ class ComparisonHistoryView:
                 self.entries.append(dict(path=path, purpose=bundle['purpose'], source=bundle['sources'][0], status=status, error='', bundle=True))
             except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
                 self.entries.append(dict(path=path, purpose='comparison', source=None, status='invalid', error=str(exc), bundle=True))
+        if selected and not any(str(row['path']) == selected for row in self.entries):
+            path = Path(selected)
+            self.entries.append(dict(path=path, purpose='comparison', source=None, status='invalid', error='上次選擇的紀錄已不存在', bundle=path.parent.name == 'learning-setup'))
         def modified(row):
             try: return row['path'].stat().st_mtime
             except OSError: return 0
