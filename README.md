@@ -98,6 +98,7 @@ for %F in (a.tsv b.tsv c.tsv d.tsv e.tsv COPYING.txt) do curl.exe -fL "https://r
 | [搜尋與評分](docs/搜尋與評分.md) | 選步策略、評分項與效能量測 |
 | [開發計畫](docs/開發計畫.md) | 目前交付、後續研究與限制 |
 | [測試說明](tests/TESTING.md) | 各測試保護的行為及執行方式 |
+| [專案搬移](docs/專案搬移.md) | 搬移既有研究資料、重建環境與驗證 |
 
 評分設定檔在 `configs/evaluation/`；學習實驗在 `data/learning/`，批次在 `data/batches/`，單盤回放在 `data/replays/`。批次的 `games.csv` 是摘要，`positions.csv`／JSONL 才是逐手局面。軟體驗收與短流程證據不等於完整研究或棋力提升；開發歷史以 Git 為準。
 
