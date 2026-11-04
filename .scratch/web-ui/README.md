@@ -1,6 +1,6 @@
 # 網頁介面
 
-狀態：W01 已完成；W02 程式實作完成，待使用者驗收；其餘待實作。不發布 GitHub Issues。
+狀態：W01、W02 已完成；W03 實作中。不發布 GitHub Issues。
 
 - [設計規格](spec.md)
 - [訪談紀錄](../../docs/design/web-ui.md)
@@ -14,7 +14,7 @@
 | 代號 | 工作票 | 狀態 | 直接阻擋 | 實作 |
 | --- | --- | --- | --- | --- |
 | W01 | [伺服器骨架、啟動入口與側欄外殼](issues/01-server-shell.md) | 已完成 | 無 | Claude |
-| W02 | [設計規範與 Material 主題](issues/02-design-system.md) | 待使用者驗收 | W01 | Claude、使用者 |
+| W02 | [設計規範與 Material 主題](issues/02-design-system.md) | 已完成 | W01 | Claude、使用者 |
 | W03 | [伺服器工作服務、全機工作鎖、工作列與首頁](issues/03-job-service.md) | 待實作 | W01 | Claude |
 | W04 | [網頁選檔對話框](issues/04-file-dialog.md) | 待實作 | W01 | Claude |
 | W05 | [對局紀錄清單與設定檢視](issues/05-records.md) | 待實作 | W02、W03 | Codex |
