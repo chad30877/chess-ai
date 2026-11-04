@@ -14,10 +14,29 @@ cd /d "%USERPROFILE%\Projects"
 git clone https://github.com/chad30877/chess-ai.git
 cd chess-ai
 py -3.12 -m venv .venv
-.venv\Scripts\python.exe -m pip install chess pygame zstandard numpy scipy
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-後續指令都從專案根目錄執行，直接指定虛擬環境的 Python，無須先啟用環境。依賴版本目前未鎖定；既有學習實驗會保存並核對數值套件版本。
+後續指令都從專案根目錄執行，直接指定虛擬環境的 Python，無須先啟用環境。`requirements.txt` 只列最低版本；既有學習實驗會保存並核對數值套件版本。
+
+## 網頁介面
+
+網頁介面正在取代 pygame 介面，搬移期間兩者並存。另需安裝 [Node.js](https://nodejs.org/) 22 以上，第一次使用或更新前端後建置一次：
+
+```cmd
+cd web
+npm install
+npm run build
+cd ..
+```
+
+啟動後會自動開啟瀏覽器，伺服器只接受本機連線；加 `--no-browser` 可不開啟、`--port` 可改埠號（預設 8765）：
+
+```cmd
+.venv\Scripts\python.exe -m apps.web
+```
+
+前端開發方式見 [web/README.md](web/README.md)。
 
 ## 快速開始
 

@@ -6,8 +6,11 @@
 & ./.venv/Scripts/python.exe -m unittest discover -s tests -t .
 ```
 
+網頁前端單元測試在 `web/` 執行 `npx ng test --watch=false`。
+
 | 檔案 | 測試內容 |
 | --- | --- |
+| `api/test_server.py` | 網頁伺服器只接受本機連線、提供前端建置產物與 Angular 路由、建置缺失提示及不洩漏建置目錄外檔案 |
 | `test_project_relocation.py` | 跨目錄身分引用、字典路徑索引、損壞拒絕、重複規劃、舊位置無法存取時讀取成果及續跑部分完成比較 |
 | `ui/test_learning_close.py` | 工作關閉確認、保存等待、未完成工作、手動恢復及子程序清理 |
 | `ui/test_saved_selection.py` | 學習資料與成果清單、改名、同名身分、失效恢復、跨來源與任務脈絡 |
