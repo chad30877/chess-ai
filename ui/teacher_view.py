@@ -144,7 +144,7 @@ class TeacherView:
             elif action == 'learning_engine_pick':
                 self.pick_engine()
             elif action == 'learning_pilot_start':
-                self.run = PilotRun(self.dataset, self.command, app.executor, workers=self.workers)
+                self.run = PilotRun(self.dataset, self.command, app.heavy_executor, workers=self.workers)
                 self.index = 0
                 self.message = ''
             elif action.startswith('learning_budget:'):

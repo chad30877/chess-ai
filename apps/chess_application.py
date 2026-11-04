@@ -21,6 +21,7 @@ from engine.evaluation.evaluator import HandcraftedEvaluator, MaterialEvaluator
 from engine.storage.data_ids import TAIPEI, allocate_id, date_key, now_iso
 from engine.sessions.batch_run import BatchSettings
 from engine.sessions.batch_execution import start_batch
+from engine.sessions.heavy_job import HeavyJobBusy, HeavyJobExecutor
 from ui.batch_setup import EvaluationFields
 from ui.evaluation_profiles import profile_name, profile_summary, config_summary
 from ui.profile_selector import ProfileSelector, rating_search
@@ -152,6 +153,13 @@ class ChessApplication:
                   round(width * self.scale) if width else None)
 
     @property
+    def heavy_executor(self):
+        """重度工作取得全機鎖，與網頁介面互相避讓；測試注入的執行器不取鎖。"""
+        if not self._owns_executor:
+            return self.executor
+        return HeavyJobExecutor(self.executor, program='pygame 介面')
+
+    @property
     def read_executor(self):
         return self._read_executor if self._read_executor is not None else self.executor
 
@@ -223,7 +231,7 @@ class ChessApplication:
                                                       for side in ("white", "black")}))
                     if self.batch_mode == "evaluation":
                         settings["workers"] = self.batch_workers
-                    self.batch = start_batch(self.batch_mode, settings, PROJECT_ROOT / "data/batches", self.executor)
+                    self.batch = start_batch(self.batch_mode, settings, PROJECT_ROOT / "data/batches", self.heavy_executor)
                     self.message = ""
                 except (OSError, ValueError, TypeError, KeyError) as exc:
                     self.message = f"無法開始批次：{exc}"
@@ -781,6 +789,13 @@ class ChessApplication:
         self.mode = "records"
 
     def handle_event(self, event):
+        try:
+            self._handle_event(event)
+        except HeavyJobBusy as exc:
+            self.message = str(exc)
+            pygame.display.set_caption(f"Chess AI：{exc}")
+
+    def _handle_event(self, event):
         if event.type == pygame.QUIT:
             if self.profile_selector is not None:
                 self.profile_selector.close(self)

@@ -59,7 +59,7 @@ class ScreeningView:
             elif action == 'learning_screening_start':
                 if app.batch and not app.batch.future.done():
                     raise ValueError('請先停止目前批次')
-                app.batch = ComparisonRun(comparison_options(self.path, 'stable'), app.executor)
+                app.batch = ComparisonRun(comparison_options(self.path, 'stable'), app.heavy_executor)
                 app.learning_batch = app.batch; app.batch_mode = 'evaluation'; app.mode = 'auto'; app.batch_games_page = 0
                 app.learning.batch_return_page = 'screening'
             elif action == 'learning_screening_select':

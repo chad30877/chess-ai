@@ -28,9 +28,9 @@ class TrainingView:
             if action=='learning_training_new':
                 self.path=self.labels/'training'/uuid4().hex
                 self.index=0; self.saved=None; self.state={}
-                self.run=TrainingRun(self.path,app.executor,label_path=self.labels)
+                self.run=TrainingRun(self.path,app.heavy_executor,label_path=self.labels)
             elif action=='learning_training_resume' and self.path and not self.load_error and not self.state.get('report'):
-                self.run=TrainingRun(self.path,app.executor)
+                self.run=TrainingRun(self.path,app.heavy_executor)
             elif action=='learning_training_advanced': self.advanced=not self.advanced
             elif action=='learning_training_stage': self.stage=(self.stage+1)%4
             elif action in ('learning_training_prev','learning_training_next'):

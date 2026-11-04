@@ -103,10 +103,10 @@ class LabelView:
                 self.path = create_labeling(self.dataset, self.pilot, reuse=action == 'learning_labels_new')
                 self.load(self.path)
                 existing = app.learning.running_labels(self.path) if hasattr(app, 'learning') else None
-                self.run = existing or (None if self.state.get('ready') else LabelRun(self.path, app.executor))
+                self.run = existing or (None if self.state.get('ready') else LabelRun(self.path, app.heavy_executor))
                 self.index, self.message = 0, ''
             elif action == 'learning_labels_resume' and self.path and not self.state.get('ready'):
-                self.run = LabelRun(self.path, app.executor)
+                self.run = LabelRun(self.path, app.heavy_executor)
                 self.message = ''
             elif action == 'learning_labels_advanced': self.advanced = not self.advanced
             elif action in ('learning_labels_prev', 'learning_labels_next'):

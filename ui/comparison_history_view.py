@@ -4,18 +4,14 @@ from datetime import datetime
 import json
 from engine.learning.teacher import digest
 from engine.learning.comparison import comparison_report
+from engine.learning.unfinished import bundle_status
 
 
 from engine.learning.comparison_setup import load_saved_setup as load_bundle
 
 from engine.learning.final_comparison import load_final_comparison
 
-def _status(statuses):
-    if all(value == 'completed' for value in statuses): return 'completed'
-    if any(value == 'failed' for value in statuses): return 'failed'
-    if any(value in ('generating', 'running') for value in statuses): return 'running'
-    if all(value == 'not-started' for value in statuses): return 'not-started'
-    return 'stopped'
+_status = bundle_status
 
 
 class ComparisonHistoryView:

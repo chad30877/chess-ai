@@ -33,7 +33,8 @@ def main(argv=None):
     if not args.no_browser:
         threading.Thread(target=_open_browser_when_ready, args=(url,), daemon=True).start()
     print(f'網頁介面：{url}')
-    uvicorn.run(create_app(), host=HOST, port=args.port, workers=1, reload=False)
+    # SSE 連線不會自行結束，關閉時最多等 3 秒再強制中斷，之後才停止工作並保存。
+    uvicorn.run(create_app(), host=HOST, port=args.port, workers=1, reload=False, timeout_graceful_shutdown=3)
 
 
 if __name__ == '__main__':

@@ -74,10 +74,10 @@ class GroupTrainingView:
                 if not groups: raise ValueError('請至少選擇一組')
                 self.path = self.labels/'group-training'/uuid4().hex
                 self.state = {}; self.saved = None; self.message = ''; self.index = 0
-                self.run = GroupTrainingRun(self.path,app.executor,label_path=self.labels,groups=groups)
+                self.run = GroupTrainingRun(self.path,app.heavy_executor,label_path=self.labels,groups=groups)
                 self.draft = False
             elif action == 'learning_groups_resume' and self.path and not self.load_error:
-                self.run = GroupTrainingRun(self.path,app.executor); self.message = ''
+                self.run = GroupTrainingRun(self.path,app.heavy_executor); self.message = ''
             elif action in ('learning_groups_prev','learning_groups_next'):
                 self.index = (self.index+(1 if action.endswith('next') else -1))%len(self.entries)
                 self.run = self._loaded_run = None; self.load(self.entries[self.index].parent)

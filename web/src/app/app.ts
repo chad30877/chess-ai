@@ -1,13 +1,15 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
+import { JobBar } from './jobs/job-bar';
+import { JobsStore } from './jobs/jobs';
 import { NAV_ITEMS } from './shell/nav-items';
 import { ProductMark } from './ui/product-mark';
 
 /** 框架紙面：側欄在淡色框架上，工作內容在內縮的白色紙面上。 */
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ProductMark],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ProductMark, JobBar],
   template: `
     <nav class="sidebar" aria-label="主要區域">
       <a class="brand" routerLink="/">
@@ -25,6 +27,7 @@ import { ProductMark } from './ui/product-mark';
         }
       </ul>
     </nav>
+    <app-job-bar class="topbar" />
     <main class="sheet">
       <router-outlet />
     </main>
@@ -32,13 +35,16 @@ import { ProductMark } from './ui/product-mark';
   styles: `
     :host {
       display: grid;
-      grid-template-columns: var(--sidebar-width) 1fr;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      grid-template-rows: 48px minmax(0, 1fr);
+      grid-template-areas: 'side top' 'side sheet';
       height: 100vh;
       background: var(--ground);
     }
 
     .sidebar {
-      padding: 12px 8px;
+      grid-area: side;
+      padding: 6px 8px;
       overflow-y: auto;
     }
 
@@ -85,8 +91,13 @@ import { ProductMark } from './ui/product-mark';
       font-size: 18px;
     }
 
+    .topbar {
+      grid-area: top;
+    }
+
     .sheet {
-      margin: var(--sheet-inset) var(--sheet-inset) var(--sheet-inset) 0;
+      grid-area: sheet;
+      margin: 0 var(--sheet-inset) var(--sheet-inset) 0;
       padding: var(--pad);
       overflow: auto;
       background: var(--surface);
@@ -96,8 +107,13 @@ import { ProductMark } from './ui/product-mark';
 
     @media (max-width: 720px) {
       :host {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 48px minmax(0, 1fr);
+        grid-template-areas: 'side' 'top' 'sheet';
+      }
+
+      .topbar {
+        padding: 0 16px;
       }
 
       .sidebar {
@@ -133,4 +149,8 @@ import { ProductMark } from './ui/product-mark';
 })
 export class App {
   protected readonly navItems = NAV_ITEMS;
+
+  constructor() {
+    inject(JobsStore).connect();
+  }
 }

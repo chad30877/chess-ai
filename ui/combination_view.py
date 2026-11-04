@@ -80,20 +80,20 @@ class CombinationView:
                 if self.preview and self.selection_changed(): self.message = '選組已變更；預覽新組合，按新建套用'
             elif action == 'learning_combination_batch_resume' and self.batch_path and self.batch_state.get('status') != 'completed':
                 self.batch_active = True; self.message = ''
-                self.run = CombinationBatchRun(self.batch_path, app.executor)
+                self.run = CombinationBatchRun(self.batch_path, app.heavy_executor)
             elif action == 'learning_combination_batch' and len(self.selected) >= 2 and self.preview:
                 selected = [g for g in GROUPS if g in self.selected]
                 selections = [list(c) for n in range(2, len(selected)+1) for c in combinations(selected,n)]
                 if not self.batch_path or self.batch_state.get('snapshot', {}).get('selections') != selections:
                     self.batch_path = create_combination_batch(self.source_path, selections)
                 self.batch_active = True; self.message = ''
-                self.run = CombinationBatchRun(self.batch_path, app.executor)
+                self.run = CombinationBatchRun(self.batch_path, app.heavy_executor)
             elif action == 'learning_combination_new' and self.preview:
                 self.path = self.source_path.parents[1]/'combinations'/uuid4().hex
                 self.state = {}; self.saved = None; self.message = ''
-                self.batch_active = False; self.run = CombinationRun(self.path,app.executor,source_path=self.source_path,groups=self.preview['groups'])
+                self.batch_active = False; self.run = CombinationRun(self.path,app.heavy_executor,source_path=self.source_path,groups=self.preview['groups'])
             elif action == 'learning_combination_resume' and self.path and not self.load_error:
-                self.batch_active = False; self.run = CombinationRun(self.path,app.executor)
+                self.batch_active = False; self.run = CombinationRun(self.path,app.heavy_executor)
             elif action in ('learning_combination_prev','learning_combination_next'):
                 self.index = (self.index+(1 if action.endswith('next') else -1))%len(self.entries)
                 self.run = self._loaded_run = None; self.load(self.entries[self.index].parent)

@@ -151,7 +151,7 @@ class RecordsView:
                 from engine.sessions.experiment_resume import resume_options
                 from engine.sessions.comparison_run import ComparisonRun
                 options = resume_options(self.catalog.root / "batches" / self.summary.batch_id)
-                app.batch = ComparisonRun(options, app.executor)
+                app.batch = ComparisonRun(options, app.heavy_executor)
                 app.batch_mode = "evaluation"
                 app.mode = "auto"
             except (OSError, ValueError, KeyError, TypeError) as exc:

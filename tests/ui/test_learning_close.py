@@ -555,7 +555,7 @@ class UnfinishedWorkTest(unittest.TestCase):
             def read(path):
                 if Path(path) == broken: raise IndexError('缺少資料')
                 return comparison_report(path)
-            with patch('ui.unfinished_tasks.comparison_report', side_effect=read):
+            with patch('engine.learning.unfinished.comparison_report', side_effect=read):
                 app.new_setup('learning'); app.learning.recovery_future.result(timeout=30); app.render()
             found = {item['path']: item['status'] for item in app.learning.recovery_entries}
             self.assertEqual(found[broken], 'unavailable')

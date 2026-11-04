@@ -330,7 +330,7 @@ class LearningView:
         try:
             setup = pending.future.result()
             from engine.learning.comparison_setup import ComparisonBundleRun
-            app.batch = ComparisonBundleRun(setup['work'], setup['planned_games'], app.executor,
+            app.batch = ComparisonBundleRun(setup['work'], setup['planned_games'], app.heavy_executor,
                                             data_root=pending.data_root, rows=pending.rows,
                                             project_root=pending.root, purpose=pending.purpose)
             app.learning_batch = app.batch; app.batch_mode = 'evaluation'; app.batch_games_page = 0
@@ -892,7 +892,7 @@ class LearningView:
             elif action == 'learning_bundle_resume':
                 from engine.learning.comparison_setup import ComparisonBundleRun
                 data = self.history_bundle.data
-                app.batch = ComparisonBundleRun(data['work'], data['planned_games'], app.executor, bundle_path=self.history_bundle.path)
+                app.batch = ComparisonBundleRun(data['work'], data['planned_games'], app.heavy_executor, bundle_path=self.history_bundle.path)
                 app.learning_batch = app.batch; app.batch_mode = 'evaluation'; app.mode = 'auto'; app.batch_games_page = 0
                 self.batch_return_page = 'history_bundle'
                 self.batch_history_bundle = self.history_bundle
@@ -979,7 +979,7 @@ class LearningView:
                 source = SOURCE_URL if self.source == 'lichess' else self.local_path
                 if not source:
                     raise ValueError('請輸入本機 PGN 路徑')
-                self.run = DatasetRun(self.root, source, int(self.seed), app.executor)
+                self.run = DatasetRun(self.root, source, int(self.seed), app.heavy_executor)
                 self._remember_new('data', self.run.path)
                 self.data = None
                 self.message = ''

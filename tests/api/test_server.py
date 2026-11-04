@@ -19,7 +19,7 @@ class ServerTest(unittest.TestCase):
         self.temp.cleanup()
 
     def client(self, address=LOCAL):
-        return TestClient(create_app(self.static), client=address)
+        return TestClient(create_app(self.static, lock_path=self.static / '.lock', scan_on_start=False), client=address)
 
     def build_frontend(self):
         (self.static / 'index.html').write_text('<app-root></app-root>', encoding='utf-8')

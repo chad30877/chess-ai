@@ -47,6 +47,7 @@ data/learning-ui.json
 data/learning-comparisons/
 data/learning-screening/
 data/.sequences.sqlite3*
+data/.heavy-job.*
 data/replays/[0-9]*.json
 
 # Generated replay exports
