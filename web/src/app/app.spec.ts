@@ -17,9 +17,9 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const links = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('mat-nav-list a'),
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('.sidebar li a'),
     );
-    expect(links.map((link) => link.querySelector('[matListItemTitle]')?.textContent?.trim())).toEqual(
+    expect(links.map((link) => link.textContent?.replace(/^\s*\S+\s+/, '').trim())).toEqual(
       NAV_ITEMS.map((item) => item.label),
     );
     expect(links.map((link) => new URL(link.href).pathname)).toEqual(

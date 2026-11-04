@@ -61,3 +61,6 @@ data/replays/game_*.json
 
 # 專案內套件快取（uv、npm）
 /.cache/
+
+# design-taste-frontend 工作檔
+/.taste-skill/

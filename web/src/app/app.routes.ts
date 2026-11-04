@@ -11,5 +11,10 @@ export const routes: Routes = [
     data: { title: item.label },
     title: `${item.label} · Chess AI`,
   })),
+  {
+    path: 'design',
+    loadComponent: () => import('./pages/design-page').then((m) => m.DesignPage),
+    title: '元件示範 · Chess AI',
+  },
   { path: '**', redirectTo: '' },
 ];

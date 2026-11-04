@@ -1,39 +1,118 @@
-// Include theming for Angular Material with `mat.theme()`.
-// This Sass mixin will define CSS variables that are used for styling Angular Material
-// components according to the Material 3 design spec.
-// Learn more about theming and how to use it for your application's
-// custom components at https://material.angular.dev/guide/theming
+// 設計規範見 docs/設計系統.md；畫面只使用這裡的 token。
 @use '@angular/material' as mat;
+
+:root {
+  color-scheme: light dark;
+
+  // 框架取棋盤深格的低彩度綠灰，紙面維持白色。
+  --ground: light-dark(#f5f7f3, #111311);
+  --surface: light-dark(#ffffff, #191c19);
+  --raised: light-dark(#f2f4f0, #202420);
+  --active: light-dark(#e8ebe5, #2a2f2a);
+  --border: light-dark(#e6e9e3, #2c312c);
+  --rule: light-dark(#eff1ec, #232723);
+  --control: light-dark(#cbcfc8, #474d47);
+  --text: light-dark(#131513, #e6e9e4);
+  --muted: light-dark(#5b605a, #9da39c);
+  --accent: light-dark(#3f6b2c, #8fbf6f);
+  --on-accent: light-dark(#ffffff, #0e1a08);
+  --positive: light-dark(#1e7b4f, #5cc18c);
+  --negative: light-dark(#c4242a, #f0787b);
+  --warning: light-dark(#92400e, #e3a35c);
+  --pill-positive-bg: light-dark(#dcfae5, #12301f);
+  --pill-positive-ink: light-dark(#04250e, #b6f0cb);
+  --pill-negative-bg: light-dark(#ffedea, #3a1517);
+  --pill-negative-ink: light-dark(#831c1e, #ffc9c6);
+  --pill-warning-bg: light-dark(#fffbeb, #33240f);
+  --pill-warning-ink: light-dark(#92400e, #f6d19b);
+  --pill-neutral-bg: light-dark(#ebedee, #2a2f2a);
+  --pill-neutral-ink: light-dark(#353736, #c9cec8);
+  --board-light: light-dark(#e9edd8, #b9c3a2);
+  --board-dark: light-dark(#7d9a5e, #5d7845);
+
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --radius-sheet: 16px;
+  --sheet-inset: 8px;
+  --row-height: 48px;
+  --sidebar-width: 228px;
+  --gap: 24px;
+  --pad: 24px;
+  --control-height: 32px;
+
+  --font-sans: 'IBM Plex Sans', 'Microsoft JhengHei UI', 'Microsoft JhengHei', 'Noto Sans TC', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', Consolas, monospace;
+  --fs-title: 22px;
+  --fs-section: 16px;
+  --fs-kpi: 28px;
+  --fs-body: 14px;
+  --fs-small: 12px;
+}
 
 html {
   height: 100%;
   @include mat.theme(
     (
       color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$blue-palette,
+        primary: mat.$green-palette,
+        theme-type: color-scheme,
       ),
-      typography: Roboto,
-      density: 0,
+      typography: (
+        plain-family: var(--font-sans),
+        brand-family: var(--font-sans),
+      ),
+      density: -2,
+    )
+  );
+
+  // Material 元件改讀本專案 token，避免預設的色調表面與陰影。
+  @include mat.theme-overrides(
+    (
+      primary: var(--accent),
+      on-primary: var(--on-accent),
+      surface: var(--surface),
+      on-surface: var(--text),
+      on-surface-variant: var(--muted),
+      outline: var(--control),
+      outline-variant: var(--border),
+      surface-container-lowest: var(--surface),
+      surface-container-low: var(--surface),
+      surface-container: var(--surface),
+      surface-container-high: var(--raised),
+      surface-container-highest: var(--active),
+      error: var(--negative),
+      corner-small: var(--radius-control),
+      corner-medium: var(--radius-card),
+      corner-full: var(--radius-control),
+    )
+  );
+  @include mat.button-toggle-overrides(
+    (
+      shape: var(--radius-control),
     )
   );
 }
 
 body {
-  // Default the application to a light color theme. This can be changed to
-  // `dark` to enable the dark color theme, or to `light dark` to defer to the
-  // user's system settings.
-  color-scheme: light dark;
-
-  // Set a default background, font and text colors for the application using
-  // Angular Material's system-level CSS variables. Learn more about these
-  // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
-  font: var(--mat-sys-body-medium);
-
-  // Reset the user agent margin.
   margin: 0;
   height: 100%;
+  background: var(--ground);
+  color: var(--text);
+  font: 400 var(--fs-body) / 1.5 var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
-/* You can add global styles to this file, and also import other style files */
+
+h1 {
+  margin: 0;
+  font: 600 var(--fs-title) / 1.3 var(--font-sans);
+}
+
+h2 {
+  margin: 0;
+  font: 600 var(--fs-section) / 1.4 var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
