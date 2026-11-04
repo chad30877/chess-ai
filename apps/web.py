@@ -10,7 +10,7 @@ import uvicorn
 from api.app import create_app
 
 HOST = '127.0.0.1'
-DEFAULT_PORT = 8765
+DEFAULT_PORT = 8642
 
 
 def _open_browser_when_ready(url):

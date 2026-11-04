@@ -10,7 +10,7 @@ Angular 22 與 Angular Material。啟動與建置步驟見[專案總覽](../READ
 npm start
 ```
 
-開啟 `http://localhost:4200/`；`/api` 請求經 `proxy.conf.json` 轉到 `127.0.0.1:8765`。
+開啟 `http://localhost:4200/`；`/api` 請求經 `proxy.conf.json` 轉到 `127.0.0.1:8642`。
 
 ## 測試
 

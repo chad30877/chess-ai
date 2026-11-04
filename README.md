@@ -30,7 +30,7 @@ npm run build
 cd ..
 ```
 
-啟動後會自動開啟瀏覽器，伺服器只接受本機連線；加 `--no-browser` 可不開啟、`--port` 可改埠號（預設 8765）：
+啟動後會自動開啟瀏覽器，伺服器只接受本機連線；加 `--no-browser` 可不開啟、`--port` 可改埠號（預設 8642）：
 
 ```cmd
 .venv\Scripts\python.exe -m apps.web
