@@ -45,6 +45,7 @@ data/batches/
 data/learning/
 data/learning-ui.json
 data/learning-comparisons/
+data/learning-screening/
 data/.sequences.sqlite3*
 data/replays/[0-9]*.json
 
