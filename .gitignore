@@ -58,3 +58,6 @@ data/replays/game_*.json
 
 # 個人產生的評分設定
 /configs/evaluation/*.json
+
+# 歸檔工作資料僅保留於本機
+/.scratch/archive/
