@@ -65,3 +65,5 @@ data/replays/game_*.json
 
 # design-taste-frontend 工作檔
 /.taste-skill/
+# 歸檔工作資料僅保留於本機
+/.scratch/archive/
